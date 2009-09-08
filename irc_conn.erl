@@ -10,23 +10,23 @@
 				channels :: [list()],
 				sock     :: port(),
 				ping     :: integer()}).
+-record(user, {nick  :: list(),
+			   ident :: list(),
+			   host  :: list()}).
 
 %% public interface
 -export([start_link/5]).
--export([chanmsg/3, privmsg/3, join/2, pong/2, part/2, quit/2, action/2, 
+-export([chanmsg/3, privmsg/3, join/2, pong/2, part/2, quit/2, me/2, 
 		 mode/4, mode/3, user/3, nick/2, oper/3, kick/4, topic/3]).
 
 -include("irc_conn.hrl").
 
 %% public interface
 
+start_link(undef, Host, Port, EventMgr, Options) ->
+	gen_server:start_link(?MODULE, {Host, Port, Options, EventMgr}, [{timeout, infinite}]);
 start_link(ServerName, Host, Port, EventMgr, Options) ->
-	case ServerName of
-		undef ->
-			gen_server:start_link(?MODULE, {Host, Port, Options, EventMgr}, [{timeout, infinite}]);
-		_ ->
-			gen_server:start_link(ServerName, ?MODULE, {Host, Port, Options, EventMgr}, [{timeout, infinite}])
-	end.
+	gen_server:start_link(ServerName, ?MODULE, {Host, Port, Options, EventMgr}, [{timeout, infinite}]).
 
 chanmsg(Conn, Channel, Msg) ->
 	call(Conn, {chanmsg, Channel, Msg}).
@@ -46,8 +46,8 @@ part(Conn, Channel) ->
 quit(Conn, QuitMsg) ->
 	call(Conn, {quit, QuitMsg}).
 
-action(Conn, Action) ->
-	call(Conn, {action, Action}).
+me(Conn, Action) ->
+	call(Conn, {me, Action}).
 
 mode(Conn, Channel, User, Mode) ->
 	call(Conn, {mode, Channel, User, Mode}).
@@ -98,9 +98,9 @@ connect(Host, Port, Options) ->
 		{ok, Sock} ->
 			#state{sock = Sock, ping = PingTimeout};
 		{error, timeout} ->
-			timer:sleep(RetryTimeout),
 			connect(Host, Port, Options);
 		{error, _} ->
+			timer:sleep(RetryTimeout),
 			connect(Host, Port, Options)
 	end.
 
@@ -117,9 +117,14 @@ handle_info({tcp_closed, Sock}, State) when Sock == State#state.sock ->
 handle_info({tcp_error, Sock, Reason}, State) when Sock == State#state.sock ->
 	{stop, {tcp_error, Reason}, State};
 handle_info({tcp, Sock, Data}, State) when Sock == State#state.sock ->
-	{Event, NewState} = parse_data(Data, State),
-	gen_event:notify(NewState#state.eventmgr, Event),
+	{Event, NewState} = parse_line(Data, State),
+	notify(NewState, Event),
 	{noreply, NewState, NewState#state.ping}.
+
+notify(_State, noevent) ->
+	noevent;
+notify(State, Event) ->
+	gen_event:notify(State#state.eventmgr, Event).
 
 terminate(_Reason, State) ->
 	gen_tcp:close(State#state.sock).
@@ -141,7 +146,7 @@ do_command({part, State, Channel}) ->
 	send(State, "PART " ++ Channel);
 do_command({quit, State, QuitMsg}) ->
 	send(State, "QUIT " ++ QuitMsg);
-do_command({action, State, Action}) ->
+do_command({me, State, Action}) ->
 	do_command({chanmsg, State, [1] ++ "ACTION " ++ Action ++ [1]});
 do_command({mode, State, Channel, User, Mode}) ->
 	send(State, "MODE " ++ Channel ++ " " ++ Mode ++ " " ++ User);
@@ -176,5 +181,66 @@ send(State, Data) ->
 
 %% IRC protocol parser
 
-parse_data(_Data, State) ->
-	State.
+parse_line(Line, State) ->
+	case regexp:first_match(Line, "^\s*:?[^:]+:") of
+		%% TODO: part (:Spender_CGB!~spender_c@81.200.112.130 PART &pron)
+		%% TODO: \s* is allowed but than `:' won't be stripped
+		nomatch ->
+			Header = string:strip(Line, both, $:), 
+			Headers = string:tokens(Header, " "),
+			parse_user(State, Headers);			
+		{match, From, Len} ->
+			Header = string:strip(string:substr(Line, From, Len), both, $:), 
+			Headers = string:tokens(Header, " "),
+			Text = string:substr(Line, From + Len, string:len(Line) - Len - 2),
+			parse_user(State, Headers ++ [Text])
+	end.
+
+parse_user([MaybeLogin | Rest], State) ->
+	case gregexp:groups(MaybeLogin, "\\(.*\\)!\\(.*\\)@\\(.*\\)") of
+		{match, [Nick, Ident, Host]} ->
+			User = #user{nick = Nick, ident = Ident, host = Host},
+			parse_tokens([User | Rest], State);
+		nomatch ->
+			parse_tokens([MaybeLogin | Rest], State)
+	end.	
+
+parse_tokens([User, "PRIVMSG", Nick, Msg], State) when Nick == State#state.nick ->
+	event({privmsg, User, Msg}, State);
+parse_tokens([User, "PRIVMSG", Channel, Msg], State) ->
+	parse_chanmsg(Channel, User, Msg, State);
+parse_tokens([User, "TOPIC", Channel, Topic], State) ->
+	event({topic, Channel, User, Topic}, State);
+parse_tokens([User, "NICK", NewNick], State) ->
+	event({nick, User, NewNick}, State);
+parse_tokens([User, "JOIN", Channel], State) ->
+	event({join, User, Channel}, State);
+parse_tokens([User, "PART", Channel, Reason], State) ->
+	event({part, User, Channel, Reason}, State);
+parse_tokens([User, "QUIT", Reason], State) ->
+	event({quit, User, Reason}, State);
+parse_tokens([User, "KICK", Channel, Nick, Reason], State) when Nick == State#state.nick ->
+	event({kicked, User, Channel, Reason}, State);
+parse_tokens([User, "KICK", Channel, Nick, Reason], State) ->
+	event({kick, User, Channel, Nick, Reason}, State);
+parse_tokens([_Server, "376" | _], State) ->
+	event({end_of_motd}, State);
+parse_tokens([_Server, "332", _, Channel, Topic], State) ->
+	event({chantopic, Channel, Topic}, State);
+parse_tokens([_Server, "366", _, Channel, _], State) ->
+	event({end_of_names, Channel}, State);
+parse_tokens(["PING" | Server], State) ->
+	pong(Server, State);
+parse_tokens(Tokens, State) ->
+	event({unknown, Tokens}, State).
+
+parse_chanmsg(Channel, User, [1, $A, $C, $T, $I, $O, $N, $\ | Action], State) ->
+	event({me, Channel, User, string:strip(Action, right, 1)}, State);
+parse_chanmsg(Channel, User, Msg, State) ->
+	event({chanmsg, Channel, User, Msg}, State).
+
+ping(Server, State) ->
+	{noevent, send("PONG " ++ Server ++ "\r\n", State)}.
+
+event(Event, State) ->
+	{{irc_event, Event}, State}.
