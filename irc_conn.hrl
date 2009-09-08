@@ -1,0 +1,4 @@
+-define(PING_TIMEOUT, 60000).
+-define(SOCK_TIMEOUT, 30000).
+-define(RETRY_TIMEOUT, 30000).
+-define(CRLF, "\r\n").
