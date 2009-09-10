@@ -5,18 +5,16 @@
 -behaviour(gen_server).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
--record(state, {eventmgr :: pid() | atom() | {atom(),atom()},
-				nick     :: list(),
-				channels :: [list()],
-				sock     :: port(),
-				ping     :: integer()}).
--record(user, {nick  :: list(),
-			   ident :: list(),
-			   host  :: list()}).
+-record(state, {eventmgr  :: pid() | atom() | {atom(),atom()},
+				nick      :: list(),
+				channels  :: [list()],
+				sock      :: port(),
+				ping      :: integer(),
+			   	data = [] :: [tuple()]}).
 
 %% public interface
 -export([start_link/5]).
--export([chanmsg/3, privmsg/3, join/2, pong/2, part/2, quit/2, me/2, 
+-export([chanmsg/3, privmsg/3, join/2, part/2, quit/2, me/2, 
 		 mode/4, mode/3, user/3, nick/2, oper/3, kick/4, topic/3]).
 
 -include("irc_conn.hrl").
@@ -36,9 +34,6 @@ privmsg(Conn, To, Msg) ->
 
 join(Conn, Channel) ->
 	call(Conn, {join, Channel}).
-
-pong(Conn, Server) ->
-	call(Conn, {pong, Server}).
 
 part(Conn, Channel) ->
 	call(Conn, {part, Channel}).
@@ -78,14 +73,6 @@ call(Conn, Req) ->
 init({Host, Port, Options, EventMgr}) ->
 	State = connect(Host, Port, Options),
 	{ok, State#state{eventmgr = EventMgr}, State#state.ping}.
-
-keyfind(Key, List, Default) ->
-	case lists:keyfind(Key, List) of
-		false ->
-			Default;
-		Any ->
-			Any
-	end.
 
 connect(Host, Port, Options) ->
 	SockTimeout = keyfind(sock_timeout, Options, ?SOCK_TIMEOUT),
@@ -140,8 +127,6 @@ do_command({privmsg, State, To, Msg}) ->
 	send(State, "PRIVMSG " ++ To ++ " :" ++ Msg);
 do_command({join, State, Channel}) ->
 	send(State, "JOIN :" ++ Channel);
-do_command({pong, State, Server}) ->
-	send(State, "PONG " ++ Server);
 do_command({part, State, Channel}) ->
 	send(State, "PART " ++ Channel);
 do_command({quit, State, QuitMsg}) ->
@@ -199,7 +184,7 @@ parse_line(Line, State) ->
 parse_user([MaybeLogin | Rest], State) ->
 	case gregexp:groups(MaybeLogin, "\\(.*\\)!\\(.*\\)@\\(.*\\)") of
 		{match, [Nick, Ident, Host]} ->
-			User = #user{nick = Nick, ident = Ident, host = Host},
+			User = {Nick, Ident, Host},
 			parse_tokens([User | Rest], State);
 		nomatch ->
 			parse_tokens([MaybeLogin | Rest], State)
@@ -239,8 +224,24 @@ parse_chanmsg(Channel, User, [1, $A, $C, $T, $I, $O, $N, $\ | Action], State) ->
 parse_chanmsg(Channel, User, Msg, State) ->
 	event({chanmsg, Channel, User, Msg}, State).
 
-ping(Server, State) ->
+pong(Server, State) ->
 	{noevent, send("PONG " ++ Server ++ "\r\n", State)}.
 
 event(Event, State) ->
 	{{irc_event, Event}, State}.
+
+%% utility
+
+keyfind(Key, List, Default) ->
+	case lists:keyfind(Key, 1, List) of
+		false ->
+			Default;
+		{Key, Value} ->
+			Value
+	end.
+
+set_data(Key, Data, State) ->
+	State#state{data = lists:keystore(Key, 1, State#state.data, {Key, Data})}.
+
+get_data(Key, State, Default) ->
+	keyfind(Key, State#state.data, Default).
