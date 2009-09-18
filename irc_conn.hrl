@@ -1,4 +1,6 @@
 -define(PING_TIMEOUT, 60000).
 -define(SOCK_TIMEOUT, 30000).
 -define(RETRY_TIMEOUT, 30000).
+-define(IRC_PORT, 6667).
 -define(CRLF, "\r\n").
+-define(MAXSEND, 400).  %% maximum text length to send
