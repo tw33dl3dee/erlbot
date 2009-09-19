@@ -1,2 +1,3 @@
 *.beam
 ./testbot.pl
+temp.erl

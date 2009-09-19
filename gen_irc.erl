@@ -1,4 +1,4 @@
--module(irc_conn).
+-module(gen_irc).
 -author("Ivan Korotkov <twee@tweedle-dee.org>").
 
 %% gen_server
@@ -8,132 +8,136 @@
 -export([behaviour_info/1]).
 
 %% public interface
--export([start_link/4, start/4]).
--export([chanmsg/3, privmsg/3, join/2, part/2, quit/2, me/2, 
+-export([start_link/5, start/5]).
+-export([chanmsg/3, privmsg/3, join/2, part/2, quit/2, action/2, 
 		 mode/4, mode/3, user/3, nick/2, oper/3, kick/4, topic/3]).
 
--include("irc_conn.hrl").
+-record(state, {mod        :: atom(),
+				mod_state  :: term(),
+				nick        :: list(),
+				sock          :: port(),
+				ping          :: integer(),
+			   	data = []     :: [tuple()]}).      %% misc data for further extensions
 
--record(state, {module    :: atom(),
-				module_state,
-				nick      :: list(),
-				channels  :: [list()],
-				sock      :: port(),
-				ping      :: integer(),
-			   	data = [] :: [tuple()]}).
+-record(conf, {ping_timeout  = 60000,
+			   sock_timeout  = 30000,
+			   retry_timeout = 30000,
+			   port          = 6667,
+			   maxsend       = 400}).
+
+-define(?CRLF).
 
 %% public interface
 
-%%%% Testing 
--export([test/0, handle_irc/1]).
-
-test() ->
-	irc_conn:start({local, irc}, ?MODULE, "192.168.1.1", []),
-	irc_conn:nick(irc, "test"),
-	irc_conn:user(irc, "test", "test"),
-	irc_conn:join(irc, "#pron"),
-	irc_conn:chanmsg(irc, "#pron", "hi all").
-
-handle_irc(Event) ->
-	io:format("Event: ~p~n", [Event]).
-
-%%%%
-
 behaviour_info(callbacks) ->
-    [{init,1},{handle_irc,1},
-     {terminate,2},{code_change,3}];
+    [{init,1}, {handle_irc_event,2},
+     {terminate,2}, {code_change,3}];
 behaviour_info(_) ->
     undefined.
 
-start_link(undef, Module, Host, Options) ->
-	gen_server:start_link(?MODULE, {Module, Host, Options}, []);
-start_link(ServerName, Module, Host, Options) ->
-	gen_server:start_link(ServerName, ?MODULE, {Module, Host, Options}, []).
+start_link(undef, Module, ModArgs, Host, Options) ->
+	gen_server:start_link(?MODULE, {Module, ModArgs, Host, Options}, []);
+start_link(ServerName, Module, ModArgs, Host, Options) ->
+	gen_server:start_link(ServerName, ?MODULE, {Module, ModArgs, Host, Options}, []).
 
-start(undef, Module, Host, Options) ->
-	gen_server:start(?MODULE, {Module, Host, Options}, []);
-start(ServerName, Module, Host, Options) ->
-	gen_server:start(ServerName, ?MODULE, {Module, Host, Options}, []).
+start(undef, Module, ModArgs, Host, Options) ->
+	gen_server:start(?MODULE, {Module, ModArgs, Host, Options}, []);
+start(ServerName, Module, ModArgs, Host, Options) ->
+	gen_server:start(ServerName, ?MODULE, {Module, ModArgs, Host, Options}, []).
 
 chanmsg(Conn, Channel, Msg) ->
-	call(Conn, {chanmsg, Channel, Msg}).
+	cast(Conn, {chanmsg, Channel, Msg}).
 
 privmsg(Conn, To, Msg) ->
-	call(Conn, {privmsg, To, Msg}).
+	cast(Conn, {privmsg, To, Msg}).
 
 join(Conn, Channel) ->
-	call(Conn, {join, Channel}).
+	cast(Conn, {join, Channel}).
 
 part(Conn, Channel) ->
-	call(Conn, {part, Channel}).
+	cast(Conn, {part, Channel}).
 
 quit(Conn, QuitMsg) ->
-	call(Conn, {quit, QuitMsg}).
+	cast(Conn, {quit, QuitMsg}).
 
-me(Conn, Action) ->
-	call(Conn, {me, Action}).
+action(Conn, Action) ->
+	cast(Conn, {action, Action}).
 
 mode(Conn, Channel, User, Mode) ->
-	call(Conn, {mode, Channel, User, Mode}).
+	cast(Conn, {mode, Channel, User, Mode}).
 
 mode(Conn, User, Mode) ->
-	call(Conn, {mode, User, Mode}).
+	cast(Conn, {mode, User, Mode}).
 
 user(Conn, Login, LongName) ->
-	call(Conn, {user, Login, LongName}).
+	cast(Conn, {user, Login, LongName}).
 
 nick(Conn, Nick) ->
-	call(Conn, {nick, Nick}).
+	cast(Conn, {nick, Nick}).
 
 oper(Conn, Login, Passwd) ->
-	call(Conn, {oper, Login, Passwd}).
+	cast(Conn, {oper, Login, Passwd}).
 
 kick(Conn, Channel, Nick, Reason) ->
-	call(Conn, {kick, Channel, Nick, Reason}).
+	cast(Conn, {kick, Channel, Nick, Reason}).
 
 topic(Conn, Channel, Topic) ->
-	call(Conn, {topic, Channel, Topic}).
+	cast(Conn, {topic, Channel, Topic}).
 
-call(Conn, Req) ->
-	gen_server:call(Conn, Req, infinity).
+channels(Conn) ->
+	cast(Conn, channels).
+
+cast(Conn, Req) ->
+	gen_server:cast(Conn, Req).
 
 %% gen_server callbacks
 
-init({Module, Host, Options}) ->
-	State = connect(Host, Options),
-	{ok, State#state{module = Module}, State#state.ping}.
+init({Module, ModArgs, Host, Options}) ->
+	State = connect(Host, conf(Options)),
+	{ok, State#state{mod = Module, mod_state = Module:init(ModArgs)}, State#state.ping}.
 
-connect(Host, Options) ->
-	SockTimeout = keyfind(sock_timeout, Options, ?SOCK_TIMEOUT),
-	RetryTimeout = keyfind(retry_timeout, Options, ?RETRY_TIMEOUT),
-	PingTimeout = keyfind(ping_timeout, Options, ?PING_TIMEOUT),
-	Port = keyfind(port, Options, ?IRC_PORT),
-	io:format("Connecting ~p:~p ~p ~p ~p~n", [Host, Port, SockTimeout, RetryTimeout, PingTimeout]),
-	case gen_tcp:connect(Host, Port, [binary,
-									  {packet, line},
-									  {send_timeout, SockTimeout}
-									  {send_timeout_close, true}
-									 ], 
-						 SockTimeout) of
+conf(Conf, [Option | Options]) ->
+	NewConf = case Option of
+		{ping_timeout, PingTimeout} ->
+			Conf#conf{ping_timeout = PingTimeout};
+		{sock_timeout, SockTimeout} ->
+			Conf#conf{sock_timeout = SockTImeout};
+		{retry_timeout, RetryTimeout} ->
+			Conf#conf{retry_timeout = RetryTimeout};
+		{port, Port} ->
+			Conf#conf{port = Port};
+		{maxsend, MaxSend} ->
+			Conf#conf{maxsend = MaxSend}
+	end,
+	conf(NewConf, Options);
+conf(Conf, []) ->
+	Conf.
+
+connect(Host, Conf) ->
+	case gen_tcp:connect(Host, Conf#conf.port, 
+						 [binary,
+						  {packet, line},
+						  {send_timeout, Conf#conf.sock_timeout},
+						  {send_timeout_close, true}], Conf#conf.sock_timeout) of
 		{ok, Sock} ->
 			io:format("ok~n", []),
-			#state{sock = Sock, ping = PingTimeout};
+			#state{sock = Sock, ping = Conf#conf.ping_timeout};
 		{error, timeout} ->
 			io:format("timeout~n", []),
-			connect(Host, Options);
+			connect(Host, Conf);
 		{error, _} ->
 			io:format("err~n", []),
-			timer:sleep(RetryTimeout),
-			connect(Host, Options);
+			timer:sleep(Conf#conf.retry_timeout),
+			connect(Host, Conf);
 		Any ->
 			io:format(":~p~n", [Any])
 	end.
 
-handle_call(Req, _From, State) ->
-	{reply, ok, do_command(Req, State), State#state.ping}.
+handle_call(_Req, _From, State) ->
+	{reply, nosuchcall, State, State#state.ping}.
 
-handle_cast(_Req, State) ->
-	{noreply, State, State#state.ping}.
+handle_cast(Req, State) ->
+	{noreply, do_command(Req, State), State#state.ping}.
 
 handle_info(timeout, State) ->
 	{stop, timeout, State};
@@ -143,20 +147,22 @@ handle_info({tcp_error, Sock, Reason}, State) when Sock == State#state.sock ->
 	{stop, {tcp_error, Reason}, State};
 handle_info({tcp, Sock, Data}, State) when Sock == State#state.sock ->
 	{Event, NewState} = parse_line(utf8:decode(Data), State),
-	notify(NewState, Event),
-	{noreply, NewState, NewState#state.ping}.
+	{noreply, notify(Event, NewState), NewState#state.ping}.
 
-notify(_State, noevent) ->
-	noevent;
-notify(#state{module = M}, Event) ->
-	M:handle_irc(Event).
-	%%gen_event:notify(State#state.eventmgr, Event).
+notify(noevent, State) ->
+	State;
+notify(Event, State) ->
+	#state{mod = M, mod_state = S} = State,
+	State#state{mod_state = M:handle_irc_event(Event, S)}.
 
-terminate(_Reason, State) ->
+terminate(Reason, State) ->
+	#state{modu = M, mod_state = S} = State,
+	M:terminate(Reason, S),
 	gen_tcp:close(State#state.sock).
 
-code_change(_Vsn, State, _Extra) ->
-	{ok, State}.
+code_change(Vsn, State, Extra) ->
+	#state{mod = M, mod_state = S} = State,
+	{ok, State#state{mod_state = M:code_change(Vsn, S, Extra)}}.
 
 %% IRC protocol commands
 
@@ -170,7 +176,7 @@ do_command({part, Channel}, State) ->
 	send(State, "PART " ++ Channel);
 do_command({quit, QuitMsg}, State) ->
 	send(State, "QUIT :" ++ QuitMsg);
-do_command({me, Channel, Action}, State) ->
+do_command({action, Channel, Action}, State) ->
 	send(State, "PRIVMSG " ++ Channel ++ " :" ++ [1] ++ "ACTION ", Action, [1]);
 do_command({mode, Channel, User, Mode}, State) ->
 	send(State, "MODE " ++ Channel ++ " " ++ Mode ++ " " ++ User);
@@ -182,18 +188,6 @@ do_command({nick, Nick}, State) ->
 	send(State, "NICK " ++ Nick);
 do_command({oper, Login, Passwd}, State) ->
 	send(State, "OPER " ++ Login ++ " " ++ Passwd);
-%% do_command({login, Nick, Login, LongName}, State) ->
-%% 	try_nick(State, Nick),
-%% 	user(State, Login, LongName);
-%% do_command({login, Nick, Login, Passwd, LongName}, State) ->
-%% 	try_nicn(State, Nick),
-%% 	user(State, Login, LongName),
-%% 	oper(State, Login, Passwd);
-%% do_command({login, Nick, Login, Passwd, LongName}, State) ->
-%% 	try_nick, Nick),
-%% 	user(State, Login, LongName),
-%% 	oper(State, Login, Passwd),
-%% 	nick(State, Nick);
 do_command({kick, Channel, Nick, Reason}, State) ->
 	send(State, "KICK " ++ Channel ++ " " ++ Nick ++ " :" ++ Reason);
 do_command({topic, Channel, Topic}, State) ->
@@ -236,10 +230,17 @@ parse_user([MaybeLogin | Rest], State) ->
 	case gregexp:groups(MaybeLogin, "\\(.*\\)!\\(.*\\)@\\(.*\\)") of
 		{match, [Nick, Ident, Host]} ->
 			User = {Nick, Ident, Host},
-			parse_tokens([User | Rest], State);
+			parse_code([User | Rest], State);
 		nomatch ->
-			parse_tokens([MaybeLogin | Rest], State)
-	end.	
+			parse_code([MaybeLogin | Rest], State)
+	end.
+
+-define(IS_DIGIT(Var), $0 =< Var, Var =< $9).
+
+parse_code([Target, [D1, D2, D3] | Rest], State) when ?IS_DIGIT(D1), ?IS_DIGIT(D2), ?IS_DIGIT(D3) ->
+	parse_tokens([Target, irc_codes:code_to_atom([D1, D2, D3]) | Rest]);
+parse_code(Tokens, State) ->
+	parse_tokens(Tokens).
 
 parse_tokens([User, "PRIVMSG", Nick, Msg], State) when Nick == State#state.nick ->
 	event({privmsg, User, Msg}, State);
@@ -261,15 +262,15 @@ parse_tokens([User, "KICK", Channel, Nick, Reason], State) when Nick == State#st
 	event({kicked, User, Channel, Reason}, State);
 parse_tokens([User, "KICK", Channel, Nick, Reason], State) ->
 	event({kick, User, Channel, Nick, Reason}, State);
-parse_tokens([_Server, "376" | _], State) ->
+parse_tokens([_Server, endofmotd | _], State) ->
 	event({end_of_motd}, State);
-parse_tokens([_Server, "332", _, Channel, Topic], State) ->
+parse_tokens([_Server, topic, _, Channel, Topic], State) ->
 	event({chantopic, Channel, Topic}, State);
-parse_tokens([_Server, "333", _, Channel, TopicAuthor, TopicTime], State) ->
-	event({chantopic, Channel, TopicAuthor, list_to_integer(TopicTime)}, State);
-parse_tokens([_Server, "353", _, _, Channel, Users], State) ->
+parse_tokens([_Server, topicinfo, _, Channel, TopicAuthor, TopicTime], State) ->
+	event({chantopic_info, Channel, TopicAuthor, list_to_integer(TopicTime)}, State);
+parse_tokens([_Server, namreply, _, _, Channel, Users], State) ->
 	event({names, Channel, parse_names(Users)}, State);
-parse_tokens([_Server, "366", _, Channel, _], State) ->
+parse_tokens([_Server, endofnames, _, Channel, _], State) ->
 	event({joined, Channel}, State);
 parse_tokens(["PING" | Server], State) ->
 	pong(Server, State);
@@ -277,7 +278,7 @@ parse_tokens(Tokens, State) ->
 	event({unknown, Tokens}, State).
 
 parse_chanmsg(Channel, User, [1, $A, $C, $T, $I, $O, $N, $\ | Action], State) ->
-	event({me, Channel, User, string:strip(Action, right, 1)}, State);
+	event({action, Channel, User, string:strip(Action, right, 1)}, State);
 parse_chanmsg(Channel, User, Msg, State) ->
 	event({chanmsg, Channel, User, Msg}, State).
 
@@ -297,20 +298,4 @@ pong(Server, State) ->
 	{noevent, send(State, "PONG " ++ Server ++ "\r\n")}.
 
 event(Event, State) ->
-	{{irc_event, Event}, State}.
-
-%% utility
-
-keyfind(Key, List, Default) ->
-	case lists:keysearch(Key, 1, List) of
-		false ->
-			Default;
-		{value, {Key, Value}} ->
-			Value
-	end.
-
-set_data(Key, Data, State) ->
-	State#state{data = lists:keystore(Key, 1, State#state.data, {Key, Data})}.
-
-get_data(Key, State, Default) ->
-	keyfind(Key, State#state.data, Default).
+	{Event, State}.
