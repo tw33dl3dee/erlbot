@@ -1,0 +1,82 @@
+--- gen_irc.erl	2009-09-20 20:09:23.529887555 +0400
++++ gen_irc.erl.j	2009-09-20 20:08:43.652887611 +0400
+@@ -5,8 +5,10 @@
+ -behaviour(gen_server).
+ -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
+ 
++-export([behaviour_info/1]).
++
+ %% public interface
+--export([start_link/4, start/4, irc_command/2]).
++-export([start_link/5, start/5, irc_command/2]).
+ 
+ -record(conf, {ping_timeout  = 60000,
+ 			   sock_timeout  = 30000,
+@@ -26,24 +28,30 @@
+ 
+ %% public interface
+ 
+-start_link(undef, Handler, Host, Options) ->
+-	gen_server:start_link(?MODULE, {Handler, Host, Options}, []);
+-start_link(ServerName, Handler, Host, Options) ->
+-	gen_server:start_link(ServerName, ?MODULE, {Handler, Host, Options}, []).
+-
+-start(undef, Handler, Host, Options) ->
+-	gen_server:start(?MODULE, {Handler, Host, Options}, []);
+-start(ServerName, Handler, Host, Options) ->
+-	gen_server:start(ServerName, ?MODULE, {Handler, Host, Options}, []).
++behaviour_info(callbacks) ->
++    [{init,1}, {handle_irc_event,2},
++     {terminate,2}, {code_change,3}];
++behaviour_info(_) ->
++    undefined.
++
++start_link(undef, Module, ModArgs, Host, Options) ->
++	gen_server:start_link(?MODULE, {Module, ModArgs, Host, Options}, []);
++start_link(ServerName, Module, ModArgs, Host, Options) ->
++	gen_server:start_link(ServerName, ?MODULE, {Module, ModArgs, Host, Options}, []).
++
++start(undef, Module, ModArgs, Host, Options) ->
++	gen_server:start(?MODULE, {Module, ModArgs, Host, Options}, []);
++start(ServerName, Module, ModArgs, Host, Options) ->
++	gen_server:start(ServerName, ?MODULE, {Module, ModArgs, Host, Options}, []).
+ 
+ irc_command(IrcRef, Cmd) ->
+ 	gen_server:cast(IrcRef, Cmd).
+ 
+ %% gen_server callbacks
+ 
+-init({Handler, Host, Options}) ->
++init({Module, ModArgs, Host, Options}) ->
+ 	State = connect(Host, conf(Options)),
+-	{ok, State#state{handler = Handler}, State#state.ping}.
++	{ok, State#state{mod = Module, mod_state = Module:init(ModArgs)}, State#state.ping}.
+ 
+ conf(Options) ->
+ 	conf(#conf{}, Options).
+@@ -103,15 +111,18 @@
+ 
+ notify(noevent, State) ->
+ 	State;
+-notify(Event, #state{handler = F} = State) ->
+-	F(Event),
+-	State.
+-
+-terminate(_Reason, State) ->
++notify(Event, State) ->
++	#state{mod = M, mod_state = S} = State,
++	State#state{mod_state = M:handle_irc_event(Event, S)}.
++
++terminate(Reason, State) ->
++	#state{mod = M, mod_state = S} = State,
++	M:terminate(Reason, S),
+ 	gen_tcp:close(State#state.sock).
+ 
+-code_change(_Vsn, State, _Extra) ->
+-	{ok, State}.
++code_change(Vsn, State, Extra) ->
++	#state{mod = M, mod_state = S} = State,
++	{ok, State#state{mod_state = M:code_change(Vsn, S, Extra)}}.
+ 
+ %% IRC protocol commands
+ 
