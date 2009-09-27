@@ -10,7 +10,7 @@
 -export([handle_irc_event/2]).
 
 %% public interface
--export([start/4, start_link/4]).
+-export([start/5, start_link/5]).
 -export([test/0, test_op/1]).
 -export([chanmsg/3, privmsg/3, join/2, part/2, quit/2, action/3, mode/4, mode/3, kick/4, topic/3, nick/2]).
 %-export([user/3, oper/3]).
@@ -27,25 +27,29 @@
 				is_oper   = false      :: boolean(),
 				conf                   :: #conf{},
 				irc_ref                :: pid(),
+				handler                :: function(),
 				chan_fsms = dict:new() :: dict()}).  %% channame -> pid()
 
 %% public interface
 
 test() ->
-	{ok, Irc} = start({local, irc}, "192.168.1.1", "test", [{autojoin, ["#t", "#test"]}]).
+	{ok, Irc} = start({local, irc}, "192.168.1.1", "test", fun test_notify/2, [{autojoin, ["#t", "#test"]}]).
 
 test_op(Pass) ->
-	{ok, Irc} = start({local, irc}, "192.168.1.1", "dumbot", [{login, "nya"}, {oper_pass, Pass}, {autojoin, ["#t", "#test"]}]).
+	{ok, Irc} = start({local, irc}, "192.168.1.1", "dumbot", fun test_notify/2, [{login, "nya"}, {oper_pass, Pass}, {autojoin, ["#t", "#test"]}]).
 
-start(undef, Host, Nick, Options) ->
-	gen_fsm:start(?MODULE, {Host, Nick, Options}, []);
-start(FsmName, Host, Nick, Options) ->
-	gen_fsm:start(FsmName, ?MODULE, {Host, Nick, Options}, []).
+test_notify(Type, Event) ->
+	io:format("*** ~p: ~p~n", [Type, Event]).
 
-start_link(undef, Host, Nick, Options) ->
-	gen_fsm:start_link(?MODULE, {Host, Nick, Options}, []);
-start_link(FsmName, Host, Nick, Options) ->
-	gen_fsm:start_link(FsmName, ?MODULE, {Host, Nick, Options}, []).
+start(undef, Host, Nick, Handler, Options) ->
+	gen_fsm:start(?MODULE, {Host, Nick, Handler, Options}, []);
+start(FsmName, Host, Nick, Handler, Options) ->
+	gen_fsm:start(FsmName, ?MODULE, {Host, Nick, Handler, Options}, []).
+
+start_link(undef, Host, Nick, Handler, Options) ->
+	gen_fsm:start_link(?MODULE, {Host, Nick, Handler, Options}, []);
+start_link(FsmName, Host, Nick, Handler, Options) ->
+	gen_fsm:start_link(FsmName, ?MODULE, {Host, Nick, Handler, Options}, []).
 
 %% IRC commands
 
@@ -73,11 +77,11 @@ mode(FsmRef, Channel, User, Mode) ->
 mode(FsmRef, User, Mode) ->
 	send_irc_command(FsmRef, {mode, User, Mode}).
 
-%% user(FsmRef, Login, LongName) ->
-%% 	send_irc_command(FsmRef, {user, Login, LongName}).
-
 nick(FsmRef, Nick) ->
 	send_irc_command(FsmRef, {nick, Nick}).
+
+%% user(FsmRef, Login, LongName) ->
+%% 	send_irc_command(FsmRef, {user, Login, LongName}).
 
 %% oper(FsmRef, Login, Passwd) ->
 %% 	send_irc_command(FsmRef, {oper, Login, Passwd}).
@@ -93,11 +97,11 @@ send_irc_command(FsmRef, Cmd) ->
 
 %% gen_fsm callbacks
 
-init({Host, Nick, Options}) ->
+init({Host, Nick, Handler, Options}) ->
 	FsmPid = self(),
 	Conf = conf({Nick, Options}),
 	{ok, IrcRef} = gen_irc:start_link(undef, fun (Event) -> ?MODULE:handle_irc_event(Event, FsmPid) end, Host, Options),
-	{ok, state_connecting, #state{nick = Nick, login = Conf#conf.login, conf = Conf, irc_ref = IrcRef}}.
+	{ok, state_connecting, #state{nick = Nick, login = Conf#conf.login, conf = Conf, irc_ref = IrcRef, handler = Handler}}.
 
 conf({Nick, Options}) ->
 	%% login and long_name default to nick
@@ -235,8 +239,8 @@ notify_genevent(Event, State) ->
 
 notify(noevent, _, State) ->
 	State;
-notify(Event, Type, State) ->
-	io:format("*** ~p: ~p~n", [Type, Event]),
+notify(Event, Type, #state{handler = H} = State) ->
+	H(Type, Event),
 	State.
 
 irc_command(Cmd, #state{irc_ref = IrcRef}) ->

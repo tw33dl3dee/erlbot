@@ -10,7 +10,7 @@
 
 -record(conf, {ping_timeout  = 60000,
 			   sock_timeout  = 30000,
-			   retry_timeout = 30000,
+			   retry_timeout = 10000,
 			   port          = 6667,
 			   maxsend       = 400}).
 
@@ -18,6 +18,7 @@
 				sock       :: port(),
 				ping       :: integer(),
 				maxsend    :: integer(),
+				conf       :: #conf{},
 			   	data = []  :: [tuple()]}).      %% misc data for further extensions
 
 -define(CRLF, "\r\n").
@@ -75,7 +76,7 @@ connect(Host, Conf) ->
 						  {send_timeout_close, true}], Conf#conf.sock_timeout) of
 		{ok, Sock} ->
 			io:format("ok~n", []),
-			#state{sock = Sock, ping = Conf#conf.ping_timeout, maxsend = Conf#conf.maxsend};
+			#state{sock = Sock, ping = Conf#conf.ping_timeout, maxsend = Conf#conf.maxsend, conf = Conf};
 		{error, timeout} ->
 			io:format("timeout~n", []),
 			connect(Host, Conf);
@@ -109,8 +110,12 @@ notify(Event, #state{handler = F} = State) ->
 	F(Event),
 	State.
 
-terminate(_Reason, State) ->
-	gen_tcp:close(State#state.sock).
+terminate(_Reason, #state{sock = Sock, conf = Conf}) ->
+	gen_tcp:close(Sock),
+	%% This is used to prevent connection throttling if started under supervisor.
+	%% Supervisor timeout must be greater than retry_timeout.
+	io:format("OOPS: ~p (~p) terminating, waiting for ~p msecs~n", [?MODULE, self(), Conf#conf.retry_timeout]),
+	timer:sleep(Conf#conf.retry_timeout).
 
 code_change(_Vsn, State, _Extra) ->
 	{ok, State}.
