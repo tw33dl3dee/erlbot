@@ -8,3 +8,4 @@ proc_app.erl
 proc_super.erl
 proc_tabs.erl
 ./ebin/*
+./Mnesia.*
