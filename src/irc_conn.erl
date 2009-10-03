@@ -6,19 +6,20 @@
 -export([init/1, terminate/3, code_change/4, handle_info/3, handle_event/3, handle_sync_event/4]).
 -export([state_connecting/2, state_auth_nick/2, state_auth_oper/2, state_auth_end/2, state_connected/2]).
 
-%% gen_irc
+%% irc_proto
 -export([handle_irc_event/2]).
 
 %% public interface
 -export([start/5, start_link/5]).
 -export([test/0, test_op/1]).
--export([chanmsg/3, privmsg/3, join/2, part/2, quit/2, action/3, mode/4, mode/3, kick/4, topic/3, nick/2]).
+-export([chanmsg/3, privmsg/3, join/2, part/2, quit/2, action/3, mode/4, mode/3, kick/4, topic/3, nick/2, irc_command/2]).
 %-export([user/3, oper/3]).
 
 -record(conf, {nick      = [] :: list(),      %% initial nick requested
 			   login     = [] :: list(),      %% login field in USER and OPER commands (defaults to nick)
 			   long_name = [] :: list(),      %% long name in USER command (defaults to nick)
 			   oper_pass = [] :: list(),      %% password in OPER command (won't do OPER if not specified)
+			   umode     = [] :: list(),      %% umode spec to request initially (like, "+F")
 			   autojoin  = [] :: [list()]}).  %% channels to join automatically
 
 -record(state, {nick                   :: list(),    %% actual nick (may differ from initially requested one)
@@ -33,10 +34,10 @@
 %% public interface
 
 test() ->
-	{ok, Irc} = start({local, irc}, "192.168.1.1", "test", fun test_notify/2, [{autojoin, ["#t", "#test"]}]).
+	{ok, _Irc} = start({local, irc}, "192.168.1.1", "test", fun test_notify/2, [{autojoin, ["#t", "#test"]}]).
 
 test_op(Pass) ->
-	{ok, Irc} = start({local, irc}, "192.168.1.1", "dumbot", fun test_notify/2, [{login, "nya"}, {oper_pass, Pass}, {autojoin, ["#t", "#test"]}]).
+	{ok, _Irc} = start({local, irc}, "192.168.1.1", "dumbot", fun test_notify/2, [{login, "nya"}, {oper_pass, Pass}, {autojoin, ["#t", "#test"]}]).
 
 test_notify(Type, Event) ->
 	io:format("*** ~p: ~p~n", [Type, Event]).
@@ -54,45 +55,45 @@ start_link(FsmName, Host, Nick, Handler, Options) ->
 %% IRC commands
 
 chanmsg(FsmRef, Channel, Msg) ->
-	send_irc_command(FsmRef, {chanmsg, Channel, Msg}).
+	command(FsmRef, {chanmsg, Channel, Msg}).
 
 privmsg(FsmRef, To, Msg) ->
-	send_irc_command(FsmRef, {privmsg, To, Msg}).
+	command(FsmRef, {privmsg, To, Msg}).
 
 action(FsmRef, Channel, Action) ->
-	send_irc_command(FsmRef, {action, Channel, Action}).
+	command(FsmRef, {action, Channel, Action}).
 
 join(FsmRef, Channel) ->
-	send_irc_command(FsmRef, {join, Channel}).
+	command(FsmRef, {join, Channel}).
 
 part(FsmRef, Channel) ->
-	send_irc_command(FsmRef, {part, Channel}).
+	command(FsmRef, {part, Channel}).
 
 quit(FsmRef, QuitMsg) ->
-	send_irc_command(FsmRef, {quit, QuitMsg}).
+	command(FsmRef, {quit, QuitMsg}).
 
 mode(FsmRef, Channel, User, Mode) ->
-	send_irc_command(FsmRef, {mode, Channel, User, Mode}).
+	command(FsmRef, {mode, Channel, User, Mode}).
 
 mode(FsmRef, User, Mode) ->
-	send_irc_command(FsmRef, {mode, User, Mode}).
+	command(FsmRef, {mode, User, Mode}).
 
 nick(FsmRef, Nick) ->
-	send_irc_command(FsmRef, {nick, Nick}).
+	command(FsmRef, {nick, Nick}).
 
 %% user(FsmRef, Login, LongName) ->
-%% 	send_irc_command(FsmRef, {user, Login, LongName}).
+%% 	command(FsmRef, {user, Login, LongName}).
 
 %% oper(FsmRef, Login, Passwd) ->
-%% 	send_irc_command(FsmRef, {oper, Login, Passwd}).
+%% 	command(FsmRef, {oper, Login, Passwd}).
 
 kick(FsmRef, Channel, Nick, Reason) ->
-	send_irc_command(FsmRef, {kick, Channel, Nick, Reason}).
+	command(FsmRef, {kick, Channel, Nick, Reason}).
 
 topic(FsmRef, Channel, Topic) ->
-	send_irc_command(FsmRef, {topic, Channel, Topic}).
+	command(FsmRef, {topic, Channel, Topic}).
 
-send_irc_command(FsmRef, Cmd) ->
+command(FsmRef, Cmd) ->
 	gen_fsm:send_event(FsmRef, {irc_command, Cmd}).
 
 %% gen_fsm callbacks
@@ -100,7 +101,7 @@ send_irc_command(FsmRef, Cmd) ->
 init({Host, Nick, Handler, Options}) ->
 	FsmPid = self(),
 	Conf = conf({Nick, Options}),
-	{ok, IrcRef} = gen_irc:start_link(undef, fun (Event) -> ?MODULE:handle_irc_event(Event, FsmPid) end, Host, Options),
+	{ok, IrcRef} = irc_proto:start_link(undef, fun (Event) -> ?MODULE:handle_irc_event(Event, FsmPid) end, Host, Options),
 	{ok, state_connecting, #state{nick = Nick, login = Conf#conf.login, conf = Conf, irc_ref = IrcRef, handler = Handler}}.
 
 conf({Nick, Options}) ->
@@ -117,6 +118,8 @@ conf(Conf, [Option | Options]) ->
 			Conf#conf{oper_pass = OperPass};
 		{autojoin, Autojoin} ->
 			Conf#conf{autojoin = Autojoin};
+		{umode, Umode} ->
+			Conf#conf{umode = Umode};
 		_ ->
 			Conf
 	end,
@@ -136,7 +139,7 @@ terminate(_Reason, _StateName, _StateData) ->
 code_change(_Vsn, StateName, StateData, _Extra) ->
 	{ok, StateName, StateData}.
 
-%% gen_irc callbacks
+%% irc_proto callbacks
 
 -define(ALL_STATE_EVENTS, [ping]).
 
@@ -181,7 +184,7 @@ state_auth_oper(Event, State) when element(1, Event) =:= nooperhost;
 								   element(1, Event) =:= passwdmismatch -> 
 	{next_state, state_connected, autojoin(State)};
 state_auth_oper({youreoper, _}, State) ->
-	{next_state, state_connected, autojoin(retry_nick(State#state{is_oper = true}))};
+	{next_state, state_connected, autojoin(retry_nick(set_umode(State#state{is_oper = true})))};
 state_auth_oper(_, State) ->
 	{next_state, state_auth_oper, State}.
 
@@ -197,18 +200,22 @@ state_connected(Event, State) ->
 	{next_state, state_connected, notify_raw_event(Event, State)}.
 
 -define(CHAN_EVENTS, [joining, chantopic, names, endofnames, parted, kicked]).
--define(ME(Nick), {Nick, _, _}).
+-define(USER(Nick), {Nick, _, _}).
 
-myevent({privmsg, Target, User, Msg}, Nick) when Target /= Nick->
+myevent({privmsg, Target, User, Msg}, Nick) when Target /= Nick ->
 	{chanmsg, Target, User, Msg};
-myevent({join, ?ME(Nick), Channel}, Nick) ->
+myevent({privmsg, Nick, User, Msg}, Nick) ->
+	{privmsg, User, Msg};
+myevent({join, ?USER(Nick), Channel}, Nick) ->
 	{joining, Channel};  % joined will be sent by channel FSM after ENDOFNAMES
-myevent({part, ?ME(Nick), Channel, _}, Nick) ->
+myevent({part, ?USER(Nick), Channel, _}, Nick) ->
 	{parted, Channel};
 myevent({kick, User, Channel, Nick, Reason}, Nick) ->
 	{kicked, Channel, User, Reason};
-myevent({nick, ?ME(Nick), NewNick}, Nick) ->
+myevent({nick, ?USER(Nick), NewNick}, Nick) ->
 	{mynick, NewNick};
+myevent({topic, Channel, ?USER(Nick), Topic}, Nick) ->
+	{mytopic, Channel, Topic};
 myevent(Event, _) ->
 	Event.
 
@@ -244,7 +251,7 @@ notify(Event, Type, #state{handler = H} = State) ->
 	State.
 
 irc_command(Cmd, #state{irc_ref = IrcRef}) ->
-	gen_irc:irc_command(IrcRef, Cmd).
+	irc_proto:irc_command(IrcRef, Cmd).
 
 auth_login(#state{nick = Nick, login = Login, conf = Conf} = State) ->
 	irc_command({nick, Nick}, State),
@@ -257,6 +264,14 @@ retry_nick(#state{conf = Conf} = State) ->
 
 auth_oper(State, OperPass) ->
 	irc_command({oper, State#state.login, OperPass}, State),
+	State.
+
+set_umode(#state{is_oper = false} = State) ->
+	State;  % must be oper
+set_umode(#state{conf = #conf{umode = []}} = State) ->
+	State;
+set_umode(#state{conf = Conf} = State) ->
+	irc_command({mode, State#state.nick, Conf#conf.umode}, State),
 	State.
 
 next_nick(#state{conf = Conf, nick_suffix = Suffix} = State) ->
@@ -274,7 +289,3 @@ autojoin(State, []) ->
 pong(Server, State) ->
 	irc_command({pong, Server}, State),
 	State.
-
-%%% Local Variables:
-%%% compile-command: "erlc irc_conn.erl"
-%%% End:

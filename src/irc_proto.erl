@@ -1,4 +1,4 @@
--module(gen_irc).
+-module(irc_proto).
 -author("Ivan Korotkov <twee@tweedle-dee.org>").
 
 %% gen_server
@@ -267,6 +267,16 @@ parse_name(Name) ->
 event(Event, State) ->
 	{Event, State}.
 
-%%% Local Variables:
-%%% compile-command: "erlc gen_irc.erl"
-%%% End:
+%% keyfind(Key, List, Default) ->
+%% 	case lists:keysearch(Key, 1, List) of
+%% 		false ->
+%% 			Default;
+%% 		{value, {Key, Value}} ->
+%% 			Value
+%% 	end.
+
+%% set_data(Key, Data, State) ->
+%% 	State#state{data = lists:keystore(Key, 1, State#state.data, {Key, Data})}.
+
+%% get_data(Key, State, Default) ->
+%% 	keyfind(Key, State#state.data, Default).

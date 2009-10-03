@@ -88,7 +88,3 @@ state_joined(chan_info, _From, Chan) ->
 
 chan_info(#chan{name = Name, topic = Topic, users = Users}) ->
 	{joined, Name, Topic, Users}.
-
-%%% Local Variables:
-%%% compile-command: "erlc irc_chan.erl"
-%%% End:

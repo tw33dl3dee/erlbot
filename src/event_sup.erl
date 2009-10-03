@@ -11,7 +11,7 @@ start_link(EventMgr, Name, Module, Args) ->
     gen_server:start_link(Name, ?MODULE, {EventMgr, Module, Args}, []).
 
 init({EventMgr, Module, Args}) ->
-    ok = gen_event:add_sup_handler(proc:where(EventMgr), Module, Args),
+    ok = gen_event:add_sup_handler(EventMgr, Module, Args),
     {ok, {EventMgr, Module}}.
 
 handle_call(_Req, _From, S) ->
@@ -28,7 +28,3 @@ terminate(_Reason, {_EventMgr, _Module}) ->
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
-
-%%% Local Variables:
-%%% compile-command: "erlc event_sup.erl"
-%%% End:
