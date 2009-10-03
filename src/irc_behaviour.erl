@@ -20,14 +20,15 @@
 %%%-------------------------------------------------------------------
 %%% API
 %%%-------------------------------------------------------------------
-add_behaviour(EvMgr, BhvMod) ->
-	io:format("adding bhv ~p to ~p~n", [BhvMod, EvMgr]),
-	event_sup:start_link(EvMgr, undef, ?MODULE, BhvMod).
 
+%% Special: define behaviour callbacks
 behaviour_info(callbacks) ->
     [{handle_event,3}];
 behaviour_info(_) ->
     undefined.
+
+add_behaviour(EvMgr, BhvMod) ->
+	event_sup:start_link(EvMgr, undef, ?MODULE, BhvMod).
 
 modules(BhvMod) ->
 	[irc_behaviour, event_sup, BhvMod].
@@ -37,7 +38,6 @@ modules(BhvMod) ->
 %%%-------------------------------------------------------------------
 
 init(BhvMod) ->
-	io:format("~p: init~n", [BhvMod]),
 	{ok, #state{mod = BhvMod}}.
 
 handle_info(_Info, State) ->
@@ -47,14 +47,14 @@ handle_call(_Request, State) ->
 	{ok, nosuchcall, State}.
 
 handle_event({Type, Event, ConnRef}, #state{mod = M} = State) ->
-	io:format("forwarding ~p ~p to behaviour ~p~n", [Type, Event, M]),
 	case M:handle_event(Type, Event, ConnRef) of
 		not_handled ->
 			{ok, State};
 		{ok, _} ->
 			{ok, State};
 		{new_event, NewType, NewEvent, _} ->
-			gen_event:notify(self(), {NewType, NewEvent, ConnRef})
+			gen_event:notify(self(), {NewType, NewEvent, ConnRef}),
+			{ok, State}
 	end;
 handle_event(Event, State) ->
 	io:format("unparseable event: ~p~n", [Event]),

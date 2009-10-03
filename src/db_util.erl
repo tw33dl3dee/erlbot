@@ -1,4 +1,4 @@
--module(erlbot_db).
+-module(db_util).
 -author("Ivan Korotkov <twee@tweedle-dee.org>").
 
 %% External interfaces

@@ -7,7 +7,6 @@
 -export([state_joining/2, state_topic/2, state_names/2, state_names/3, state_joined/2, state_joined/3]).
 
 %%% public interface
-
 -export([start/1, start_link/1, chan_event/2, get_chan_info/1]).
 
 -record(chan, {name                 :: list(),

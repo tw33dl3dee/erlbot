@@ -6,7 +6,7 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 %% public interface
--export([start_link/4, start/4, irc_command/2]).
+-export([start_link/4, start/4, start_link/3, start/3, irc_command/2]).
 
 -record(conf, {ping_timeout  = 60000,
 			   sock_timeout  = 30000,
@@ -26,13 +26,13 @@
 
 %% public interface
 
-start_link(undef, Handler, Host, Options) ->
-	gen_server:start_link(?MODULE, {Handler, Host, Options}, []);
+start_link(Handler, Host, Options) ->
+	gen_server:start_link(?MODULE, {Handler, Host, Options}, []).
 start_link(ServerName, Handler, Host, Options) ->
 	gen_server:start_link(ServerName, ?MODULE, {Handler, Host, Options}, []).
 
-start(undef, Handler, Host, Options) ->
-	gen_server:start(?MODULE, {Handler, Host, Options}, []);
+start(Handler, Host, Options) ->
+	gen_server:start(?MODULE, {Handler, Host, Options}, []).
 start(ServerName, Handler, Host, Options) ->
 	gen_server:start(ServerName, ?MODULE, {Handler, Host, Options}, []).
 

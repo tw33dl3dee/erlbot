@@ -4,8 +4,7 @@
 
 -export([handle_event/3]).
 
--define(USER(Nick), {Nick, _, _}).
-
+-include("irc.hrl").
 -include("utf8.hrl").
 
 handle_event(genevent, {chanmsg, Chan, ?USER(Nick), [121,101,115,116,58,32,1093,1091,1081]}, Conn) ->

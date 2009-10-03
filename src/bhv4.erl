@@ -4,11 +4,10 @@
 
 -export([handle_event/3]).
 
--define(USER(Nick), {Nick, _, _}).
-
+-include("irc.hrl").
 -include("utf8.hrl").
 
-handle_event(genevent, {oops, Chan}, Conn) ->
+handle_event(genevent, {ne_to_slovo, Chan}, Conn) ->
 	irc_conn:chanmsg(Conn, Chan, ?U("не то слово")),
 	{ok, undefined};
 handle_event(_, _, _) ->

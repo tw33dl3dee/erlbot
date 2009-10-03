@@ -10,8 +10,7 @@
 -export([handle_irc_event/2]).
 
 %% public interface
--export([start/5, start_link/5]).
--export([test/0, test_op/1]).
+-export([start/3, start_link/3,start/2, start_link/2]).
 -export([chanmsg/3, privmsg/3, join/2, part/2, quit/2, action/3, mode/4, mode/3, kick/4, topic/3, nick/2, irc_command/2]).
 %-export([user/3, oper/3]).
 
@@ -31,25 +30,18 @@
 				handler                :: function(),
 				chan_fsms = dict:new() :: dict()}).  %% channame -> pid()
 
+-include("irc.hrl").
+
 %% public interface
 
-test() ->
-	{ok, _Irc} = start({local, irc}, "192.168.1.1", "test", fun test_notify/2, [{autojoin, ["#t", "#test"]}]).
-
-test_op(Pass) ->
-	{ok, _Irc} = start({local, irc}, "192.168.1.1", "dumbot", fun test_notify/2, [{login, "nya"}, {oper_pass, Pass}, {autojoin, ["#t", "#test"]}]).
-
-test_notify(Type, Event) ->
-	io:format("*** ~p: ~p~n", [Type, Event]).
-
-start(undef, Host, Nick, Handler, Options) ->
-	gen_fsm:start(?MODULE, {Host, Nick, Handler, Options}, []);
-start(FsmName, Host, Nick, Handler, Options) ->
+start(Handler, {Host, Nick, Options}) ->
+	gen_fsm:start(?MODULE, {Host, Nick, Handler, Options}, []).
+start(FsmName, Handler, {Host, Nick, Options}) ->
 	gen_fsm:start(FsmName, ?MODULE, {Host, Nick, Handler, Options}, []).
 
-start_link(undef, Host, Nick, Handler, Options) ->
-	gen_fsm:start_link(?MODULE, {Host, Nick, Handler, Options}, []);
-start_link(FsmName, Host, Nick, Handler, Options) ->
+start_link(Handler, {Host, Nick, Options}) ->
+	gen_fsm:start_link(?MODULE, {Host, Nick, Handler, Options}, []).
+start_link(FsmName, Handler, {Host, Nick, Options}) ->
 	gen_fsm:start_link(FsmName, ?MODULE, {Host, Nick, Handler, Options}, []).
 
 %% IRC commands
@@ -101,7 +93,7 @@ command(FsmRef, Cmd) ->
 init({Host, Nick, Handler, Options}) ->
 	FsmPid = self(),
 	Conf = conf({Nick, Options}),
-	{ok, IrcRef} = irc_proto:start_link(undef, fun (Event) -> ?MODULE:handle_irc_event(Event, FsmPid) end, Host, Options),
+	{ok, IrcRef} = irc_proto:start_link(fun (Event) -> ?MODULE:handle_irc_event(Event, FsmPid) end, Host, Options),
 	{ok, state_connecting, #state{nick = Nick, login = Conf#conf.login, conf = Conf, irc_ref = IrcRef, handler = Handler}}.
 
 conf({Nick, Options}) ->
@@ -141,6 +133,7 @@ code_change(_Vsn, StateName, StateData, _Extra) ->
 
 %% irc_proto callbacks
 
+%% events that are handled via send_all_state_event
 -define(ALL_STATE_EVENTS, [ping]).
 
 handle_irc_event(Event, FsmPid) when is_tuple(Event) ->
@@ -199,8 +192,8 @@ state_connected({irc_command, Cmd}, State) ->
 state_connected(Event, State) ->
 	{next_state, state_connected, notify_raw_event(Event, State)}.
 
+%% events that are propagated to channel FSM
 -define(CHAN_EVENTS, [joining, chantopic, names, endofnames, parted, kicked]).
--define(USER(Nick), {Nick, _, _}).
 
 myevent({privmsg, Target, User, Msg}, Nick) when Target /= Nick ->
 	{chanmsg, Target, User, Msg};

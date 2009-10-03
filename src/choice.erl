@@ -10,7 +10,7 @@
 -behaviour(gen_server).
 
 %% External exports
--export([start_link/0, start/0, make_choice/1]).
+-export([start_link/0, start/0, make/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -24,7 +24,7 @@ start_link() ->
 start() -> 
 	gen_server:start({local, ?MODULE}, choice, [], []).
 
-make_choice(Choices) when is_list(Choices), length(Choices) > 1 ->
+make(Choices) when is_list(Choices), length(Choices) > 1 ->
 	gen_server:call(?MODULE, {choose, Choices}).
 
 %%%-------------------------------------------------------------------

@@ -1,0 +1,2 @@
+-define(USER(Nick), {Nick, _, _}).
+-define(TOPIC(Topic), {Topic, _, _}).
