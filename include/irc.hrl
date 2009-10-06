@@ -1,2 +1,3 @@
 -define(USER(Nick), {Nick, _, _}).
 -define(TOPIC(Topic), {Topic, _, _}).
+-define(IS_CHAN(ChanName), hd(ChanName) =:= $# orelse hd(ChanName) =:= $& orelse hd(ChanName) =:= $+ orelse hd(ChanName) =:= $!).

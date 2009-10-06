@@ -1,0 +1,6 @@
+-*- org -*-
+
+* TODO Distinguish between channel, user and chan+user MODE command/message.
+* DONE Reconnection timeout in case `irc_conn' dies.
+* DONE Add own nick to mymode, mytopic.
+* TODO Close socket immediately on termination, print some error.

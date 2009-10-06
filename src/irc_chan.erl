@@ -13,6 +13,9 @@
 			   topic = {[], [], 0}  :: {list(), list(), integer()},   %% topic, author, ts
 			   users = []           :: [{atom(), list(), list()}]}).  %% type (op/user), nick, flags
 
+-include("irc_chan.hrl").
+-include("irc.hrl").
+
 %%% Public interface
 
 start(Name) ->
@@ -21,18 +24,19 @@ start(Name) ->
 start_link(Name) ->
 	gen_fsm:start_link(?MODULE, Name, []).
 
-chan_event(FsmRef, Event) when element(1, Event) =:= endofnames ->
-	gen_fsm:sync_send_event(FsmRef, Event, infinity);
 chan_event(FsmRef, Event) ->
-	gen_fsm:send_event(FsmRef, Event),
-	event(Event).
+	chan_event(FsmRef, Event, lists:member(element(1, Event), ?SYNC_CHAN_EVENTS)).
 
-event({parted, _} = E) ->
-	E;
-event({kicked, _, _, _} = E) ->
-	E;
-event(_) ->
-	noevent.	
+chan_event(FsmRef, Event, true) ->
+	gen_fsm:sync_send_event(FsmRef, Event, infinity);
+chan_event(FsmRef, Event, false) ->
+	gen_fsm:send_event(FsmRef, Event),
+	async_chan_event(Event, lists:member(element(1, Event), ?HIDDEN_CHAN_EVENTS)).
+
+async_chan_event(_, true) ->
+	noevent;
+async_chan_event(Event, false) ->
+	Event.
 
 get_chan_info(FsmRef) ->
 	gen_fsm:sync_send_event(FsmRef, chan_info, infinity).
@@ -73,17 +77,86 @@ state_names({endofnames, _, _}, Chan) ->
 	{next_state, state_joined, Chan}.
 
 state_names({endofnames, _, _}, _From, Chan) ->
-	{reply, chan_info(Chan), state_joined, Chan}.
+	{reply, chan_info(Chan, as_event), state_joined, Chan}.
 
 state_joined({parted, _}, Chan)  ->
 	{stop, normal, Chan};
 state_joined({kicked, _, _, _}, Chan) ->
 	{stop, normal, Chan};
+state_joined({kick, _, _, Nick, _}, Chan) ->
+	{next_state, state_joined, remove_user(Nick, Chan)};
+state_joined({part, _, ?USER(Nick), _}, Chan) ->
+	{next_state, state_joined, remove_user(Nick, Chan)};
+state_joined({quit, ?USER(Nick), _}, Chan) ->
+	{next_state, state_joined, remove_user(Nick, Chan)};
+state_joined({join, _, ?USER(Nick)}, Chan) ->
+	{next_state, state_joined, add_user(Nick, Chan)};
+state_joined({nick, ?USER(OldNick), NewNick}, Chan) ->
+	{next_state, state_joined, rename_user(OldNick, NewNick, Chan)};
+state_joined({mode, _, _, Mode, Nick}, Chan) ->
+	{next_state, state_joined, change_mode(Nick, Mode, Chan)};
+state_joined({mymode, _, _, Mode, MyNick}, Chan) ->
+	{next_state, state_joined, change_mode(MyNick, Mode, Chan)};
+state_joined({topic, _, ?USER(AuthorNick), Topic}, Chan) ->
+	{next_state, state_joined, change_topic(Topic, AuthorNick, Chan)};
+state_joined({mytopic, _, MyNick, Topic}, Chan) ->
+	{next_state, state_joined, change_topic(Topic, MyNick, Chan)};
 state_joined(_, Chan) ->
 	{next_state, state_joined, Chan}.
 
 state_joined(chan_info, _From, Chan) ->
-	{reply, chan_info(Chan), joined, Chan}.
+	{reply, chan_info(Chan, as_info), state_joined, Chan}.
 
-chan_info(#chan{name = Name, topic = Topic, users = Users}) ->
-	{joined, Name, Topic, Users}.
+chan_info(#chan{name = Name, topic = Topic, users = Users}, as_event) ->
+	{joined, Name, Topic, Users};
+chan_info(#chan{name = Name, topic = Topic, users = Users}, as_info) ->
+	{Name, Topic, Users}.
+
+remove_user(Nick, #chan{users = Users} = Chan) ->
+	Chan#chan{users = lists:keydelete(Nick, 2, Users)}.
+
+add_user(Nick, #chan{users = Users} = Chan) ->
+	Chan#chan{users = [{user, Nick, []} | Users]}.
+
+rename_user(OldNick, NewNick, Chan) ->
+	NewUsers = lists:map(fun ({T, N, F}) when N =:= OldNick -> {T, NewNick, F};
+							 (User)                         -> User end, Chan#chan.users),
+	Chan#chan{users = NewUsers}.
+
+change_mode(Nick, [$- | Mode], Chan) ->
+	remove_mode(Nick, Mode, Chan);
+change_mode(Nick, [$+ | Mode], Chan) ->
+	add_mode(Nick, Mode, Chan);
+change_mode(Nick, Mode, Chan) ->
+	add_mode(Nick, Mode, Chan).
+
+%% Ops get added to tail, users -- to head
+
+add_mode(Nick, [$o | Mode], Chan) ->
+	{value, User, Others} = lists:keytake(Nick, 2, Chan#chan.users),
+	add_mode(Nick, Mode, Chan#chan{users = Others ++ [setelement(1, User, op)]});
+add_mode(Nick, [$v | Mode], Chan) ->
+	NewUsers = lists:map(fun ({T, N, F}) when N =:= Nick -> {T, N, util:set_flag(voice, F)};
+							 (User)                      -> User end, Chan#chan.users),
+	add_mode(Nick, Mode, Chan#chan{users = NewUsers});
+add_mode(Nick, [_ | Mode], Chan) ->
+	add_mode(Nick, Mode, Chan);
+add_mode(_, [], Chan) ->
+	Chan.
+
+remove_mode(Nick, [$o | Mode], Chan) ->
+	{value, User, Others} = lists:keytake(Nick, 2, Chan#chan.users),
+	remove_mode(Nick, Mode, Chan#chan{users = [setelement(1, User, user) | Others]});
+remove_mode(Nick, [$v | Mode], Chan) ->
+	NewUsers = lists:map(fun ({T, N, F}) when N =:= Nick -> {T, N, util:unset_flag(voice, F)};
+							 (User)                -> User end, Chan#chan.users),
+	remove_mode(Nick, Mode, Chan#chan{users = NewUsers});
+remove_mode(Nick, [_ | Mode], Chan) ->
+	remove_mode(Nick, Mode, Chan);
+remove_mode(_, [], Chan) ->
+	Chan.
+
+%% TODO: handle `me' here somehow
+change_topic(Topic, Nick, Chan) ->
+	{M, S, _} = now(),
+	Chan#chan{topic = {Topic, Nick, M*1000000 + S}}.

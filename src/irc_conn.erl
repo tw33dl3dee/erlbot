@@ -4,14 +4,15 @@
 %% gen_fsm
 -behaviour(gen_fsm).
 -export([init/1, terminate/3, code_change/4, handle_info/3, handle_event/3, handle_sync_event/4]).
--export([state_connecting/2, state_auth_nick/2, state_auth_oper/2, state_auth_end/2, state_connected/2]).
+-export([state_connecting/2, state_auth_nick/2, state_auth_oper/2, state_auth_end/2, state_connected/2, state_connected/3]).
 
 %% irc_proto
 -export([handle_irc_event/2]).
 
 %% public interface
 -export([start/3, start_link/3,start/2, start_link/2]).
--export([chanmsg/3, privmsg/3, join/2, part/2, quit/2, action/3, mode/4, mode/3, kick/4, topic/3, nick/2, irc_command/2]).
+-export([chanmsg/3, privmsg/3, join/2, part/2, quit/2, action/3, mode/4, mode/3, kick/4, topic/3, nick/2, command/2]).
+-export([get_channels_info/1, get_channels/1]).
 %-export([user/3, oper/3]).
 
 -record(conf, {nick      = [] :: list(),      %% initial nick requested
@@ -19,18 +20,20 @@
 			   long_name = [] :: list(),      %% long name in USER command (defaults to nick)
 			   oper_pass = [] :: list(),      %% password in OPER command (won't do OPER if not specified)
 			   umode     = [] :: list(),      %% umode spec to request initially (like, "+F")
-			   autojoin  = [] :: [list()]}).  %% channels to join automatically
+			   autojoin  = [] :: [list()],    %% channels to join automatically
+			   retry_timeout = 6000}).        %% timeout between connection retries
 
--record(state, {nick                   :: list(),    %% actual nick (may differ from initially requested one)
-				nick_suffix = 1        :: integer(), %% suffix appended to nick on nick collision
-				login                  :: list(),    %% actual login used
-				is_oper   = false      :: boolean(),
-				conf                   :: #conf{},
-				irc_ref                :: pid(),
-				handler                :: function(),
-				chan_fsms = dict:new() :: dict()}).  %% channame -> pid()
+-record(conn, {nick                   :: list(),    %% actual nick (may differ from initially requested one)
+			   nick_suffix = 1        :: integer(), %% suffix appended to nick on nick collision
+			   login                  :: list(),    %% actual login used
+			   is_oper   = false      :: boolean(),
+			   conf                   :: #conf{},
+			   irc_ref                :: pid(),
+			   handler                :: function(),
+			   chan_fsms = dict:new() :: dict()}).  %% channame -> pid()
 
 -include("irc.hrl").
+-include("irc_chan.hrl").
 
 %% public interface
 
@@ -88,13 +91,20 @@ topic(FsmRef, Channel, Topic) ->
 command(FsmRef, Cmd) ->
 	gen_fsm:send_event(FsmRef, {irc_command, Cmd}).
 
+get_channels(FsmRef) ->
+	gen_fsm:sync_send_event(FsmRef, get_channels, infinity).
+
+get_channels_info(FsmRef) ->
+	gen_fsm:sync_send_event(FsmRef, get_channels_info, infinity).
+
 %% gen_fsm callbacks
 
 init({Host, Nick, Handler, Options}) ->
 	FsmPid = self(),
 	Conf = conf({Nick, Options}),
+	process_flag(trap_exit, true),
 	{ok, IrcRef} = irc_proto:start_link(fun (Event) -> ?MODULE:handle_irc_event(Event, FsmPid) end, Host, Options),
-	{ok, state_connecting, #state{nick = Nick, login = Conf#conf.login, conf = Conf, irc_ref = IrcRef, handler = Handler}}.
+	{ok, state_connecting, #conn{nick = Nick, login = Conf#conf.login, conf = Conf, irc_ref = IrcRef, handler = Handler}}.
 
 conf({Nick, Options}) ->
 	%% login and long_name default to nick
@@ -112,6 +122,8 @@ conf(Conf, [Option | Options]) ->
 			Conf#conf{autojoin = Autojoin};
 		{umode, Umode} ->
 			Conf#conf{umode = Umode};
+		{retry_timeout, RetryTimeout} ->
+			Conf#conf{retry_timeout = RetryTimeout};
 		_ ->
 			Conf
 	end,
@@ -120,13 +132,19 @@ conf(Conf, []) ->
 	Conf.
 
 handle_info({'DOWN', _, process, Pid, _}, StateName, StateData) ->
-	{next_state, StateName, StateData#state{chan_fsms = dict:erase(Pid, StateData#state.chan_fsms)}};
+	Channels = dict:filter(fun (_, V) when V =:= Pid -> false; (_, _) -> true end, StateData#conn.chan_fsms),
+	{next_state, StateName, StateData#conn{chan_fsms = Channels}};
+handle_info({'EXIT', _, Reason}, _StateName, StateData) when Reason =/= normal ->
+	{stop, Reason, StateData};
 handle_info(_Info, StateName, StateData) ->
 	io:format("INFO: ~p~n", [_Info]),
 	{next_state, StateName, StateData}.
 
-terminate(_Reason, _StateName, _StateData) ->
-	ok.
+terminate(Reason, _StateName, #conn{conf = Conf}) ->
+	%% This is used to prevent connection throttling if started under supervisor.
+	%% Supervisor timeout must be greater than retry_timeout.
+	io:format("OOPS: ~p (~p) terminating with reason ~p, waiting for ~p msecs~n", [?MODULE, self(), Reason, Conf#conf.retry_timeout]),
+	timer:sleep(Conf#conf.retry_timeout).
 
 code_change(_Vsn, StateName, StateData, _Extra) ->
 	{ok, StateName, StateData}.
@@ -145,7 +163,7 @@ handle_irc_event(Event, FsmPid, true) ->
 handle_irc_event(Event, FsmPid, false) ->
 	gen_fsm:send_event(FsmPid, Event).
 
-%% States
+%% Conns
 
 handle_event({ping, Server}, StateName, StateData) ->
 	{next_state, StateName, pong(Server, StateData)};
@@ -155,130 +173,137 @@ handle_event(_Event, StateName, StateData) ->
 handle_sync_event(_Event, _From, StateName, StateData) ->
 	{reply, ok, StateName, StateData}.
 
-state_connecting({notice, _}, State) ->
-	{next_state, state_auth_nick, auth_login(State)};
-state_connecting(_, State) ->
-	{next_state, state_connecting, State}.
+state_connecting({notice, _}, Conn) ->
+	{next_state, state_auth_nick, auth_login(Conn)};
+state_connecting(_, Conn) ->
+	{next_state, state_connecting, Conn}.
 
-state_auth_nick(Event, State) when element(1, Event) =:= erroneusnickname;
+state_auth_nick(Event, Conn) when element(1, Event) =:= erroneusnickname;
 								   element(1, Event) =:= nicknameinuse ->
-	{next_state, state_auth_nick, auth_login(next_nick(State))};
-state_auth_nick({myinfo, _, _, _, _}, #state{conf = Conf} = State) ->
+	{next_state, state_auth_nick, auth_login(next_nick(Conn))};
+state_auth_nick({myinfo, _, _, _, _}, #conn{conf = Conf} = Conn) ->
 	case Conf#conf.oper_pass of
 		[] ->
-			{next_state, state_auth_end, State};
+			{next_state, state_auth_end, Conn};
 		OperPass ->
-			{next_state, state_auth_oper, auth_oper(State, OperPass)}
+			{next_state, state_auth_oper, auth_oper(Conn, OperPass)}
 	end;
-state_auth_nick(_, State) ->
-	{next_state, state_auth_nick, State}.
+state_auth_nick(_, Conn) ->
+	{next_state, state_auth_nick, Conn}.
 
-state_auth_oper(Event, State) when element(1, Event) =:= nooperhost;
+state_auth_oper(Event, Conn) when element(1, Event) =:= nooperhost;
 								   element(1, Event) =:= passwdmismatch -> 
-	{next_state, state_connected, autojoin(State)};
-state_auth_oper({youreoper, _}, State) ->
-	{next_state, state_connected, autojoin(retry_nick(set_umode(State#state{is_oper = true})))};
-state_auth_oper(_, State) ->
-	{next_state, state_auth_oper, State}.
+	{next_state, state_connected, autojoin(Conn)};
+state_auth_oper({youreoper, _}, Conn) ->
+	{next_state, state_connected, autojoin(retry_nick(set_umode(Conn#conn{is_oper = true})))};
+state_auth_oper(_, Conn) ->
+	{next_state, state_auth_oper, Conn}.
 
-state_auth_end({endofmotd, _}, State) ->
-	{next_state, state_connected, autojoin(State)};
-state_auth_end(_, State) ->
-	{next_state, state_auth_end, State}.
+state_auth_end({endofmotd, _}, Conn) ->
+	{next_state, state_connected, autojoin(Conn)};
+state_auth_end(_, Conn) ->
+	{next_state, state_auth_end, Conn}.
 
-state_connected({irc_command, Cmd}, State) ->
-	irc_command(Cmd, State),
-	{next_state, state_connected, State};
-state_connected(Event, State) ->
-	{next_state, state_connected, notify_raw_event(Event, State)}.
+state_connected({irc_command, Cmd}, Conn) ->
+	irc_command(Cmd, Conn),
+	{next_state, state_connected, Conn};
+state_connected(Event, Conn) ->
+	{next_state, state_connected, notify_raw_event(Event, Conn)}.
 
-%% events that are propagated to channel FSM
--define(CHAN_EVENTS, [joining, chantopic, names, endofnames, parted, kicked]).
+state_connected(get_channels, _From, Conn) ->
+	{reply, dict:fetch_keys(Conn#conn.chan_fsms), state_connected, Conn};
+state_connected(get_channels_info, _From, Conn) -> 
+	Channels = dict:to_list(Conn#conn.chan_fsms),
+	ChanInfo = lists:map(fun ({Chan, FsmRef}) -> {Chan, irc_chan:get_chan_info(FsmRef)} end, Channels),
+	{reply, ChanInfo, state_connected, Conn}.
 
 myevent({privmsg, Target, User, Msg}, Nick) when Target /= Nick ->
 	{chanmsg, Target, User, Msg};
 myevent({privmsg, Nick, User, Msg}, Nick) ->
 	{privmsg, User, Msg};
-myevent({join, ?USER(Nick), Channel}, Nick) ->
+myevent({join, Channel, ?USER(Nick)}, Nick) ->
 	{joining, Channel};  % joined will be sent by channel FSM after ENDOFNAMES
-myevent({part, ?USER(Nick), Channel, _}, Nick) ->
+myevent({part, Channel, ?USER(Nick), _}, Nick) ->
 	{parted, Channel};
-myevent({kick, User, Channel, Nick, Reason}, Nick) ->
+myevent({kick, Channel, User, Nick, Reason}, Nick) ->
 	{kicked, Channel, User, Reason};
+myevent({mode, Channel, User, Mode, Nick}, Nick) ->
+	{mymode, Channel, User, Mode, Nick};
 myevent({nick, ?USER(Nick), NewNick}, Nick) ->
 	{mynick, NewNick};
 myevent({topic, Channel, ?USER(Nick), Topic}, Nick) ->
-	{mytopic, Channel, Topic};
+	{mytopic, Channel, Nick, Topic};
 myevent(Event, _) ->
 	Event.
 
-notify_raw_event(Event, State) ->
-	notify_event(myevent(Event, State#state.nick), State).
+notify_raw_event(Event, Conn) ->
+	notify_event(myevent(Event, Conn#conn.nick), Conn).
 
-notify_event(Event, State) ->
-	notify_event(Event, lists:member(element(1, Event), ?CHAN_EVENTS), State).
+notify_event(Event, Conn) ->
+	notify_event(Event, lists:member(element(1, Event), ?CHAN_EVENTS), Conn).
 
-notify_event({mynick, Nick}, _, State) ->
-	State#state{nick = Nick};
-notify_event(Event, true, State) ->
-	notify_chanevent(Event, State);
-notify_event(Event, false, State) ->
-	notify_genevent(Event, State).
+%% TODO: handle mymode here?..
+notify_event({mynick, Nick}, _, Conn) ->
+	Conn#conn{nick = Nick};
+notify_event(Event, true, Conn) ->
+	notify_chanevent(Event, Conn);
+notify_event(Event, false, Conn) ->
+	notify_genevent(Event, Conn).
 
-notify_chanevent({joining, Channel}, State) ->
+notify_chanevent({joining, Channel}, Conn) ->
 	{ok, Pid} = irc_chan:start_link(Channel),
 	erlang:monitor(process, Pid),
-	State#state{chan_fsms = dict:store(Channel, Pid, State#state.chan_fsms)};
-notify_chanevent(Event, State) ->
+	Conn#conn{chan_fsms = dict:store(Channel, Pid, Conn#conn.chan_fsms)};
+notify_chanevent(Event, Conn) ->
 	Channel = element(2, Event),
-	Pid = dict:fetch(Channel, State#state.chan_fsms),
-	notify(irc_chan:chan_event(Pid, Event), chanevent, State).
+	Pid = dict:fetch(Channel, Conn#conn.chan_fsms),
+	notify(irc_chan:chan_event(Pid, Event), chanevent, Conn).
 
-notify_genevent(Event, State) ->
-	notify(Event, genevent, State).
+notify_genevent(Event, Conn) ->
+	notify(Event, genevent, Conn).
 
-notify(noevent, _, State) ->
-	State;
-notify(Event, Type, #state{handler = H} = State) ->
+notify(noevent, _, Conn) ->
+	Conn;
+notify(Event, Type, #conn{handler = H} = Conn) ->
 	H(Type, Event),
-	State.
+	Conn.
 
-irc_command(Cmd, #state{irc_ref = IrcRef}) ->
+irc_command(Cmd, #conn{irc_ref = IrcRef}) ->
 	irc_proto:irc_command(IrcRef, Cmd).
 
-auth_login(#state{nick = Nick, login = Login, conf = Conf} = State) ->
-	irc_command({nick, Nick}, State),
-	irc_command({user, Login, Conf#conf.long_name}, State),
-	State.
+auth_login(#conn{nick = Nick, login = Login, conf = Conf} = Conn) ->
+	irc_command({nick, Nick}, Conn),
+	irc_command({user, Login, Conf#conf.long_name}, Conn),
+	Conn.
 
-retry_nick(#state{conf = Conf} = State) ->
-	irc_command({nick, Conf#conf.nick}, State),
-	State.
+retry_nick(#conn{conf = Conf} = Conn) ->
+	irc_command({nick, Conf#conf.nick}, Conn),
+	Conn.
 
-auth_oper(State, OperPass) ->
-	irc_command({oper, State#state.login, OperPass}, State),
-	State.
+auth_oper(Conn, OperPass) ->
+	irc_command({oper, Conn#conn.login, OperPass}, Conn),
+	Conn.
 
-set_umode(#state{is_oper = false} = State) ->
-	State;  % must be oper
-set_umode(#state{conf = #conf{umode = []}} = State) ->
-	State;
-set_umode(#state{conf = Conf} = State) ->
-	irc_command({mode, State#state.nick, Conf#conf.umode}, State),
-	State.
+set_umode(#conn{is_oper = false} = Conn) ->
+	Conn;  % must be oper
+set_umode(#conn{conf = #conf{umode = []}} = Conn) ->
+	Conn;
+set_umode(#conn{conf = Conf} = Conn) ->
+	irc_command({mode, Conn#conn.nick, Conf#conf.umode}, Conn),
+	Conn.
 
-next_nick(#state{conf = Conf, nick_suffix = Suffix} = State) ->
-	State#state{nick = Conf#conf.nick ++ "_" ++ integer_to_list(Suffix), nick_suffix = Suffix + 1}.
+next_nick(#conn{conf = Conf, nick_suffix = Suffix} = Conn) ->
+	Conn#conn{nick = Conf#conf.nick ++ "_" ++ integer_to_list(Suffix), nick_suffix = Suffix + 1}.
 
-autojoin(#state{conf = Conf} = State) ->
-	autojoin(State, Conf#conf.autojoin).
+autojoin(#conn{conf = Conf} = Conn) ->
+	autojoin(Conn, Conf#conf.autojoin).
 
-autojoin(State, [Channel | Rest]) ->
-	irc_command({join, Channel}, State),
-	autojoin(State, Rest);
-autojoin(State, []) ->
-	State.
+autojoin(Conn, [Channel | Rest]) ->
+	irc_command({join, Channel}, Conn),
+	autojoin(Conn, Rest);
+autojoin(Conn, []) ->
+	Conn.
 
-pong(Server, State) ->
-	irc_command({pong, Server}, State),
-	State.
+pong(Server, Conn) ->
+	irc_command({pong, Server}, Conn),
+	Conn.

@@ -10,7 +10,6 @@
 
 -record(conf, {ping_timeout  = 60000,
 			   sock_timeout  = 30000,
-			   retry_timeout = 10000,
 			   port          = 6667,
 			   maxsend       = 400}).
 
@@ -42,7 +41,8 @@ irc_command(IrcRef, Cmd) ->
 %% gen_server callbacks
 
 init({Handler, Host, Options}) ->
-	State = connect(Host, conf(Options)),
+	process_flag(trap_exit, true),
+	{ok, State} = connect(Host, conf(Options)),
 	{ok, State#state{handler = Handler}, State#state.ping}.
 
 conf(Options) ->
@@ -54,8 +54,6 @@ conf(Conf, [Option | Options]) ->
 			Conf#conf{ping_timeout = PingTimeout};
 		{sock_timeout, SockTimeout} ->
 			Conf#conf{sock_timeout = SockTimeout};
-		{retry_timeout, RetryTimeout} ->
-			Conf#conf{retry_timeout = RetryTimeout};
 		{port, Port} ->
 			Conf#conf{port = Port};
 		{maxsend, MaxSend} ->
@@ -68,24 +66,20 @@ conf(Conf, []) ->
 	Conf.
 
 connect(Host, Conf) ->
-	io:format("connect to ~p, conf ~p~n", [Host, Conf]),
+	io:format("Connecting to ~p, conf ~p~n", [Host, Conf]),
 	case gen_tcp:connect(Host, Conf#conf.port, 
 						 [binary,
 						  {packet, line},
 						  {send_timeout, Conf#conf.sock_timeout},
 						  {send_timeout_close, true}], Conf#conf.sock_timeout) of
 		{ok, Sock} ->
-			io:format("ok~n", []),
-			#state{sock = Sock, ping = Conf#conf.ping_timeout, maxsend = Conf#conf.maxsend, conf = Conf};
+			{ok, #state{sock = Sock, ping = Conf#conf.ping_timeout, maxsend = Conf#conf.maxsend, conf = Conf}};
 		{error, timeout} ->
-			io:format("timeout~n", []),
+			io:format("Timeout~n", []),
 			connect(Host, Conf);
-		{error, _} ->
-			io:format("err~n", []),
-			timer:sleep(Conf#conf.retry_timeout),
-			connect(Host, Conf);
-		Any ->
-			io:format(":~p~n", [Any])
+		{error, Error} ->
+			io:format("Error: ~p~n", [Error]),
+			{error, Error}
 	end.
 
 handle_call(_Req, _From, State) ->
@@ -94,6 +88,7 @@ handle_call(_Req, _From, State) ->
 handle_cast(Req, State) ->
 	{noreply, do_command(Req, State), State#state.ping}.
 
+%% EXIT signal is not handled and will terminate
 handle_info(timeout, State) ->
 	{stop, timeout, State};
 handle_info({tcp_closed, Sock}, State) when Sock == State#state.sock ->
@@ -110,12 +105,11 @@ notify(Event, #state{handler = F} = State) ->
 	F(Event),
 	State.
 
-terminate(_Reason, #state{sock = Sock, conf = Conf}) ->
-	gen_tcp:close(Sock),
-	%% This is used to prevent connection throttling if started under supervisor.
-	%% Supervisor timeout must be greater than retry_timeout.
-	io:format("OOPS: ~p (~p) terminating, waiting for ~p msecs~n", [?MODULE, self(), Conf#conf.retry_timeout]),
-	timer:sleep(Conf#conf.retry_timeout).
+%% Actually, this code and EXIT trapping are not neccessary as TCP socket is closed when controlling process dies
+
+terminate(Reason, #state{sock = Sock}) ->
+	io:format("OOPS: ~p (~p) terminating with reason ~p~n", [?MODULE, self(), Reason]),
+	gen_tcp:close(Sock).
 
 code_change(_Vsn, State, _Extra) ->
 	{ok, State}.
@@ -213,15 +207,17 @@ parse_tokens([User, "TOPIC", Channel, Topic], State) ->
 parse_tokens([User, "NICK", NewNick], State) ->
 	event({nick, User, NewNick}, State);
 parse_tokens([User, "JOIN", Channel], State) ->
-	event({join, User, Channel}, State);
+	event({join, Channel, User}, State);
 parse_tokens([User, "PART", Channel, Reason], State) ->
-	event({part, User, Channel, Reason}, State);
+	event({part, Channel, User, Reason}, State);
 parse_tokens([User, "PART", Channel], State) ->
-	event({part, User, Channel, []}, State);
+	event({part, Channel, User, []}, State);
 parse_tokens([User, "QUIT", Reason], State) ->
 	event({quit, User, Reason}, State);
 parse_tokens([User, "KICK", Channel, Nick, Reason], State) ->
-	event({kick, User, Channel, Nick, Reason}, State);
+	event({kick, Channel, User, Nick, Reason}, State);
+parse_tokens([User, "MODE", Channel, Mode, Nick], State) ->
+	event({mode, Channel, User, Mode, Nick}, State);
 parse_tokens([_Server, "NOTICE", _Target, Notice], State) ->
 	event({notice, Notice}, State);
 parse_tokens([_Server, topic, _Target, Channel, Topic], State) ->
@@ -245,7 +241,7 @@ parse_tokens([_Server, Reply, _Target, Text], State) when is_atom(Reply) ->
 parse_tokens(Tokens, State) ->
 	event({unknown, Tokens}, State).
 
-parse_privmsg(Channel, User, [1, $A, $C, $T, $I, $O, $N, $\ | Action], State) ->
+parse_privmsg(Channel, User, [1] ++ "ACTION " ++ Action, State) ->
 	event({action, Channel, User, string:strip(Action, right, 1)}, State);
 parse_privmsg(Target, User, Msg, State) ->
 	%% @notice Target may also be own nick (which means privmsg) or channel (chanmsg) but that's detected 

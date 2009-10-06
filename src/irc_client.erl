@@ -19,7 +19,7 @@
 -export([init/1]).
 
 %% Testing interface
--export([test/0]).
+-export([test/0, test/1]).
 
 -include(".secret.hrl").
 -define(CHILD_SHUTDOWN, 60000).
@@ -48,7 +48,7 @@ start_irc(SupPid, ConnArgs, Behaviours) ->
 							   gen_event:notify(Pid, {Type, Event, ConnRef})
 					   end
 			   end,
-	Irc = {irc_conn, {irc_conn, start_link, [Notifier, ConnArgs]}, permanent, ?CHILD_SHUTDOWN, worker, [irc_conn, irc_proto, irc_chan, irc_codes]},
+	Irc = {irc_conn, {irc_conn, start_link, [{local, irc}, Notifier, ConnArgs]}, permanent, ?CHILD_SHUTDOWN, worker, [irc_conn, irc_proto, irc_chan, irc_codes]},
 	supervisor:start_child(SupPid, Irc),
 	{ok, SupPid}.
 
@@ -63,9 +63,34 @@ add_behaviour(SupRef, BhvMod) ->
 
 test() ->
 	{ok, Pid} = start_link({local, erlbot}, 
+						   {"192.168.1.1", "yest", [{login, "nya"}, {oper_pass, ?MAGIC_WORD}, {autojoin, ["#test"]}, {umode, "+F"}]}, 
+						   [bhv_log, bhv1, bhv2, bhv3, bhv4]),
+	unlink(Pid),
+	Pid.
+
+test(1) ->
+	{ok, Pid} = start_link({local, erlbot}, 
 						   {"192.168.1.1", "yest", [{login, "nya"}, {oper_pass, ?MAGIC_WORD}, {autojoin, ["#test", "#mstu"]}, {umode, "+F"}]}, 
 						   [bhv_log, bhv1, bhv2, bhv3, bhv4]),
 	unlink(Pid),
+	timer:sleep(5000),
+	irc_conn:quit(irc_client:irc_conn(Pid), "quit"),
+	Pid;
+test(2) ->
+	{ok, Pid} = start_link({local, erlbot}, 
+						   {"192.168.1.1", "yest", [{login, "nya"}, {oper_pass, ?MAGIC_WORD}, {autojoin, ["#test", "#mstu"]}, {umode, "+F"}]}, 
+						   [bhv_log, bhv1, bhv2, bhv3, bhv4]),
+	unlink(Pid),
+	timer:sleep(5000),
+	irc_conn:command(irc_client:irc_conn(Pid), nosuchcmd),
+	Pid;
+test(3) ->
+	{ok, Pid} = start_link({local, erlbot}, 
+						   {"192.168.1.1", "yest", [{login, "nya"}, {oper_pass, ?MAGIC_WORD}, {autojoin, ["#test", "#mstu"]}, {umode, "+F"}]}, 
+						   [bhv_log, bhv1, bhv2, bhv3, bhv4]),
+	unlink(Pid),
+	timer:sleep(100),
+	irc_conn:get_channels(irc_client:irc_conn(Pid)),
 	Pid.
 
 %%%-------------------------------------------------------------------
