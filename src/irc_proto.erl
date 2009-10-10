@@ -40,10 +40,11 @@ irc_command(IrcRef, Cmd) ->
 
 %% gen_server callbacks
 
+%% real connect is deferred to handle_info
 init({Handler, Host, Options}) ->
 	process_flag(trap_exit, true),
-	{ok, State} = connect(Host, conf(Options)),
-	{ok, State#state{handler = Handler}, State#state.ping}.
+	self() ! {connect, Host, conf(Options), Handler},
+	{ok, undefined}.
 
 conf(Options) ->
 	conf(#conf{}, Options).
@@ -65,6 +66,32 @@ conf(Conf, [Option | Options]) ->
 conf(Conf, []) ->
 	Conf.
 
+handle_call(_Req, _From, State) ->
+	{reply, nosuchcall, State, State#state.ping}.
+
+handle_cast(Req, State) ->
+	{noreply, do_command(Req, State), State#state.ping}.
+
+%% EXIT signal is not handled and will terminate
+handle_info(timeout, State) ->
+	{stop, timeout, State};
+handle_info({tcp_closed, Sock}, State) when Sock == State#state.sock ->
+	{stop, tcp_closed, State};
+handle_info({tcp_error, Sock, Reason}, State) when Sock == State#state.sock ->
+	{stop, {tcp_error, Reason}, State};
+handle_info({tcp, Sock, Data}, State) when Sock == State#state.sock ->
+	{Event, NewState} = parse_line(utf8:decode(Data), State),
+	{noreply, notify(Event, NewState), NewState#state.ping};
+handle_info({connect, Host, Conf, Handler}, undefined) ->
+	{ok, State} = connect(Host, Conf),
+	{noreply, State#state{handler = Handler}, State#state.ping}.
+
+notify(noevent, State) ->
+	State;
+notify(Event, #state{handler = F} = State) ->
+	F(Event),
+	State.
+
 connect(Host, Conf) ->
 	io:format("Connecting to ~p, conf ~p~n", [Host, Conf]),
 	case gen_tcp:connect(Host, Conf#conf.port, 
@@ -81,29 +108,6 @@ connect(Host, Conf) ->
 			io:format("Error: ~p~n", [Error]),
 			{error, Error}
 	end.
-
-handle_call(_Req, _From, State) ->
-	{reply, nosuchcall, State, State#state.ping}.
-
-handle_cast(Req, State) ->
-	{noreply, do_command(Req, State), State#state.ping}.
-
-%% EXIT signal is not handled and will terminate
-handle_info(timeout, State) ->
-	{stop, timeout, State};
-handle_info({tcp_closed, Sock}, State) when Sock == State#state.sock ->
-	{stop, tcp_closed, State};
-handle_info({tcp_error, Sock, Reason}, State) when Sock == State#state.sock ->
-	{stop, {tcp_error, Reason}, State};
-handle_info({tcp, Sock, Data}, State) when Sock == State#state.sock ->
-	{Event, NewState} = parse_line(utf8:decode(Data), State),
-	{noreply, notify(Event, NewState), NewState#state.ping}.
-
-notify(noevent, State) ->
-	State;
-notify(Event, #state{handler = F} = State) ->
-	F(Event),
-	State.
 
 %% Actually, this code and EXIT trapping are not neccessary as TCP socket is closed when controlling process dies
 

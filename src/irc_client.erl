@@ -49,7 +49,7 @@ start_irc(SupPid, ConnArgs, Behaviours) ->
 					   end
 			   end,
 	Irc = {irc_conn, {irc_conn, start_link, [{local, irc}, Notifier, ConnArgs]}, permanent, ?CHILD_SHUTDOWN, worker, [irc_conn, irc_proto, irc_chan, irc_codes]},
-	supervisor:start_child(SupPid, Irc),
+	{ok, _} = supervisor:start_child(SupPid, Irc),
 	{ok, SupPid}.
 
 start_link(Level) ->
@@ -59,11 +59,11 @@ irc_conn(SupRef) ->
 	whereis_child(SupRef, irc_conn).
 
 add_behaviour(SupRef, BhvMod) ->
-	supervisor:start_child(SupRef, bhv_spec(SupRef, BhvMod)).
+	{ok, _} = supervisor:start_child(SupRef, bhv_spec(SupRef, BhvMod)).
 
 test() ->
 	{ok, Pid} = start_link({local, erlbot}, 
-						   {"192.168.1.1", "yest", [{login, "nya"}, {oper_pass, ?MAGIC_WORD}, {autojoin, ["#test"]}, {umode, "+F"}]}, 
+						   {"192.168.1.1", "yest", [{login, "nya"}, {oper_pass, ?MAGIC_WORD}, {autojoin, ["#pron", "#test"]}, {umode, "+F"}]}, 
 						   [bhv_log, bhv1, bhv2, bhv3, bhv4]),
 	unlink(Pid),
 	Pid.
@@ -98,8 +98,9 @@ test(3) ->
 %%%-------------------------------------------------------------------
 
 init(top) ->
+	Throttle = {throttle, {throttle, start_link, []}, permanent, ?CHILD_SHUTDOWN, worker, [throttle]},
 	HandlerSup = {handlers_sup, {?MODULE, start_link, [handlers]}, permanent, infinity, supervisor, [?MODULE]},
-	{ok, {{one_for_one, ?MAX_R, ?MAX_T}, [HandlerSup]}};
+	{ok, {{one_for_one, ?MAX_R, ?MAX_T}, [Throttle, HandlerSup]}};
 init(handlers) ->
 	EvMgr = {ev_mgr, {gen_event, start_link, []}, permanent, ?CHILD_SHUTDOWN, worker, dynamic},
 	BhvSup = {bhv_sup, {?MODULE, start_link, [bhv]}, permanent, infinity, supervisor, [?MODULE]},

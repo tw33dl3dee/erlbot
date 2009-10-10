@@ -21,7 +21,7 @@
 			   oper_pass = [] :: list(),      %% password in OPER command (won't do OPER if not specified)
 			   umode     = [] :: list(),      %% umode spec to request initially (like, "+F")
 			   autojoin  = [] :: [list()],    %% channels to join automatically
-			   retry_timeout = 6000}).        %% timeout between connection retries
+			   conn_rate = {2, 16000}}).      %% maximum connection rate
 
 -record(conn, {nick                   :: list(),    %% actual nick (may differ from initially requested one)
 			   nick_suffix = 1        :: integer(), %% suffix appended to nick on nick collision
@@ -100,9 +100,10 @@ get_channels_info(FsmRef) ->
 %% gen_fsm callbacks
 
 init({Host, Nick, Handler, Options}) ->
+	process_flag(trap_exit, true),
 	FsmPid = self(),
 	Conf = conf({Nick, Options}),
-	process_flag(trap_exit, true),
+	conn_throttle(Host, Conf),
 	{ok, IrcRef} = irc_proto:start_link(fun (Event) -> ?MODULE:handle_irc_event(Event, FsmPid) end, Host, Options),
 	{ok, state_connecting, #conn{nick = Nick, login = Conf#conf.login, conf = Conf, irc_ref = IrcRef, handler = Handler}}.
 
@@ -122,14 +123,21 @@ conf(Conf, [Option | Options]) ->
 			Conf#conf{autojoin = Autojoin};
 		{umode, Umode} ->
 			Conf#conf{umode = Umode};
-		{retry_timeout, RetryTimeout} ->
-			Conf#conf{retry_timeout = RetryTimeout};
+		{conn_rate, MaxConn, Period} ->
+			Conf#conf{conn_rate = {MaxConn, Period}};
 		_ ->
 			Conf
 	end,
 	conf(NewConf, Options);
 conf(Conf, []) ->
 	Conf.
+
+conn_throttle(Host, #conf{conn_rate = {MaxConn, Period}}) ->
+	throttle:wait(Host, MaxConn, Period,
+				  fun (Delay) ->
+						  io:format("Connecting to often, delaying for ~p msec...~n", [Delay]),
+						  Delay
+				  end).
 
 handle_info({'DOWN', _, process, Pid, _}, StateName, StateData) ->
 	Channels = dict:filter(fun (_, V) when V =:= Pid -> false; (_, _) -> true end, StateData#conn.chan_fsms),
@@ -140,11 +148,8 @@ handle_info(_Info, StateName, StateData) ->
 	io:format("INFO: ~p~n", [_Info]),
 	{next_state, StateName, StateData}.
 
-terminate(Reason, _StateName, #conn{conf = Conf}) ->
-	%% This is used to prevent connection throttling if started under supervisor.
-	%% Supervisor timeout must be greater than retry_timeout.
-	io:format("OOPS: ~p (~p) terminating with reason ~p, waiting for ~p msecs~n", [?MODULE, self(), Reason, Conf#conf.retry_timeout]),
-	timer:sleep(Conf#conf.retry_timeout).
+terminate(Reason, _StateName, _StateData) ->
+	io:format("OOPS: ~p (~p) terminating with reason ~p~n", [?MODULE, self(), Reason]).
 
 code_change(_Vsn, StateName, StateData, _Extra) ->
 	{ok, StateName, StateData}.
