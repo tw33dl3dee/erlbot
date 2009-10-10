@@ -46,14 +46,14 @@ handle_info(_Info, State) ->
 handle_call(_Request, State) ->
 	{ok, nosuchcall, State}.
 
-handle_event({Type, Event, ConnRef}, #state{mod = M} = State) ->
-	case M:handle_event(Type, Event, ConnRef) of
+handle_event({Type, Event, Irc}, #state{mod = M} = State) ->
+	case M:handle_event(Type, Event, Irc) of
 		not_handled ->
 			{ok, State};
 		{ok, _} ->
 			{ok, State};
 		{new_event, NewType, NewEvent, _} ->
-			gen_event:notify(self(), {NewType, NewEvent, ConnRef}),
+			gen_event:notify(self(), {NewType, NewEvent, Irc}),
 			{ok, State}
 	end;
 handle_event(Event, State) ->

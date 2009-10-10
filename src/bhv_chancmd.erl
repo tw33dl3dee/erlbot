@@ -13,7 +13,7 @@
 -include("utf8.hrl").
 -include("irc.hrl").
 
-handle_event(genevent, {chanmsg, Chan, User, [$! | Cmd]}, _Conn) ->
+handle_event(genevent, {chanmsg, Chan, User, [$! | Cmd]}, _Irc) ->
 	{new_event, customevent, {chancmd, Chan, User, util:split(Cmd)}, undefined};
-handle_event(_Type, _Event, _Conn) ->
+handle_event(_Type, _Event, _Irc) ->
 	not_handled.

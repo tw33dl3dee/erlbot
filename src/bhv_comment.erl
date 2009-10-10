@@ -13,13 +13,13 @@
 -include("utf8.hrl").
 -include("irc.hrl").
 
-handle_event(genevent, {topic, Chan, User, _}, Conn) ->
-	comment(topic, Chan, User, Conn);
-handle_event(genevent, {join, User, Chan}, Conn) ->
-	comment(join, Chan, User, Conn);
-handle_event(genevent, {part, User, Chan, _}, Conn) ->
-	comment(exit, Chan, User, Conn);
-handle_event(genevent, {quit, User, _}) ->
-	comment(exit, "TODO", User, Conn);
-handle_event(_Type, _Event, _Conn) ->
+handle_event(genevent, {topic, Chan, User, _}, Irc) ->
+	comment(topic, Chan, User, Irc);
+handle_event(genevent, {join, User, Chan}, Irc) ->
+	comment(join, Chan, User, Irc);
+handle_event(genevent, {part, User, Chan, _}, Irc) ->
+	comment(exit, Chan, User, Irc);
+handle_event(genevent, {quit, User, _}, Irc) ->
+	comment(exit, "TODO", User, Irc);
+handle_event(_Type, _Event, _Irc) ->
 	not_handled.

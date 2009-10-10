@@ -13,7 +13,7 @@
 -include("utf8.hrl").
 -include("irc.hrl").
 
-handle_event(_Type, _Event, _Conn) ->
+handle_event(_Type, _Event, _Irc) ->
 	not_handled.
 
 %% TODO: own nick

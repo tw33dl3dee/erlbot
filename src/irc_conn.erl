@@ -13,7 +13,6 @@
 -export([start/3, start_link/3,start/2, start_link/2]).
 -export([chanmsg/3, privmsg/3, join/2, part/2, quit/2, action/3, mode/4, mode/3, kick/4, topic/3, nick/2, command/2]).
 -export([get_channels_info/1, get_channels/1]).
-%-export([user/3, oper/3]).
 
 -record(conf, {nick      = [] :: list(),      %% initial nick requested
 			   login     = [] :: list(),      %% login field in USER and OPER commands (defaults to nick)
@@ -47,55 +46,57 @@ start_link(Handler, {Host, Nick, Options}) ->
 start_link(FsmName, Handler, {Host, Nick, Options}) ->
 	gen_fsm:start_link(FsmName, ?MODULE, {Host, Nick, Handler, Options}, []).
 
-%% IRC commands
+%%% IRC commands
+%%% Irc may be #irc{} or FSM pid/name
 
-chanmsg(FsmRef, Channel, Msg) ->
-	command(FsmRef, {chanmsg, Channel, Msg}).
+chanmsg(Irc, Channel, Msg) ->
+	command(Irc, {chanmsg, Channel, Msg}).
 
-privmsg(FsmRef, To, Msg) ->
-	command(FsmRef, {privmsg, To, Msg}).
+privmsg(Irc, To, Msg) ->
+	command(Irc, {privmsg, To, Msg}).
 
-action(FsmRef, Channel, Action) ->
-	command(FsmRef, {action, Channel, Action}).
+action(Irc, Channel, Action) ->
+	command(Irc, {action, Channel, Action}).
 
-join(FsmRef, Channel) ->
-	command(FsmRef, {join, Channel}).
+join(Irc, Channel) ->
+	command(Irc, {join, Channel}).
 
-part(FsmRef, Channel) ->
-	command(FsmRef, {part, Channel}).
+part(Irc, Channel) ->
+	command(Irc, {part, Channel}).
 
-quit(FsmRef, QuitMsg) ->
-	command(FsmRef, {quit, QuitMsg}).
+quit(Irc, QuitMsg) ->
+	command(Irc, {quit, QuitMsg}).
 
-mode(FsmRef, Channel, User, Mode) ->
-	command(FsmRef, {mode, Channel, User, Mode}).
+mode(Irc, Channel, User, Mode) ->
+	command(Irc, {mode, Channel, User, Mode}).
 
-mode(FsmRef, User, Mode) ->
-	command(FsmRef, {mode, User, Mode}).
+mode(Irc, User, Mode) ->
+	command(Irc, {mode, User, Mode}).
 
-nick(FsmRef, Nick) ->
-	command(FsmRef, {nick, Nick}).
+nick(Irc, Nick) ->
+	command(Irc, {nick, Nick}).
 
-%% user(FsmRef, Login, LongName) ->
-%% 	command(FsmRef, {user, Login, LongName}).
+kick(Irc, Channel, Nick, Reason) ->
+	command(Irc, {kick, Channel, Nick, Reason}).
 
-%% oper(FsmRef, Login, Passwd) ->
-%% 	command(FsmRef, {oper, Login, Passwd}).
+topic(Irc, Channel, Topic) ->
+	command(Irc, {topic, Channel, Topic}).
 
-kick(FsmRef, Channel, Nick, Reason) ->
-	command(FsmRef, {kick, Channel, Nick, Reason}).
-
-topic(FsmRef, Channel, Topic) ->
-	command(FsmRef, {topic, Channel, Topic}).
-
-command(FsmRef, Cmd) ->
+command(#irc{conn_ref = FsmRef}, Cmd) ->
+	gen_fsm:send_event(FsmRef, {irc_command, Cmd});
+command(FsmRef, Cmd) when is_pid(FsmRef); is_atom(FsmRef) ->
 	gen_fsm:send_event(FsmRef, {irc_command, Cmd}).
 
-get_channels(FsmRef) ->
-	gen_fsm:sync_send_event(FsmRef, get_channels, infinity).
+get_channels(Irc) ->
+	sync_command(Irc, get_channels).
 
-get_channels_info(FsmRef) ->
-	gen_fsm:sync_send_event(FsmRef, get_channels_info, infinity).
+get_channels_info(Irc) ->
+	sync_command(Irc, get_channels_info).
+
+sync_command(#irc{conn_ref = FsmRef}, Cmd) ->
+	gen_fsm:sync_send_event(FsmRef, Cmd, infinity);
+sync_command(FsmRef, Cmd) when is_pid(FsmRef); is_atom(FsmRef) ->
+	gen_fsm:sync_send_event(FsmRef, Cmd, infinity).
 
 %% gen_fsm callbacks
 
@@ -269,8 +270,8 @@ notify_genevent(Event, Conn) ->
 
 notify(noevent, _, Conn) ->
 	Conn;
-notify(Event, Type, #conn{handler = H} = Conn) ->
-	H(Type, Event),
+notify(Event, Type, #conn{handler = H,     nick = Nick, login = Login, is_oper = IsOper} = Conn) ->
+	H(Type, Event, #irc{conn_ref = self(), nick = Nick, login = Login, is_oper = IsOper}),
 	Conn.
 
 irc_command(Cmd, #conn{irc_ref = IrcRef}) ->

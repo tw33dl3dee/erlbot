@@ -39,13 +39,12 @@ start_link(ConnArgs, Behaviours) ->
 
 start_irc(SupPid, ConnArgs, Behaviours) ->
 	lists:map(fun (BhvMod) -> add_behaviour(SupPid, BhvMod) end, Behaviours),
-	Notifier = fun (Type, Event) -> 
+	Notifier = fun (Type, Event, Irc) -> 
 					   case ev_mgr(SupPid) of 
 						   undefined ->
 							   {error, badarg};
 						   Pid ->
-							   ConnRef = irc_conn(SupPid),
-							   gen_event:notify(Pid, {Type, Event, ConnRef})
+							   gen_event:notify(Pid, {Type, Event, Irc})
 					   end
 			   end,
 	Irc = {irc_conn, {irc_conn, start_link, [{local, irc}, Notifier, ConnArgs]}, permanent, ?CHILD_SHUTDOWN, worker, [irc_conn, irc_proto, irc_chan, irc_codes]},
@@ -63,7 +62,7 @@ add_behaviour(SupRef, BhvMod) ->
 
 test() ->
 	{ok, Pid} = start_link({local, erlbot}, 
-						   {"192.168.1.1", "yest", [{login, "nya"}, {oper_pass, ?MAGIC_WORD}, {autojoin, ["#pron", "#test"]}, {umode, "+F"}]}, 
+						   {"192.168.1.1", "yest", [{login, "nya"}, {oper_pass, ?MAGIC_WORD}, {autojoin, ["#test"]}, {umode, "+F"}]}, 
 						   [bhv_log, bhv1, bhv2, bhv3, bhv4]),
 	unlink(Pid),
 	Pid.

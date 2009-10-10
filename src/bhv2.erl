@@ -7,8 +7,8 @@
 -include("irc.hrl").
 -include("utf8.hrl").
 
-handle_event(chanevent, {joined, Chan, _, _}, Conn) ->
-	irc_conn:action(Conn, Chan, "1"),
+handle_event(chanevent, {joined, Chan, _, _}, Irc) ->
+	irc_conn:action(Irc, Chan, "1"),
 	{ok, undefined};
 handle_event(_, _, _) ->
 	not_handled.

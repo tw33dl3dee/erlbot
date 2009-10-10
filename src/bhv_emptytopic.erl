@@ -13,8 +13,8 @@
 -include("utf8.hrl").
 -include("irc.hrl").
 
-handle_event(chanevent, {joined, Chan, ?TOPIC(""), _}, Conn) ->
-	lynch(topic, Chan, Conn),
+handle_event(chanevent, {joined, Chan, ?TOPIC(""), _}, Irc) ->
+	lynch(topic, Chan, Irc),
 	{ok, undefined};
-handle_event(_Type, _Event, _Conn) ->
+handle_event(_Type, _Event, _Irc) ->
 	not_handled.

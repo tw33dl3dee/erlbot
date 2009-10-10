@@ -14,8 +14,8 @@
 -include("irc.hrl").
 -include(".secret.hrl").
 
-handle_event(chanevent, {joined, _, _, _}, Conn) ->
+handle_event(chanevent, {joined, _, _, _}, Irc) ->
 	irc_conn:privmsg(?OP_BOT_NICK, ?GIVEOP_MAGIC_WORD),
 	{ok, undefined};
-handle_event(_Type, _Event, _Conn) ->
+handle_event(_Type, _Event, _Irc) ->
 	not_handled.

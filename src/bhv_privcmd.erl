@@ -13,7 +13,7 @@
 -include("utf8.hrl").
 -include("irc.hrl").
 
-handle_event(genevent, {privmsg, User, Msg}, _Conn) ->
+handle_event(genevent, {privmsg, User, Msg}, _Irc) ->
 	{new_event, customevent, {privcmd, User, util:split(Msg)}, undefined};
-handle_event(_Type, _Event, _Conn) ->
+handle_event(_Type, _Event, _Irc) ->
 	not_handled.
