@@ -47,14 +47,17 @@ handle_call(_Request, State) ->
 	{ok, nosuchcall, State}.
 
 handle_event({Type, Event, Irc}, #state{mod = M} = State) ->
-	case M:handle_event(Type, Event, Irc) of
+	case catch M:handle_event(Type, Event, Irc) of
 		not_handled ->
 			{ok, State};
 		{ok, _} ->
 			{ok, State};
 		{new_event, NewType, NewEvent, _} ->
 			gen_event:notify(self(), {NewType, NewEvent, Irc}),
-			{ok, State}
+			{ok, State};
+		{'EXIT', Reason} ->
+			gen_event:notify(self(), {exitevent, {M, Reason}, Irc}),
+			{'EXIT', Reason}
 	end;
 handle_event(Event, State) ->
 	io:format("unparseable event: ~p~n", [Event]),

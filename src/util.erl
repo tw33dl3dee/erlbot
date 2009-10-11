@@ -1,11 +1,19 @@
 -module(util).
 -author("Ivan Korotkov <twee@tweedle-dee.org>").
 
--export([split/1, set_flag/2, unset_flag/2]).
+-export([print/1, print/2, split/1, set_flag/2, unset_flag/2]).
 -export([epoch/0, epoch/1]).
 -export([uri_encode/1]).
 -export([execvp/4, find_prog/2, signame/1]).
 -export([check_latin/1, count_latin/1, check_letter/1, count_letters/1]).
+
+print(Term) ->
+	lists:flatten(io_lib:print(Term)).
+
+print(Format, Data) when is_list(Data) ->
+	lists:flatten(io_lib:format(Format, Data));
+print(Format, Data) ->
+	print(Format, [Data]).
 
 split(String) ->
 	re:split(String, "\s+", [{return, list}, trim]).

@@ -155,16 +155,25 @@ send(State, Prefix) ->
 send(State, Prefix, Data) ->
 	send(State, Prefix, Data, []).
 
+send(State, Prefix, [], Suffix) ->
+	send_lines(State, Prefix, [""], Suffix);
 send(State, Prefix, Data, Suffix) ->
-	send_bytes(State, utf8:encode(Prefix), utf8:encode(Data), utf8:encode(Suffix)).
+	Lines = string:tokens(Data, ?CRLF),
+	send_lines(State, Prefix, Lines, Suffix).
 
-send_bytes(State, Prefix, Data, Suffix) when size(Data) =< State#state.maxsend ->
-	ok = gen_tcp:send(State#state.sock, <<Prefix/binary, Data/binary, Suffix/binary, ?CRLF>>),
+send_lines(State, Prefix, [Line | Rest], Suffix) ->
+	S = send_bytes(State, utf8:encode(Prefix), utf8:encode(Line), utf8:encode(Suffix)),
+	send_lines(S, Prefix, Rest, Suffix);
+send_lines(State, _, _, _) ->
+	State.
+
+send_bytes(State, Prefix, Bytes, Suffix) when size(Bytes) =< State#state.maxsend ->
+	ok = gen_tcp:send(State#state.sock, <<Prefix/binary, Bytes/binary, Suffix/binary, ?CRLF>>),
 	State;
-send_bytes(State, Prefix, Data, Suffix) ->
-	{Line, Rest} = utf8:split(Data, State#state.maxsend),
-	send_bytes(State, Prefix, Line, Suffix),
-	send_bytes(State, Prefix, Rest, Suffix).
+send_bytes(State, Prefix, Bytes, Suffix) ->
+	{ByteLine, Rest} = utf8:split(Bytes, State#state.maxsend),
+	S = send_bytes(State, Prefix, ByteLine, Suffix),
+	send_bytes(S, Prefix, Rest, Suffix).
 
 %% IRC protocol parser
 

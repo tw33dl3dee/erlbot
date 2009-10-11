@@ -13,6 +13,7 @@
 -export([start/3, start_link/3,start/2, start_link/2]).
 -export([chanmsg/3, privmsg/3, join/2, part/2, quit/2, action/3, mode/4, mode/3, kick/4, topic/3, nick/2, command/2]).
 -export([get_channels_info/1, get_channels/1]).
+-export([each_channel/2, each_channel/3]).
 
 -record(conf, {nick      = [] :: list(),      %% initial nick requested
 			   login     = [] :: list(),      %% login field in USER and OPER commands (defaults to nick)
@@ -97,6 +98,12 @@ sync_command(#irc{conn_ref = FsmRef}, Cmd) ->
 	gen_fsm:sync_send_event(FsmRef, Cmd, infinity);
 sync_command(FsmRef, Cmd) when is_pid(FsmRef); is_atom(FsmRef) ->
 	gen_fsm:sync_send_event(FsmRef, Cmd, infinity).
+
+each_channel(Irc, Fun) ->
+	[Fun(Chan) || Chan <- get_channels(Irc)].
+
+each_channel(Irc, Fun, User) ->
+	todo.
 
 %% gen_fsm callbacks
 

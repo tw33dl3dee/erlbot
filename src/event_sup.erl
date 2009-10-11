@@ -12,6 +12,7 @@ start_link(EventMgr, Name, Module, Args) ->
 
 init({EventMgr, Module, Args}) ->
     ok = gen_event:add_sup_handler(EventMgr, Module, Args),
+	erlang:monitor(process, EventMgr),
     {ok, {EventMgr, Module}}.
 
 handle_call(_Req, _From, S) ->
@@ -21,7 +22,10 @@ handle_cast(_From, S) ->
     {stop, unknown_cast, S}.
 
 handle_info({gen_event_EXIT, Mod, Reason}, State) ->
-    {stop, {gen_event_EXIT, Mod, Reason}, State}.
+    {stop, {gen_event_EXIT, Mod, Reason}, State};
+handle_info({'DOWN', _, process, _, _}, State) ->
+	io:format("gen_event DOWN ~p~n", [State]),
+	{stop, gen_event_DOWN, State}.
 
 terminate(_Reason, {_EventMgr, _Module}) ->
     ok.
