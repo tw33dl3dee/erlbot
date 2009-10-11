@@ -14,12 +14,12 @@
 -include("irc.hrl").
 
 handle_event(genevent, {topic, Chan, User, _}, Irc) ->
-	comment(topic, Chan, User, Irc);
+	erlbot:comment(topic, Chan, User, Irc);
 handle_event(genevent, {join, User, Chan}, Irc) ->
-	comment(join, Chan, User, Irc);
+	erlbot:comment(join, Chan, User, Irc);
 handle_event(genevent, {part, User, Chan, _}, Irc) ->
-	comment(exit, Chan, User, Irc);
+	erlbot:comment(exit, Chan, User, Irc);
 handle_event(genevent, {quit, User, _}, Irc) ->
-	comment(exit, "TODO", User, Irc);
+	erlbot:comment(exit, "TODO", User, Irc);
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.

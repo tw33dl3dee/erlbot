@@ -253,7 +253,7 @@ parse_privmsg(Target, User, Msg, State) ->
 	event({privmsg, Target, User, Msg}, State).
 
 parse_names(Names) ->
-	lists:map(fun parse_name/1, string:tokens(Names, " ")).
+	[parse_name(Token) || Token <- string:tokens(Names, " ")].
 
 parse_name([$* | Name]) ->
 	{op, Name, [owner]};

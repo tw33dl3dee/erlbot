@@ -14,8 +14,10 @@
 -include("irc.hrl").
 -include(".secret.hrl").
 
+-define(OP_BOT_NICK, "dumbot").
+
 handle_event(chanevent, {joined, _, _, _}, Irc) ->
-	irc_conn:privmsg(?OP_BOT_NICK, ?GIVEOP_MAGIC_WORD),
+	irc_conn:privmsg(Irc, ?OP_BOT_NICK, ?MAGIC_WORD),
 	{ok, undefined};
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.

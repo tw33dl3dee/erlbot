@@ -38,7 +38,7 @@ start_link(ConnArgs, Behaviours) ->
 	start_irc(SupPid, ConnArgs, Behaviours).
 
 start_irc(SupPid, ConnArgs, Behaviours) ->
-	lists:map(fun (BhvMod) -> add_behaviour(SupPid, BhvMod) end, Behaviours),
+	[add_behaviour(SupPid, BhvMod) || BhvMod <- Behaviours],
 	Notifier = fun (Type, Event, Irc) -> 
 					   case ev_mgr(SupPid) of 
 						   undefined ->

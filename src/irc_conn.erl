@@ -220,7 +220,7 @@ state_connected(get_channels, _From, Conn) ->
 	{reply, dict:fetch_keys(Conn#conn.chan_fsms), state_connected, Conn};
 state_connected(get_channels_info, _From, Conn) -> 
 	Channels = dict:to_list(Conn#conn.chan_fsms),
-	ChanInfo = lists:map(fun ({Chan, FsmRef}) -> {Chan, irc_chan:get_chan_info(FsmRef)} end, Channels),
+	ChanInfo = [{Chan, irc_chan:get_chan_info(FsmRef)} || {Chan, FsmRef} <- Channels],
 	{reply, ChanInfo, state_connected, Conn}.
 
 myevent({privmsg, Target, User, Msg}, Nick) when Target /= Nick ->

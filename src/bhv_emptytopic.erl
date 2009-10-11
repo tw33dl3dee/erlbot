@@ -14,7 +14,7 @@
 -include("irc.hrl").
 
 handle_event(chanevent, {joined, Chan, ?TOPIC(""), _}, Irc) ->
-	lynch(topic, Chan, Irc),
+	erlbot:lynch(topic, Chan, Irc),
 	{ok, undefined};
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.
