@@ -1,0 +1,240 @@
+=== modified file 'src/event_sup.erl'
+*** src/event_sup.erl	2009-10-03 14:10:55 +0000
+--- src/event_sup.erl	2009-10-11 15:35:00 +0000
+***************
+*** 1,18 ****
+  -module(event_sup).
+  -behaviour(gen_server).
+  
+! -export([start_link/4]).
+  
+  -export([init/1, handle_info/2, handle_call/3, handle_cast/2, terminate/2, code_change/3]).
+  
+! start_link(EventMgr, undef, Module, Args) ->
+!     gen_server:start_link(?MODULE, {EventMgr, Module, Args}, []);
+! start_link(EventMgr, Name, Module, Args) ->
+!     gen_server:start_link(Name, ?MODULE, {EventMgr, Module, Args}, []).
+  
+! init({EventMgr, Module, Args}) ->
+      ok = gen_event:add_sup_handler(EventMgr, Module, Args),
+!     {ok, {EventMgr, Module}}.
+  
+  handle_call(_Req, _From, S) ->
+      {stop, unknown_call, S}.
+--- 1,18 ----
+  -module(event_sup).
+  -behaviour(gen_server).
+  
+! -export([start_link/5]).
+  
+  -export([init/1, handle_info/2, handle_call/3, handle_cast/2, terminate/2, code_change/3]).
+  
+! start_link(EventMgr, ErrNotifier, undef, Module, Args) ->
+!     gen_server:start_link(?MODULE, {EventMgr, ErrNotifier, Module, Args}, []);
+! start_link(EventMgr, ErrNotifier, Name, Module, Args) ->
+!     gen_server:start_link(Name, ?MODULE, {EventMgr, ErrNotifier, Module, Args}, []).
+  
+! init({EventMgr, ErrNotifier, Module, Args}) ->
+      ok = gen_event:add_sup_handler(EventMgr, Module, Args),
+!     {ok, {EventMgr, ErrNotifier, Module}}.
+  
+  handle_call(_Req, _From, S) ->
+      {stop, unknown_call, S}.
+***************
+*** 20,29 ****
+  handle_cast(_From, S) ->
+      {stop, unknown_cast, S}.
+  
+! handle_info({gen_event_EXIT, Mod, Reason}, State) ->
+      {stop, {gen_event_EXIT, Mod, Reason}, State}.
+  
+! terminate(_Reason, {_EventMgr, _Module}) ->
+      ok.
+  
+  code_change(_OldVsn, State, _Extra) ->
+--- 20,30 ----
+  handle_cast(_From, S) ->
+      {stop, unknown_cast, S}.
+  
+! handle_info({gen_event_EXIT, Mod, Reason}, {_, ErrNotifier, _}) ->
+! 	ErrNotifier(Mod, Reason),
+      {stop, {gen_event_EXIT, Mod, Reason}, State}.
+  
+! terminate(_Reason, _State) ->
+      ok.
+  
+  code_change(_OldVsn, State, _Extra) ->
+
+=== modified file 'src/irc_behaviour.erl'
+*** src/irc_behaviour.erl	2009-10-10 22:51:42 +0000
+--- src/irc_behaviour.erl	2009-10-11 15:56:49 +0000
+***************
+*** 27,33 ****
+--- 27,37 ----
+  behaviour_info(_) ->
+      undefined.
+  
++ %% Must be called only from within irc_client supervisor context
+  add_behaviour(EvMgr, BhvMod) ->
++ 	ErrNotifier = fun (Mod, Reason) ->
++ 						  Irc =  
++ 						  gen_event:notify(EvMgr, {errevent, {Mod, Reason}, Irc})
+  	event_sup:start_link(EvMgr, undef, ?MODULE, BhvMod).
+  
+  modules(BhvMod) ->
+
+=== modified file 'src/irc_client.erl'
+*** src/irc_client.erl	2009-10-11 13:57:02 +0000
+--- src/irc_client.erl	2009-10-11 15:56:49 +0000
+***************
+*** 39,56 ****
+  
+  start_irc(SupPid, ConnArgs, Behaviours) ->
+  	[add_behaviour(SupPid, BhvMod) || BhvMod <- Behaviours],
+! 	Notifier = fun (Type, Event, Irc) -> 
+! 					   case ev_mgr(SupPid) of 
+! 						   undefined ->
+! 							   {error, badarg};
+! 						   Pid ->
+! 							   gen_event:notify(Pid, {Type, Event, Irc})
+! 					   end
+! 			   end,
+  	Irc = {irc_conn, {irc_conn, start_link, [{local, irc}, Notifier, ConnArgs]}, permanent, ?CHILD_SHUTDOWN, worker, [irc_conn, irc_proto, irc_chan, irc_codes]},
+  	{ok, _} = supervisor:start_child(SupPid, Irc),
+  	{ok, SupPid}.
+  
+  start_link(Level) ->
+  	supervisor:start_link(?MODULE, Level).
+  
+--- 39,59 ----
+  
+  start_irc(SupPid, ConnArgs, Behaviours) ->
+  	[add_behaviour(SupPid, BhvMod) || BhvMod <- Behaviours],
+! 	Notifier = notifier(SupPid),
+  	Irc = {irc_conn, {irc_conn, start_link, [{local, irc}, Notifier, ConnArgs]}, permanent, ?CHILD_SHUTDOWN, worker, [irc_conn, irc_proto, irc_chan, irc_codes]},
+  	{ok, _} = supervisor:start_child(SupPid, Irc),
+  	{ok, SupPid}.
+  
++ notifier(SupRef) ->
++ 	fun (Type, Event, Irc) -> 
++ 			case ev_mgr(Sup) of 
++ 				undefined ->
++ 					{error, badarg};
++ 				Pid ->
++ 					gen_event:notify(Pid, {Type, Event, Irc})
++ 			end
++ 	end.
++ 
+  start_link(Level) ->
+  	supervisor:start_link(?MODULE, Level).
+  
+***************
+*** 60,96 ****
+  add_behaviour(SupRef, BhvMod) ->
+  	{ok, _} = supervisor:start_child(SupRef, bhv_spec(SupRef, BhvMod)).
+  
+! test() ->
+! 	{ok, Pid} = start_link({local, erlbot}, 
+! 						   {"192.168.1.1", "yest", [{login, "nya"}, {oper_pass, ?MAGIC_WORD}, {autojoin, ["#test"]}, {umode, "+F"}]}, 
+! 						   [bhv_log, bhv1, bhv2, bhv3, bhv4]),
+! 	unlink(Pid),
+! 	Pid.
+! 
+! test(1) ->
+! 	{ok, Pid} = start_link({local, erlbot}, 
+! 						   {"192.168.1.1", "yest", [{login, "nya"}, {oper_pass, ?MAGIC_WORD}, {autojoin, ["#test", "#mstu"]}, {umode, "+F"}]}, 
+! 						   [bhv_log, bhv1, bhv2, bhv3, bhv4]),
+! 	unlink(Pid),
+! 	timer:sleep(5000),
+! 	irc_conn:quit(irc_client:irc_conn(Pid), "quit"),
+! 	Pid;
+! test(2) ->
+! 	{ok, Pid} = start_link({local, erlbot}, 
+! 						   {"192.168.1.1", "yest", [{login, "nya"}, {oper_pass, ?MAGIC_WORD}, {autojoin, ["#test", "#mstu"]}, {umode, "+F"}]}, 
+! 						   [bhv_log, bhv1, bhv2, bhv3, bhv4]),
+! 	unlink(Pid),
+! 	timer:sleep(5000),
+! 	irc_conn:command(irc_client:irc_conn(Pid), nosuchcmd),
+! 	Pid;
+! test(3) ->
+! 	{ok, Pid} = start_link({local, erlbot}, 
+! 						   {"192.168.1.1", "yest", [{login, "nya"}, {oper_pass, ?MAGIC_WORD}, {autojoin, ["#test", "#mstu"]}, {umode, "+F"}]}, 
+! 						   [bhv_log, bhv1, bhv2, bhv3, bhv4]),
+! 	unlink(Pid),
+! 	timer:sleep(100),
+! 	irc_conn:get_channels(irc_client:irc_conn(Pid)),
+! 	Pid.
+  
+  %%%-------------------------------------------------------------------
+  %%% Callback functions from supervisor
+--- 63,71 ----
+  add_behaviour(SupRef, BhvMod) ->
+  	{ok, _} = supervisor:start_child(SupRef, bhv_spec(SupRef, BhvMod)).
+  
+! bhv_spec(SupRef, BhvMod) ->
+! 	Notifier = notifier(SupPid),
+! 	{BhvMod, {irc_behaviour, add_behaviour, [ev_mgr(SupRef), BhvMod]}, permanent, ?CHILD_SHUTDOWN, worker, irc_behaviour:modules(BhvMod)}.
+  
+  %%%-------------------------------------------------------------------
+  %%% Callback functions from supervisor
+***************
+*** 111,119 ****
+  %%% Internal functions
+  %%%-------------------------------------------------------------------
+  
+- bhv_spec(SupRef, BhvMod) ->
+- 	{BhvMod, {irc_behaviour, add_behaviour, [ev_mgr(SupRef), BhvMod]}, permanent, ?CHILD_SHUTDOWN, worker, irc_behaviour:modules(BhvMod)}.
+- 
+  whereis_child(SupRef, ChildId) ->
+  	ChildrenInfo = supervisor:which_children(SupRef),
+  	whereis_child(ChildrenInfo, ChildId, []).
+--- 86,91 ----
+***************
+*** 132,140 ****
+  ev_mgr(SupRef) ->
+  	whereis_child(SupRef, ev_mgr).
+  
+! %% test_whereis(SupRef) ->
+! %% 	io:format("then: ~p~n", [now()]),
+! %% 	lists:map(fun (_) -> whereis_child(SupRef, handler) end, lists:seq(1, 1000000)),
+! %% 	io:format("later: ~p~n", [now()]),
+! %% 	lists:map(fun (_) -> whereis(?MODULE) end, lists:seq(1, 1000000)),
+! %% 	io:format("now: ~p~n", [now()]).	
+--- 104,139 ----
+  ev_mgr(SupRef) ->
+  	whereis_child(SupRef, ev_mgr).
+  
+! %%% Testing
+! 
+! test() ->
+! 	{ok, Pid} = start_link({local, erlbot}, 
+! 						   {"192.168.1.1", "yest", [{login, "nya"}, {oper_pass, ?MAGIC_WORD}, {autojoin, ["#test"]}, {umode, "+F"}]}, 
+! 						   [bhv_log, bhv1, bhv2, bhv3, bhv4]),
+! 	unlink(Pid),
+! 	Pid.
+! 
+! test(1) ->
+! 	{ok, Pid} = start_link({local, erlbot}, 
+! 						   {"192.168.1.1", "yest", [{login, "nya"}, {oper_pass, ?MAGIC_WORD}, {autojoin, ["#test", "#mstu"]}, {umode, "+F"}]}, 
+! 						   [bhv_log, bhv1, bhv2, bhv3, bhv4]),
+! 	unlink(Pid),
+! 	timer:sleep(5000),
+! 	irc_conn:quit(irc_client:irc_conn(Pid), "quit"),
+! 	Pid;
+! test(2) ->
+! 	{ok, Pid} = start_link({local, erlbot}, 
+! 						   {"192.168.1.1", "yest", [{login, "nya"}, {oper_pass, ?MAGIC_WORD}, {autojoin, ["#test", "#mstu"]}, {umode, "+F"}]}, 
+! 						   [bhv_log, bhv1, bhv2, bhv3, bhv4]),
+! 	unlink(Pid),
+! 	timer:sleep(5000),
+! 	irc_conn:command(irc_client:irc_conn(Pid), nosuchcmd),
+! 	Pid;
+! test(3) ->
+! 	{ok, Pid} = start_link({local, erlbot}, 
+! 						   {"192.168.1.1", "yest", [{login, "nya"}, {oper_pass, ?MAGIC_WORD}, {autojoin, ["#test", "#mstu"]}, {umode, "+F"}]}, 
+! 						   [bhv_log, bhv1, bhv2, bhv3, bhv4]),
+! 	unlink(Pid),
+! 	timer:sleep(100),
+! 	irc_conn:get_channels(irc_client:irc_conn(Pid)),
+! 	Pid.
+
