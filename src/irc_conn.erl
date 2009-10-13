@@ -12,8 +12,8 @@
 %% public interface
 -export([start/3, start_link/3,start/2, start_link/2]).
 -export([chanmsg/3, privmsg/3, join/2, part/2, quit/2, action/3, mode/4, mode/3, kick/4, topic/3, nick/2, command/2]).
--export([get_channels_info/1, get_channels/1]).
--export([each_channel/2, each_channel/3]).
+-export([get_channels_info/1, get_channels/1, get_channel_info/2]).
+-export([each_channel/2, each_channel/3, is_user_present/3]).
 
 -record(conf, {nick      = [] :: list(),      %% initial nick requested
 			   login     = [] :: list(),      %% login field in USER and OPER commands (defaults to nick)
@@ -94,16 +94,32 @@ get_channels(Irc) ->
 get_channels_info(Irc) ->
 	sync_command(Irc, get_channels_info).
 
+get_channel_info(Irc, Chan) ->
+	sync_command(Irc, {get_channel_info, Chan}).	
+
 sync_command(#irc{conn_ref = FsmRef}, Cmd) ->
 	gen_fsm:sync_send_event(FsmRef, Cmd, infinity);
 sync_command(FsmRef, Cmd) when is_pid(FsmRef); is_atom(FsmRef) ->
 	gen_fsm:sync_send_event(FsmRef, Cmd, infinity).
 
+%% Call Fun for each channel we're online
 each_channel(Irc, Fun) ->
 	[Fun(Chan) || Chan <- get_channels(Irc)].
 
-each_channel(Irc, Fun, User) ->
-	todo.
+%% Call Fun for each channel where specified nick is online
+each_channel(Irc, Fun, Nick) ->
+	[Fun(Chan) || {Chan, _, Users} <- get_channels_info(Irc), is_user_present(Nick, Users)].
+
+is_user_present(Irc, Nick, Chan) ->
+	{_, _, Users} = get_channel_info(Irc, Chan),
+	is_user_present(Nick, Users).
+
+is_user_present(Nick, [{_, Nick, _} | _]) ->
+	true;
+is_user_present(Nick, [_ | Rest]) ->
+	is_user_present(Nick, Rest);
+is_user_present(_, []) ->
+	false.
 
 %% gen_fsm callbacks
 
@@ -227,8 +243,15 @@ state_connected(get_channels, _From, Conn) ->
 	{reply, dict:fetch_keys(Conn#conn.chan_fsms), state_connected, Conn};
 state_connected(get_channels_info, _From, Conn) -> 
 	Channels = dict:to_list(Conn#conn.chan_fsms),
-	ChanInfo = [{Chan, irc_chan:get_chan_info(FsmRef)} || {Chan, FsmRef} <- Channels],
-	{reply, ChanInfo, state_connected, Conn}.
+	ChanInfo = [irc_chan:get_chan_info(FsmRef) || {Chan, FsmRef} <- Channels],
+	{reply, ChanInfo, state_connected, Conn};
+state_connected({get_channel_info, Chan}, _From, Conn) ->
+	case dict:find(Chan, Conn#conn.chan_fsms) of 
+		{ok, FsmRef} ->
+			{reply, irc_chan:get_chan_info(FsmRef), state_connected, Conn};
+		Error ->
+			{reply, Error, state_connected, Conn}
+	end.
 
 myevent({privmsg, Target, User, Msg}, Nick) when Target /= Nick ->
 	{chanmsg, Target, User, Msg};
