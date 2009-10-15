@@ -17,7 +17,7 @@ handle_event(exitevent, {Bhv, Reason}, Irc) ->
 	Trace = util:print("CRASHED in behaviour `~p' with reason:~n    ~.8p", [Bhv, Reason]),
 	irc_conn:each_channel(Irc, fun (Chan) ->
 									   irc_conn:action(Irc, Chan, Trace),
-									   irc_conn:action(Irc, Chan, "sucks huuuuuge cock :(")
+									   irc_conn:action(Irc, Chan, choice:make(["sucks huuuuuge cock :(", "аццки уныл v_v"]))
 							   end),
 	{ok, undefined};
 handle_event(_, _, _) ->

@@ -3,4 +3,8 @@
 * TODO Distinguish between channel, user and chan+user MODE command/message.
 * DONE Reconnection timeout in case `irc_conn' dies.
 * DONE Add own nick to mymode, mytopic.
-* TODO Close socket immediately on termination, print some error.
+* DONE Close socket immediately on termination, print some error.
+* TODO Eliminate list flattening where possible.
+* TODO ALL_CHAN_EVENTS.
+* TODO Better misspell correction.
+* TODO Behaviour dependencies.

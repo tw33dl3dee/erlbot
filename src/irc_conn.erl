@@ -243,7 +243,7 @@ state_connected(get_channels, _From, Conn) ->
 	{reply, dict:fetch_keys(Conn#conn.chan_fsms), state_connected, Conn};
 state_connected(get_channels_info, _From, Conn) -> 
 	Channels = dict:to_list(Conn#conn.chan_fsms),
-	ChanInfo = [irc_chan:get_chan_info(FsmRef) || {Chan, FsmRef} <- Channels],
+	ChanInfo = [irc_chan:get_chan_info(FsmRef) || {_, FsmRef} <- Channels],
 	{reply, ChanInfo, state_connected, Conn};
 state_connected({get_channel_info, Chan}, _From, Conn) ->
 	case dict:find(Chan, Conn#conn.chan_fsms) of 

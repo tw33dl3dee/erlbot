@@ -1,7 +1,7 @@
 #
 
 BIN = ebin
-BHVS = irc_behaviour
+BHVS = utf8 irc_behaviour
 SRC = src
 INC = include
 ERLC = erlc

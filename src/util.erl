@@ -1,10 +1,10 @@
 -module(util).
 -author("Ivan Korotkov <twee@tweedle-dee.org>").
 
--export([print/1, print/2, split/1, set_flag/2, unset_flag/2]).
+-export([print/1, print/2, split/1, contains/2, set_flag/2, unset_flag/2]).
 -export([epoch/0, epoch/1]).
 -export([uri_encode/1]).
--export([execvp/4, find_prog/2, signame/1]).
+-export([execvp/3, execvp/4, system/1, system/2, find_prog/2, signame/1]).
 -export([check_latin/1, count_latin/1, check_letter/1, count_letters/1]).
 
 print(Term) ->
@@ -17,6 +17,12 @@ print(Format, Data) ->
 
 split(String) ->
 	re:split(String, "\s+", [{return, list}, trim]).
+
+contains(String, Pattern) ->
+	case re:run(String, Pattern, [unicode, caseless, {capture, none}]) of
+		match -> true;
+		nomatch -> false
+	end.
 
 set_flag(Flag, Flags) ->
 	[Flag | unset_flag(Flag, Flags)].
@@ -40,6 +46,15 @@ find_prog(File, Dir) ->
 
 -define(EXEC_LINE, 1048576).
 
+%% Exec shell command with given input.
+system(Command, Input) ->
+	UtfCmd = binary_to_list(utf8:encode(Command)),
+	Port = open_port({spawn, UtfCmd}, [{line, ?EXEC_LINE}, eof, exit_status, binary]),
+	send_input(Port, Input),
+	loop_port(Port, []).
+
+system(Command) -> system(Command, <<>>).
+
 %% Exec program (absolute path or relative to WD) with specified WD and Input.
 execvp(File, Args, Dir, Input) ->
 	case filename:pathtype(File) of
@@ -48,6 +63,8 @@ execvp(File, Args, Dir, Input) ->
 		_ ->
 			execvp0(filename:absname(File, Dir), [File | Args], Dir, Input)
 	end.
+
+execvp(File, Args, Dir) -> execvp(File, Args, Dir, <<>>).
 
 %% Note that Args are expected to be utf8 while Arg0 is not.
 execvp0(Path, [Arg0 | Args], Dir, Input) ->

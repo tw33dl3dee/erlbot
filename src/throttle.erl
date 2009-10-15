@@ -10,7 +10,10 @@
 -behaviour(gen_server).
 
 %% External exports
--export([start_link/0, wait/3, wait/4, cancel/1, test/1]).
+-export([start_link/0, wait/3, wait/4, cancel/1]).
+
+%% For testing
+-export([test/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -38,68 +41,14 @@ wait(Id, MaxCount, Period, PreWait) ->
 		{wait, Delay} ->
 			io:format("~p: waiting ~p~n", [Id, Delay]),
 			timer:sleep(PreWait(Delay)),
+			% to ensure that `ok' is returned (no waiting) we pass MaxCount + 1;
+			% if race happens, last `times' element is not yet removed but we ignore it
+			ok = gen_server:call(?MODULE, {wait, Id, MaxCount + 1, Period}, infinity),
 			{ok, waited, Delay}
 	end.	
 
 cancel(Id) ->
 	gen_server:call(?MODULE, {cancel, Id}, infinity).
-
-test(1) ->
-	start_link(),
-	wait(abc, 3, 5000),
-	wait(def, 3, 5000),
-	wait(abc, 3, 5000),
-	wait(def, 3, 5000),
-	wait(abc, 3, 5000),
-	wait(def, 3, 5000),
-	wait(abc, 3, 5000),
-	wait(def, 3, 5000),
-	wait(abc, 3, 5000),
-	wait(def, 3, 5000),
-	timer:sleep(5000);
-test(2) ->
-	start_link(),
-	wait(abc, 3, 5000),
-	wait(def, 3, 5000),
-	wait(abc, 3, 5000),
-	wait(def, 3, 5000),
-	timer:sleep(500),
-	wait(abc, 3, 5000),
-	wait(def, 3, 5000),
-	timer:sleep(1000),
-	wait(abc, 3, 5000),
-	wait(def, 3, 5000),
-	wait(abc, 3, 5000),
-	wait(def, 3, 5000),
-	timer:sleep(5000);
-test(3) ->
-	start_link(),
-	Me = self(),
-	spawn(fun () ->
-				  wait(abc, 3, 5000),
-				  wait(abc, 3, 5000),
-				  timer:sleep(500),
-				  wait(abc, 3, 5000),
-				  timer:sleep(1000),
-				  wait(abc, 3, 5000),
-				  wait(abc, 3, 5000),
-				  wait(abc, 3, 5000),
-				  Me ! done
-		  end),
-	spawn(fun () ->
-				  wait(def, 3, 5000),
-				  wait(def, 3, 5000),
-				  wait(def, 3, 5000),
-				  cancel(def),
-				  wait(def, 3, 5000),
-				  wait(def, 3, 5000),
-				  wait(def, 3, 5000),
-				  wait(def, 3, 5000, fun (D) -> io:format("waiting ~p msec~n", [D]), D end),
-				  wait(def, 3, 5000),
-				  Me ! done
-		  end),
-	receive done -> receive done -> ok end end,
-	timer:sleep(5000).
 
 %%%-------------------------------------------------------------------
 %%% Callback functions from gen_server
@@ -108,7 +57,8 @@ test(3) ->
 init(_) ->
 	{ok, #state{}}.
 
--define(EXPIRE_DELAY, 1000).
+-define(EXPIRE_DELAY, 1000).  %% How much longer than Period shall time data be kept
+%-define(WAIT_BIAS,    1).     %% How much longer to wait than neccessary
 
 handle_call({wait, Id, MaxCount, Period}, _From, #state{traces = Traces} = State) ->
 	TimerRef = erlang:start_timer(Period + ?EXPIRE_DELAY, self(), Id),
@@ -155,7 +105,8 @@ filter_trace(Trace, MaxCount, Period) ->
 	case length(Times) of
 		L when L > MaxCount ->
 			TimeDiff = Now - lists:nth(MaxCount + 1, Times),
-			{{wait, Period - TimeDiff}, Trace#trace{times = Times}};
+			% now() not included in Times, will be added in subsequent `wait' call after sleeping
+			{{wait, Period - TimeDiff}, Trace#trace{times = tl(Times)}}; 
 		_ ->
 			{ok, Trace#trace{times = Times}}
 	end.
@@ -184,3 +135,55 @@ clean_msg(TimerRef) ->
 	after 0 ->
 			ok
 	end.
+
+%%% Testing
+
+test(1) ->
+	start_link(),
+	wait(abc, 2, 5000),
+	wait(abc, 2, 5000),
+	wait(abc, 2, 5000), % WAITS
+	wait(abc, 2, 5000),
+	wait(abc, 2, 5000), % WAITS
+	wait(abc, 2, 5000);
+test(2) ->
+	start_link(),
+	wait(abc, 3, 5000),
+	wait(def, 3, 5000),
+	wait(abc, 3, 5000),
+	wait(def, 3, 5000),
+	timer:sleep(500),
+	wait(abc, 3, 5000),
+	wait(def, 3, 5000),
+	timer:sleep(1000),
+	wait(abc, 3, 5000),
+	wait(def, 3, 5000),
+	wait(abc, 3, 5000),
+	wait(def, 3, 5000);
+test(3) ->
+	start_link(),
+	Me = self(),
+	spawn(fun () ->
+				  wait(abc, 3, 5000),
+				  wait(abc, 3, 5000),
+				  timer:sleep(500),
+				  wait(abc, 3, 5000),
+				  timer:sleep(1000),
+				  wait(abc, 3, 5000),
+				  wait(abc, 3, 5000),
+				  wait(abc, 3, 5000),
+				  Me ! done
+		  end),
+	spawn(fun () ->
+				  wait(def, 3, 5000),
+				  wait(def, 3, 5000),
+				  wait(def, 3, 5000),
+				  cancel(def),
+				  wait(def, 3, 5000),
+				  wait(def, 3, 5000),
+				  wait(def, 3, 5000),
+				  wait(def, 3, 5000, fun (D) -> io:format("waiting ~p msec~n", [D]), D end),
+				  wait(def, 3, 5000),
+				  Me ! done
+		  end),
+	receive done -> receive done -> ok end end.

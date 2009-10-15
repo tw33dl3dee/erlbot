@@ -53,8 +53,9 @@ irc_conn(SupRef) ->
 
 init(_) ->
 	Throttle = {throttle, {throttle, start_link, []}, permanent, ?CHILD_SHUTDOWN, worker, [throttle]},
+	Choice = {choice, {choice, start_link, []}, permanent, ?CHILD_SHUTDOWN, worker, [choice]},
 	EvMgr = {ev_mgr, {gen_event, start_link, []}, permanent, ?CHILD_SHUTDOWN, worker, dynamic},
-	{ok, {{one_for_one, ?MAX_R, ?MAX_T}, [Throttle, EvMgr]}}.
+	{ok, {{one_for_one, ?MAX_R, ?MAX_T}, [Choice, Throttle, EvMgr]}}.
 
 %%%-------------------------------------------------------------------
 %%% Internal functions
@@ -108,7 +109,7 @@ ev_mgr(SupRef) ->
 test() ->
 	{ok, Pid} = start_link({local, erlbot}, 
 						   {"192.168.1.1", "yest", [{login, "nya"}, {oper_pass, ?MAGIC_WORD}, {autojoin, ["#test"]}, {umode, "+F"}]}, 
-						   [bhv_err_print, bhv_log, bhv1, bhv2, bhv3, bhv4]),
+						   [bhv_err_print, bhv_log, bhv_test, bhv_appeal, bhv_chancmd, bhv_getop, bhv_pom, bhv_privcmd]),
 	unlink(Pid),
 	Pid.
 
