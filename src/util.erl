@@ -100,17 +100,13 @@ wait_port(Port, Data) ->
 				 end,
 	{ExitStatus, transform_output(Data)}.
 
-transform_output([_ | T]) ->
-	lists:flatten(transform_output(T, []));
-transform_output([]) ->
-	[].
+transform_output(Data) ->
+	transform_output(Data, []).
 
-transform_output([eol | T], Lines) ->
-	transform_output(T, [$\n | Lines]);
-transform_output([noeol | T], Lines) ->
-	transform_output(T, Lines);
-transform_output([Line | T], Lines) ->	
+transform_output([eol, Line | T], Lines) ->
 	transform_output(T, [Line | Lines]);
+transform_output([noeol, Cont | T], [Begin | Lines]) ->
+	transform_output(T, [Begin ++ Cont | Lines]);
 transform_output([], Lines) ->
 	Lines.
 

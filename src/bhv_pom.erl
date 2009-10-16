@@ -14,7 +14,7 @@
 -include("irc.hrl").
 
 handle_event(cmdevent, {chancmd, Chan, _, ["mooon"]}, Irc) ->
-	{success, Moon} = util:system("pom"),
+	{success, [Moon]} = util:system("pom"),
 	irc_conn:chanmsg(Irc, Chan, Moon),
 	{ok, undefined};
 handle_event(_Type, _Event, _Irc) ->

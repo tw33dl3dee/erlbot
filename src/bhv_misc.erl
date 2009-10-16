@@ -24,7 +24,7 @@ handle_event(cmdevent, {chancmd, Chan, _, ["uptime"]}, Irc) ->
 	erlbot:show_uptime(Irc, Chan),
 	{ok, undefined};
 handle_event(cmdevent, {chancmd, Chan, _, ["time"]}, Irc) ->
-	{success, Time} = util:system("date '+%a %b %d %R:%S %Z %Y'"),
+	{success, [Time]} = util:system("date '+%a %b %d %R:%S %Z %Y'"),
 	irc_conn:chanmsg(Irc, Chan, io_lib:format("Точное время: ~s.", [Time])),
 	{ok, undefined};
 handle_event(cmdevent, {chancmd, Chan, ?USER(Nick), ["ping"]}, Irc) ->
