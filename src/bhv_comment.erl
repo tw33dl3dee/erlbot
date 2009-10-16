@@ -13,13 +13,15 @@
 -include("utf8.hrl").
 -include("irc.hrl").
 
-handle_event(genevent, {topic, Chan, User, _}, Irc) ->
-	erlbot:comment(topic, Chan, User, Irc);
-handle_event(genevent, {join, User, Chan}, Irc) ->
-	erlbot:comment(join, Chan, User, Irc);
-handle_event(genevent, {part, User, Chan, _}, Irc) ->
-	erlbot:comment(exit, Chan, User, Irc);
-handle_event(genevent, {quit, User, _}, Irc) ->
-	erlbot:comment(exit, "TODO", User, Irc);
+handle_event(chanevent, {topic, Chan, ?USER(Nick), _}, Irc) ->
+	erlbot:comment(topic, Chan, Nick, Irc);
+handle_event(chanevent, {join, Chan, ?USER(Nick)}, Irc) ->
+	erlbot:comment(join, Chan, Nick, Irc);
+handle_event(chanevent, {part, Chan, ?USER(Nick), _}, Irc) ->
+	erlbot:comment(exit, Chan, Nick, Irc);
+%% prevent Nick from being removed from channels FSM _after_ this point
+handle_event(genevent, {quit, ?USER(Nick), _}, Irc) ->
+	irc_conn:each_channel(Irc, fun (Chan) -> erlbot:comment(exit, Chan, Nick, Irc) end, Nick),
+	{ok, undefined};
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.

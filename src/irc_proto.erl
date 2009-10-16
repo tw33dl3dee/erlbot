@@ -134,7 +134,7 @@ do_command({action, Channel, Action}, State) ->
 	send(State, "PRIVMSG " ++ Channel ++ " :" ++ [1] ++ "ACTION ", Action, [1]);
 do_command({mode, Channel, User, Mode}, State) ->
 	send(State, "MODE " ++ Channel ++ " " ++ Mode ++ " " ++ User);
-do_command({mode, User, Mode}, State) ->
+do_command({umode, User, Mode}, State) ->
 	send(State, "MODE " ++ User ++ " " ++ Mode);
 do_command({user, Login, LongName}, State) ->
 	send(State, "USER " ++ Login ++ " 8 * :" ++ LongName);
@@ -158,7 +158,9 @@ send(State, Prefix, Data) ->
 send(State, Prefix, [], Suffix) ->
 	send_lines(State, Prefix, [""], Suffix);
 send(State, Prefix, Data, Suffix) ->
-	Lines = string:tokens(Data, ?CRLF),
+	%Lines = string:tokens(Data, ?CRLF),
+	%% @TODO something sensible about this
+	Lines = [Data],
 	send_lines(State, Prefix, Lines, Suffix).
 
 send_lines(State, Prefix, [Line | Rest], Suffix) ->
@@ -229,6 +231,8 @@ parse_tokens([User, "QUIT", Reason], State) ->
 	event({quit, User, Reason}, State);
 parse_tokens([User, "KICK", Channel, Nick, Reason], State) ->
 	event({kick, Channel, User, Nick, Reason}, State);
+parse_tokens([Nick, "MODE", Nick, Mode], State) ->
+	event({umode, Mode, Nick}, State);
 parse_tokens([User, "MODE", Channel, Mode, Nick], State) ->
 	event({mode, Channel, User, Mode, Nick}, State);
 parse_tokens([_Server, "NOTICE", _Target, Notice], State) ->

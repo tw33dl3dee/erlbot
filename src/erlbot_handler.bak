@@ -25,93 +25,9 @@ handle_chanevent({kicked, Chan, User, _Reason}, State) ->
 	cmd({join, Chan}, State),
 	State#state{was_kicked = true, kicked_by = User};
 
-do_blurp(State) ->
-	do_blurp(State, random_p:uniform()).
-
-do_blurp(State, X) when X < 0.025 ->
-	timer:sleep(1000),
-	Words = ["Хамите", "Хо-хо!", "Знаменито", "Мрак", "Жуть", "Не учите меня жить", 
-			 "Как ребёнка", "Кр-р-расота!", "Толстый и красивый", "Поедем на извозчике",
-			 "Поедем на таксо", "У вас вся спина белая", "Подумаешь!", "Ого!"],
-	cmd({chanmsg, [lists:nth(random_p:uniform(length(Words)), Words)]}, State),
-	ok;
-do_blurp(_, _) ->
-	ok.
-
-parse_cmd(State, _, ["mooon"]) ->
-	cmd({chanmsg, [yadbot_util:system("pom")]}, State),
-	ok;
-parse_cmd(State, User, [[$# | Rest]]) ->
-	case catch list_to_integer(Rest) of
-		{'EXIT', _} ->
-			unknown_cmd;
-		Num when Num > 0 ->
-			io:format("Bash query: ~p~n", [Num]),
-			do_bash(State, Num);
-		_ ->
-			cmd({chanmsg, [User#user.nick ++ " sucks huge cock"]}, State),
-			ok
-	end;
-parse_cmd(State, _, ["bash" | Rest]) ->
-	SearchQuery = string:join(Rest, " "),
-	do_bash_search(State, SearchQuery);
-parse_cmd(State, _, ["gg" | Rest]) ->
-	SearchQuery = string:join(Rest, " "),
-	do_google(State, SearchQuery);
-parse_cmd(State, _, ["gc" | Rest]) ->
-	SearchQuery = string:join(Rest, " "),
-	do_gcalc(State, SearchQuery);
-parse_cmd(State, _, ["w" | Topic]) ->
-	do_wiki(State, "en", string:join(Topic, " "));
-parse_cmd(State, _, ["в" | Topic]) ->
-	do_wiki(State, "ru", string:join(Topic, " "));
-parse_cmd(State, _, ["l" | Topic]) ->
-	do_lurkmore(State, string:join(Topic, " "));
-parse_cmd(State, _, ["л" | Topic]) ->
-	do_lurkmore(State, string:join(Topic, " "));
-parse_cmd(State, _, ["Jbo" | Sentence]) ->
-	do_jbofihe(State, string:join(Sentence, " "));
-parse_cmd(State, _, ["jbo" | Sentence]) ->
-	do_cmafihe(State, string:join(Sentence, " "));
-parse_cmd(State, _, ["jvo" | Sentence]) ->
-	do_jvocuhadju(State, string:join(Sentence, " "));
-parse_cmd(State, _, ["en-jbo" | Word]) ->
-	do_dict(State, "www.lojban.org", "en->jbo", string:join(Word, " "));
-parse_cmd(State, _, ["en-ru" | Word]) ->
-	do_gdict(State, "en|ru", string:join(Word, " "));
-parse_cmd(State, _, ["ru-en" | Word]) ->
-	do_gdict(State, "ru|en", string:join(Word, " "));
-parse_cmd(State, _, ["de-ru" | Word]) ->
-	do_gdict(State, "de|ru", string:join(Word, " "));
-parse_cmd(State, _, ["ru-de" | Word]) ->
-	do_gdict(State, "ru|de", string:join(Word, " "));
-parse_cmd(State, _, ["jbo-en" | Word]) ->
-	do_dict(State, "www.lojban.org", "jbo->en", string:join(Word, " "));
-parse_cmd(State, _, ["lynch"]) ->
-	do_lynch(State, chanmsg);
-parse_cmd(State, _, ["lynch", "topic"]) ->
-	do_lynch(State, topic);
-parse_cmd(State, _, ["lynchtopic"]) ->
-	do_lynch(State, topic);
-parse_cmd(State, _, ["jabberwock"]) ->
-	do_jabberwock(State);
-parse_cmd(State, _, ["uptime"]) ->
-	show_uptime(State);
-parse_cmd(State, User, ["time"]) ->
-	show_time(State, User#user.nick);
-parse_cmd(State, User, ["ping"]) ->
-	show_ping(State, User#user.nick);
 parse_cmd(State, User, ["stat"]) ->
 	show_stat(State, User#user.ident);
-parse_cmd(State, _, ["help"]) ->
-	show_help(State);
-parse_cmd(State, _, ["dice", Max]) ->
-	case catch list_to_integer(Max) of
-		{'EXIT', _} ->
-			ok;
-		X ->
-			do_dice(State, X)
-	end;
+
 parse_cmd(State, User, ["suicide", Delay]) ->
 	case catch list_to_integer(Delay) of
 		{'EXIT', _} -> 
@@ -121,25 +37,13 @@ parse_cmd(State, User, ["suicide", Delay]) ->
 	end;
 parse_cmd(State, User, ["suicide"]) ->
 	do_suicide(State, User#user.nick);
-parse_cmd(State, User, ["kickme"]) ->
-	do_kickme(State, User#user.nick);
-parse_cmd(State, _, ["identify"]) ->
-	cmd({me, ["is twee's bot written in Erlang and Perl (http://tweedle-dee.org/svn/yadbot/)"]}, State),
-	ok;
-parse_cmd(_State, _User, Cmd) ->
-	io:format("Unknown command: ~p", [Cmd]),
-	unknown_cmd.
 
-parse_privcmd(State, User, [?GIVEOP_MAGIC_WORD]) ->
-	cmd({mode, [User#user.nick, "+o"]}, State),
-	ok;
+
 parse_privcmd(State, User, ["stat"]) ->
 	show_stat(State, User#user.ident);
+
 parse_privcmd(State, User, ["hist"]) ->
 	show_history(State, User);
-parse_privcmd(_State, _User, Cmd) ->
-	io:format("Unknown private command: ~p", [Cmd]),
-	unknown_cmd.
 
 empty_err_msg(X) when X < 0.25 ->
 	"А вот хуй...";
@@ -248,24 +152,6 @@ do_dice(State, Max) ->
 	timer:sleep(?DICE_TIMEOUT),
 	cmd({chanmsg, [integer_to_list(Res)]}, State).
 
-show_uptime(State) ->
-	{Uptime, _} = statistics(wall_clock),
-	UptimeSec = Uptime div 1000,
-	{Rest1, Sec} = {UptimeSec div 60, UptimeSec rem 60},
-	{Rest2, Min} = {Rest1 div 60, Rest1 rem 60},
-	{Day, Hour} = {Rest2 div 24, Rest2 rem 24},
-	cmd({chanmsg, [lists:flatten(io_lib:format("Uptime: ~b day(s), ~b:~b:~b", [Day, Hour, Min, Sec]))]}, State),
-	ok.
-
-show_time(State, Nick) ->
-	Time = yadbot_util:system("date '+%a %b %d %R:%S %Z %Y'"),
-	cmd({chanmsg, [lists:flatten(io_lib:format("Точное время: ~s. Так лучше, ~s?", [Time, Nick]))]}, State),
-	ok.
-
-show_ping(State, Nick) ->
-	{Action, Msg} = ping_msg(Nick, random_p:uniform()),
-	cmd({Action, [Msg]}, State).
-
 show_help(State) ->	
 	cmd({me, ["-- ахуенно полезный и функциональный бот."]}, State),
 	cmd({me, ["умеет:"]}, State),
@@ -274,15 +160,6 @@ show_help(State) ->
 	cmd({chanmsg, ["Приватные команды:"]}, State),
 	print_long_results(State, ?PRIVCMDLIST),
 	cmd({me, ["няшка =^_^="]}, State).
-
-ping_msg(Nick, X) when X < 0.25 ->
-	{chanmsg, "Да-да, " ++ Nick ++ "?.."};
-ping_msg(_Nick, X) when X < 0.5 ->
-	{me, "pong"};
-ping_msg(_Nick, X) when X < 0.75 ->
-	{chanmsg, "Ну, понг."};
-ping_msg(Nick, _) ->
-	{chanmsg, Nick ++ ": сам пинг, че надо?"}.
 
 stat_line(#userstat{ident = Ident, line_count = LineCount, sym_count = SymCount}) ->
 	lists:flatten(io_lib:format(" ~-15s | ~6B | ~8B", [Ident, LineCount, SymCount])).
@@ -362,16 +239,6 @@ do_suicide(State, Nick, _) ->
 do_suicide(State, Nick) ->
 	do_suicide(State, Nick, ?SUICIDE_TIMEOUT).
 
-do_kickme(State, Nick) ->
-	cmd({kick, [Nick, goodbye_msg(Nick, random_p:uniform())]}, State),
-	ok.
-
-do_neko(State) ->
-	cmd({chanmsg, ["^_^"]}, State).
-
-goodbye_msg(Nick, X) when X < 0.5 -> "Всегда пожалуйста, " ++ Nick;
-goodbye_msg(_, _) -> "Кто к нам с хуем придет, тот нахуй и пойдет.".
-
 suicide_msg(_, X) when X < 0.4 -> "Прощай, жестокий мир.";
 suicide_msg(Nick, X) when X < 0.8 -> "Сука ты, " ++ Nick ++ "!";
 suicide_msg(_, _) -> "И ты, Брут :(".
@@ -384,25 +251,6 @@ suicide_self_greeting(State, X) when X < 0.5 ->
 	["Ты суицидальный мудак, " ++ State#state.nick];
 suicide_self_greeting(_, _) ->
 	["Мафия говорила, что она бессмертна..."].
-
-comment_topic(State, Nick, _, X) when X < 0.1 ->
-	cmd({chanmsg, ["Говенный топег, " ++ Nick ++ "."]}, State);
-comment_topic(State, _, _, X) when X < 0.2 ->
-	cmd({chanmsg, ["Гг :)"]}, State);
-comment_topic(State, Nick, _, _) ->
-	cmd({chanmsg, ["Мощно задвинул, " ++ Nick ++ "."]}, State).
-
-comment_join(State, Nick, X) when X < 0.5 ->
-	cmd({chanmsg, ["Превед, " ++ Nick ++ "."]}, State);
-comment_join(State, Nick, X) when X < 0.75 ->
-	cmd({chanmsg, [">> ВНИМАНИЕ: К нам приходит пользователь СИСЬКИ^W" ++ Nick ++ ". Поприветствуем!"]}, State);
-comment_join(State, Nick, _) ->
-	cmd({me, ["приветствует " ++ Nick ++ "."]}, State).
-
-comment_exit(State, Nick, X) when X < 0.5 ->
-	cmd({chanmsg, ["Нам будет нехватать тебя, " ++ Nick ++ "."]}, State);
-comment_exit(State, _, _) ->
-	cmd({chanmsg, ["Гг, наконец-то он ушел."]}, State).
 
 update_stat(User, Msg) ->
 	mnesia:sync_transaction(fun () -> update_stat_txn(User, Msg) end).

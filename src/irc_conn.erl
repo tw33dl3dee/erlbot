@@ -11,17 +11,19 @@
 
 %% public interface
 -export([start/3, start_link/3,start/2, start_link/2]).
--export([chanmsg/3, privmsg/3, join/2, part/2, quit/2, action/3, mode/4, mode/3, kick/4, topic/3, nick/2, command/2]).
+-export([chanmsg/3, privmsg/3, join/2, part/2, quit/2, action/3, mode/4, umode/2, kick/4, topic/3, nick/2, command/2]).
 -export([get_channels_info/1, get_channels/1, get_channel_info/2]).
 -export([each_channel/2, each_channel/3, is_user_present/3]).
+-export([async_chanmsg/3, async_privmsg/3]).
 
 -record(conf, {nick      = [] :: list(),      %% initial nick requested
 			   login     = [] :: list(),      %% login field in USER and OPER commands (defaults to nick)
 			   long_name = [] :: list(),      %% long name in USER command (defaults to nick)
 			   oper_pass = [] :: list(),      %% password in OPER command (won't do OPER if not specified)
-			   umode     = [] :: list(),      %% umode spec to request initially (like, "+F")
+			   umode    = [] :: list(),      %% umode spec to request initially (like, "+F")
 			   autojoin  = [] :: [list()],    %% channels to join automatically
-			   conn_rate = {2, 16000}}).      %% maximum connection rate
+			   msg_interval = 200,            %% minimal interval between messages when sending long bulks
+			   conn_rate    = {2, 16000}}).   %% maximum connection rate
 
 -record(conn, {nick                   :: list(),    %% actual nick (may differ from initially requested one)
 			   nick_suffix = 1        :: integer(), %% suffix appended to nick on nick collision
@@ -50,6 +52,19 @@ start_link(FsmName, Handler, {Host, Nick, Options}) ->
 %%% IRC commands
 %%% Irc may be #irc{} or FSM pid/name
 
+sync_command(#irc{conn_ref = FsmRef}, Cmd) ->
+	gen_fsm:sync_send_event(FsmRef, Cmd, infinity);
+sync_command(FsmRef, Cmd) when is_pid(FsmRef); is_atom(FsmRef) ->
+	gen_fsm:sync_send_event(FsmRef, Cmd, infinity).
+
+async_command(#irc{conn_ref = FsmRef}, Cmd) ->
+	gen_fsm:send_event(FsmRef, Cmd);
+async_command(FsmRef, Cmd) when is_pid(FsmRef); is_atom(FsmRef) ->
+	gen_fsm:send_event(FsmRef, Cmd).
+
+command(Irc, Cmd) ->
+	async_command(Irc, {irc_command, Cmd}).
+
 chanmsg(Irc, Channel, Msg) ->
 	command(Irc, {chanmsg, Channel, Msg}).
 
@@ -71,8 +86,8 @@ quit(Irc, QuitMsg) ->
 mode(Irc, Channel, User, Mode) ->
 	command(Irc, {mode, Channel, User, Mode}).
 
-mode(Irc, User, Mode) ->
-	command(Irc, {mode, User, Mode}).
+umode(Irc, Mode) ->
+	command(Irc, {umode, Mode}).
 
 nick(Irc, Nick) ->
 	command(Irc, {nick, Nick}).
@@ -83,11 +98,6 @@ kick(Irc, Channel, Nick, Reason) ->
 topic(Irc, Channel, Topic) ->
 	command(Irc, {topic, Channel, Topic}).
 
-command(#irc{conn_ref = FsmRef}, Cmd) ->
-	gen_fsm:send_event(FsmRef, {irc_command, Cmd});
-command(FsmRef, Cmd) when is_pid(FsmRef); is_atom(FsmRef) ->
-	gen_fsm:send_event(FsmRef, {irc_command, Cmd}).
-
 get_channels(Irc) ->
 	sync_command(Irc, get_channels).
 
@@ -96,11 +106,6 @@ get_channels_info(Irc) ->
 
 get_channel_info(Irc, Chan) ->
 	sync_command(Irc, {get_channel_info, Chan}).	
-
-sync_command(#irc{conn_ref = FsmRef}, Cmd) ->
-	gen_fsm:sync_send_event(FsmRef, Cmd, infinity);
-sync_command(FsmRef, Cmd) when is_pid(FsmRef); is_atom(FsmRef) ->
-	gen_fsm:sync_send_event(FsmRef, Cmd, infinity).
 
 %% Call Fun for each channel we're online
 each_channel(Irc, Fun) ->
@@ -120,6 +125,13 @@ is_user_present(Nick, [_ | Rest]) ->
 	is_user_present(Nick, Rest);
 is_user_present(_, []) ->
 	false.
+
+%% Send big bulk of private/channel messages asynchronously
+async_chanmsg(Irc, Channel, LongMsg) ->
+	async_command(Irc, {async_chanmsg, Channel, LongMsg}).
+
+async_privmsg(Irc, To, LongMsg) ->
+	async_command(Irc, {async_privmsg, To, LongMsg}).
 
 %% gen_fsm callbacks
 
@@ -149,6 +161,8 @@ conf(Conf, [Option | Options]) ->
 			Conf#conf{umode = Umode};
 		{conn_rate, MaxConn, Period} ->
 			Conf#conf{conn_rate = {MaxConn, Period}};
+		{msg_interval, MsgInterval} ->
+			Conf#conf{msg_interval = MsgInterval};
 		_ ->
 			Conf
 	end,
@@ -233,6 +247,17 @@ state_auth_end({endofmotd, _}, Conn) ->
 state_auth_end(_, Conn) ->
 	{next_state, state_auth_end, Conn}.
 
+state_connected({async_chanmsg, Channel, LongMsg}, Conn) ->
+	{next_state, state_connected, Conn};
+state_connected({async_privmsg, To, LongMsg}, Conn) ->
+	%% TODO: deeplist-aware tokens/2
+	spawn_link(fun () ->
+					   [begin irc_command({privmsg, To, Line}, Conn), 
+							  msg_throttle(Conn)
+						end || Line <- string:tokens(LongMsg, "\r\n")],
+					   ok
+			   end),
+	{next_state, state_connected, Conn};	
 state_connected({irc_command, Cmd}, Conn) ->
 	irc_command(Cmd, Conn),
 	{next_state, state_connected, Conn};
@@ -265,6 +290,9 @@ myevent({kick, Channel, User, Nick, Reason}, Nick) ->
 	{kicked, Channel, User, Reason};
 myevent({mode, Channel, User, Mode, Nick}, Nick) ->
 	{mymode, Channel, User, Mode, Nick};
+%% User mode event can ONLY be myevent anyway
+myevent({umode, Mode, Nick}, Nick) ->
+	{umode, Mode, Nick};
 myevent({nick, ?USER(Nick), NewNick}, Nick) ->
 	{mynick, NewNick};
 myevent({topic, Channel, ?USER(Nick), Topic}, Nick) ->
@@ -304,6 +332,8 @@ notify(Event, Type, #conn{handler = H,     nick = Nick, login = Login, is_oper =
 	H(Type, Event, #irc{conn_ref = self(), nick = Nick, login = Login, is_oper = IsOper}),
 	Conn.
 
+irc_command({umode, Mode}, #conn{irc_ref = IrcRef, nick = Nick}) ->
+	irc_proto:irc_command(IrcRef, {umode, Nick, Mode});
 irc_command(Cmd, #conn{irc_ref = IrcRef}) ->
 	irc_proto:irc_command(IrcRef, Cmd).
 
@@ -325,7 +355,7 @@ set_umode(#conn{is_oper = false} = Conn) ->
 set_umode(#conn{conf = #conf{umode = []}} = Conn) ->
 	Conn;
 set_umode(#conn{conf = Conf} = Conn) ->
-	irc_command({mode, Conn#conn.nick, Conf#conf.umode}, Conn),
+	irc_command({umode, Conf#conf.umode}, Conn),
 	Conn.
 
 next_nick(#conn{conf = Conf, nick_suffix = Suffix} = Conn) ->
@@ -339,6 +369,9 @@ autojoin(Conn, [Channel | Rest]) ->
 	autojoin(Conn, Rest);
 autojoin(Conn, []) ->
 	Conn.
+
+msg_throttle(#conn{conf = #conf{msg_interval = T}}) ->
+	timer:sleep(T).
 
 pong(Server, Conn) ->
 	irc_command({pong, Server}, Conn),
