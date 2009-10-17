@@ -18,7 +18,7 @@ multiline(Format, Data) ->
 	multiline(Format, [Data]).
 
 split(String) ->
-	re:split(String, "\s+", [{return, list}, trim]).
+	re:split(String, "\s+", [unicode, {return, list}, trim]).
 
 contains(String, Pattern) ->
 	case re:run(String, Pattern, [unicode, caseless, {capture, none}]) of
@@ -59,12 +59,10 @@ system(Command) -> system(Command, <<>>).
 
 %% Exec program (absolute path or relative to WD) with specified WD and Input.
 execvp(File, Args, Dir, Input) ->
-	case filename:pathtype(File) of
-		absolute ->
-			execvp0(File, [File | Args], Dir, Input);
-		_ ->
-			execvp0(filename:absname(File, Dir), [File | Args], Dir, Input)
-	end.
+	% If File is absolute, Dir will be ignored
+	Path = filename:absname(filename:join(Dir, File)),
+	io:format("exec ~s~n", [Path]),
+	execvp0(Path, [File | Args], Dir, Input).
 
 execvp(File, Args, Dir) -> execvp(File, Args, Dir, <<>>).
 
