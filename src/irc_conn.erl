@@ -14,7 +14,7 @@
 -export([chanmsg/3, privmsg/3, join/2, part/2, quit/2, action/3, mode/4, umode/2, kick/4, topic/3, nick/2, command/2]).
 -export([get_channels_info/1, get_channels/1, get_channel_info/2]).
 -export([each_channel/2, each_channel/3, is_user_present/3]).
--export([async_chanmsg/3, async_privmsg/3]).
+-export([async_chanmsg/3, async_action/3, async_privmsg/3]).
 
 -record(conf, {nick      = [] :: list(),      %% initial nick requested
 			   login     = [] :: list(),      %% login field in USER and OPER commands (defaults to nick)
@@ -127,11 +127,14 @@ is_user_present(_, []) ->
 	false.
 
 %% Send big bulk of private/channel messages asynchronously
-async_chanmsg(Irc, Channel, LongMsg) ->
-	async_command(Irc, {async_chanmsg, Channel, LongMsg}).
+async_chanmsg(Irc, Channel, Lines) ->
+	async_command(Irc, {async_irc_command, chanmsg, Channel, Lines}).
 
-async_privmsg(Irc, To, LongMsg) ->
-	async_command(Irc, {async_privmsg, To, LongMsg}).
+async_action(Irc, Channel, Lines) ->
+	async_command(Irc, {async_irc_command, action, Channel, Lines}).
+
+async_privmsg(Irc, To, Lines) ->
+	async_command(Irc, {async_irc_command, privmsg, To, Lines}).
 
 %% gen_fsm callbacks
 
@@ -247,17 +250,25 @@ state_auth_end({endofmotd, _}, Conn) ->
 state_auth_end(_, Conn) ->
 	{next_state, state_auth_end, Conn}.
 
-state_connected({async_chanmsg, Channel, LongMsg}, Conn) ->
-	{next_state, state_connected, Conn};
-state_connected({async_privmsg, To, LongMsg}, Conn) ->
-	%% TODO: deeplist-aware tokens/2
+state_connected({async_irc_command, privmsg, To, Lines}, Conn) ->
 	spawn_link(fun () ->
 					   [begin irc_command({privmsg, To, Line}, Conn), 
 							  msg_throttle(Conn)
-						end || Line <- string:tokens(LongMsg, "\r\n")],
+						end || Line <- Lines],
 					   ok
 			   end),
 	{next_state, state_connected, Conn};	
+state_connected({async_irc_command, Cmd, Channel, Lines}, Conn) ->
+	case dict:find(Channel, Conn#conn.chan_fsms) of
+		{ok, FsmRef} ->
+			Fun = fun (Line) -> irc_command({Cmd, Channel, Line}, Conn),
+								msg_throttle(Conn)
+				  end,
+			irc_chan:chan_event(FsmRef, {irc_command, Fun, Lines});
+		_ ->	
+			false
+	end,
+	{next_state, state_connected, Conn};
 state_connected({irc_command, Cmd}, Conn) ->
 	irc_command(Cmd, Conn),
 	{next_state, state_connected, Conn};

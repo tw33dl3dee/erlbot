@@ -101,6 +101,9 @@ state_joined({topic, _, ?USER(AuthorNick), Topic}, Chan) ->
 	{next_state, state_joined, change_topic(Topic, AuthorNick, Chan)};
 state_joined({mytopic, _, MyNick, Topic}, Chan) ->
 	{next_state, state_joined, change_topic(Topic, MyNick, Chan)};
+state_joined({irc_command, Fun, Lines}, Chan) ->
+	[Fun(Line) || Line <- Lines],
+	{next_state, state_joined, Chan};
 state_joined(_, Chan) ->
 	{next_state, state_joined, Chan}.
 

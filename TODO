@@ -4,7 +4,7 @@
 * DONE Reconnection timeout in case `irc_conn' dies.
 * DONE Add own nick to mymode, mytopic.
 * DONE Close socket immediately on termination, print some error.
-* TODO Eliminate list flattening where possible.
+* TODO Eliminate list flattening where possible (util:multiline remaining).
 * TODO ALL_CHAN_EVENTS.
 * TODO Behaviour dependencies.
 * DONE Disable \r\n anywhere else but in async_*
