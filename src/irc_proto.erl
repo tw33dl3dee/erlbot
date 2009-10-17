@@ -23,6 +23,8 @@
 -define(CRLF, "\r\n").
 -define(IS_DIGIT(Var), $0 =< Var, Var =< $9).
 
+-compile([bin_opt_info]).
+
 %% public interface
 
 start_link(Handler, Host, Options) ->
@@ -152,30 +154,32 @@ do_command({pong, Server}, State) ->
 send(State, Prefix) ->
 	send(State, Prefix, [], []).
 
-send(State, Prefix, Data) ->
-	send(State, Prefix, Data, []).
+send(State, Prefix, Line) ->
+	send(State, Prefix, Line, []).
 
-send(State, Prefix, [], Suffix) ->
-	send_lines(State, Prefix, [""], Suffix);
-send(State, Prefix, Data, Suffix) ->
-	%Lines = string:tokens(Data, ?CRLF),
-	%% @TODO something sensible about this
-	Lines = [Data],
-	send_lines(State, Prefix, Lines, Suffix).
-
-send_lines(State, Prefix, [Line | Rest], Suffix) ->
-	S = send_bytes(State, utf8:encode(Prefix), utf8:encode(Line), utf8:encode(Suffix)),
-	send_lines(S, Prefix, Rest, Suffix);
-send_lines(State, _, _, _) ->
-	State.
+send(State, Prefix, Line, Suffix) ->
+	send_bytes(State, utf8:encode(Prefix), utf8:encode(Line), utf8:encode(Suffix)).
 
 send_bytes(State, Prefix, Bytes, Suffix) when size(Bytes) =< State#state.maxsend ->
+	true = sanity_check(Bytes),
 	ok = gen_tcp:send(State#state.sock, <<Prefix/binary, Bytes/binary, Suffix/binary, ?CRLF>>),
 	State;
 send_bytes(State, Prefix, Bytes, Suffix) ->
 	{ByteLine, Rest} = utf8:split(Bytes, State#state.maxsend),
 	S = send_bytes(State, Prefix, ByteLine, Suffix),
 	send_bytes(S, Prefix, Rest, Suffix).
+
+%% Ensure buffer has no CRLF and null bytes
+sanity_check(<<C/utf8, Rest/binary>>) ->
+	case C of
+		$\r -> false;
+		$\n -> false;
+		0   -> false;
+		_   ->
+			sanity_check(Rest)
+	end;
+sanity_check(<<>>) ->
+	true.
 
 %% IRC protocol parser
 

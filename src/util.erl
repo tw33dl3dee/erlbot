@@ -1,19 +1,21 @@
 -module(util).
 -author("Ivan Korotkov <twee@tweedle-dee.org>").
 
--export([print/1, print/2, split/1, contains/2, set_flag/2, unset_flag/2]).
+-export([multiline/1, multiline/2, split/1, contains/2, set_flag/2, unset_flag/2]).
 -export([epoch/0, epoch/1]).
 -export([uri_encode/1]).
 -export([execvp/3, execvp/4, system/1, system/2, find_prog/2, signame/1]).
 -export([check_latin/1, count_latin/1, check_letter/1, count_letters/1]).
 
-print(Term) ->
-	lists:flatten(io_lib:print(Term)).
+-define(CRLF, "\r\n").
 
-print(Format, Data) when is_list(Data) ->
-	lists:flatten(io_lib:format(Format, Data));
-print(Format, Data) ->
-	print(Format, [Data]).
+multiline(Term) ->
+	string:tokens(lists:flatten(io_lib:print(Term)), ?CRLF).
+
+multiline(Format, Data) when is_list(Data) ->
+	string:tokens(lists:flatten(io_lib:format(Format, Data)), ?CRLF);
+multiline(Format, Data) ->
+	multiline(Format, [Data]).
 
 split(String) ->
 	re:split(String, "\s+", [{return, list}, trim]).

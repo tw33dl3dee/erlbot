@@ -12,6 +12,8 @@
 -module(utf8).
 -author("Ivan Korotkov <twee@tweedle-dee.org>").
 
+-compile([bin_opt_info]).
+
 %% External API
 -export([encode/1, decode/1, try_decode/1, split/2]).
 

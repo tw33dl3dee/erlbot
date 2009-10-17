@@ -25,7 +25,7 @@ handle_event(cmdevent, {chancmd, Chan, _, ["uptime"]}, Irc) ->
 	{ok, undefined};
 handle_event(cmdevent, {chancmd, Chan, _, ["time"]}, Irc) ->
 	{success, [Time]} = util:system("date '+%a %b %d %R:%S %Z %Y'"),
-	irc_conn:chanmsg(Irc, Chan, io_lib:format("Точное время: ~s.", [Time])),
+	irc_conn:chanmsg(Irc, Chan, ["Точное время: ", Time, "."]),
 	{ok, undefined};
 handle_event(cmdevent, {chancmd, Chan, ?USER(Nick), ["ping"]}, Irc) ->
 	irc_conn:command(Irc, choice:make([{chanmsg, Chan, ["Да-да, ", Nick, "?.."]},
