@@ -211,7 +211,7 @@ handle_irc_event(Event, FsmPid, false) ->
 
 %% Conns
 
-handle_event({ping, Server}, StateName, StateData) ->
+handle_event({ping, _, Server}, StateName, StateData) ->
 	{next_state, StateName, pong(Server, StateData)};
 handle_event(_Event, StateName, StateData) ->
 	{next_state, StateName, StateData}.
@@ -219,7 +219,7 @@ handle_event(_Event, StateName, StateData) ->
 handle_sync_event(_Event, _From, StateName, StateData) ->
 	{reply, ok, StateName, StateData}.
 
-state_connecting({notice, _}, Conn) ->
+state_connecting({notice, _, _}, Conn) ->
 	{next_state, state_auth_nick, auth_login(Conn)};
 state_connecting(_, Conn) ->
 	{next_state, state_connecting, Conn}.
@@ -227,7 +227,7 @@ state_connecting(_, Conn) ->
 state_auth_nick(Event, Conn) when element(1, Event) =:= erroneusnickname;
 								   element(1, Event) =:= nicknameinuse ->
 	{next_state, state_auth_nick, auth_login(next_nick(Conn))};
-state_auth_nick({myinfo, _, _, _, _}, #conn{conf = Conf} = Conn) ->
+state_auth_nick({myinfo, _, _, _, _, _}, #conn{conf = Conf} = Conn) ->
 	case Conf#conf.oper_pass of
 		[] ->
 			{next_state, state_auth_end, Conn};
@@ -240,12 +240,12 @@ state_auth_nick(_, Conn) ->
 state_auth_oper(Event, Conn) when element(1, Event) =:= nooperhost;
 								   element(1, Event) =:= passwdmismatch -> 
 	{next_state, state_connected, autojoin(Conn)};
-state_auth_oper({youreoper, _}, Conn) ->
+state_auth_oper({youreoper, _, _}, Conn) ->
 	{next_state, state_connected, autojoin(retry_nick(set_umode(Conn#conn{is_oper = true})))};
 state_auth_oper(_, Conn) ->
 	{next_state, state_auth_oper, Conn}.
 
-state_auth_end({endofmotd, _}, Conn) ->
+state_auth_end({endofmotd, _, _}, Conn) ->
 	{next_state, state_connected, autojoin(Conn)};
 state_auth_end(_, Conn) ->
 	{next_state, state_auth_end, Conn}.
@@ -302,9 +302,9 @@ myevent({kick, Channel, User, Nick, Reason}, Nick) ->
 myevent({mode, Channel, User, Mode, Nick}, Nick) ->
 	{mymode, Channel, User, Mode, Nick};
 %% User mode event can ONLY be myevent anyway
-myevent({umode, Mode, Nick}, Nick) ->
-	{umode, Mode, Nick};
-myevent({nick, ?USER(Nick), NewNick}, Nick) ->
+myevent({umode, Nick, Mode}, Nick) ->
+	{umode, Nick, Mode};
+myevent({nick, NewNick, ?USER(Nick)}, Nick) ->
 	{mynick, NewNick};
 myevent({topic, Channel, ?USER(Nick), Topic}, Nick) ->
 	{mytopic, Channel, Nick, Topic};

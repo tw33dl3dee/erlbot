@@ -8,6 +8,13 @@
 %% public interface
 -export([start_link/4, start/4, start_link/3, start/3, irc_command/2]).
 
+%% @type irc_event() = {Type, Originator} | {Type, Originator, Arg1} | {Type, Originator, Arg1, Arg2} | etc
+%%              Type = atom()
+%%        Originator = list() | 'undefined'.
+%% Type is atom describing event type (chanmsg, topic, etc), Originator is either channel name (when event belongs to channel), 
+%% user name (when event is associated with some user, like quitting, changing nick, privmsg) or 
+%% `undefined' if event is a server event.
+
 -record(conf, {ping_timeout  = 60000,
 			   sock_timeout  = 30000,
 			   port          = 6667,
@@ -199,9 +206,9 @@ parse_line(Line, State) ->
 	end.
 
 parse_special(["ERROR", Error], State) ->
-	event({error, Error}, State);
+	event({error, undefined, Error}, State);
 parse_special(["PING", Server], State) ->
-	event({ping, Server}, State);
+	event({ping, undefined, Server}, State);
 parse_special(Tokens, State) ->
 	parse_user(Tokens, State).
 
@@ -224,7 +231,7 @@ parse_tokens([User, "PRIVMSG", Target, Msg], State) ->
 parse_tokens([User, "TOPIC", Channel, Topic], State) ->
 	event({topic, Channel, User, Topic}, State);
 parse_tokens([User, "NICK", NewNick], State) ->
-	event({nick, User, NewNick}, State);
+	event({nick, NewNick, User}, State);
 parse_tokens([User, "JOIN", Channel], State) ->
 	event({join, Channel, User}, State);
 parse_tokens([User, "PART", Channel, Reason], State) ->
@@ -236,11 +243,11 @@ parse_tokens([User, "QUIT", Reason], State) ->
 parse_tokens([User, "KICK", Channel, Nick, Reason], State) ->
 	event({kick, Channel, User, Nick, Reason}, State);
 parse_tokens([Nick, "MODE", Nick, Mode], State) ->
-	event({umode, Mode, Nick}, State);
+	event({umode, Nick, Mode}, State);
 parse_tokens([User, "MODE", Channel, Mode, Nick], State) ->
 	event({mode, Channel, User, Mode, Nick}, State);
 parse_tokens([_Server, "NOTICE", _Target, Notice], State) ->
-	event({notice, Notice}, State);
+	event({notice, undefined, Notice}, State);
 parse_tokens([_Server, topic, _Target, Channel, Topic], State) ->
 	event({chantopic, Channel, Topic}, State);
 parse_tokens([_Server, topicinfo, _Target, Channel, Author, Ts], State) ->
@@ -250,7 +257,7 @@ parse_tokens([_Server, namreply, _Target, _, Channel, Users], State) ->
 parse_tokens([_Server, endofnames, _Target, Channel, Text], State) ->
 	event({endofnames, Channel, Text}, State);
 parse_tokens([_Server, myinfo, _Target, Server, Vsn, Umodes, Chanmodes], State) ->
-	event({myinfo, Server, Vsn, Umodes, Chanmodes}, State);
+	event({myinfo, undefined, Server, Vsn, Umodes, Chanmodes}, State);
 parse_tokens([_Server, nicknameinuse, _Target, Nick, Text], State) ->
 	event({nicknameinuse, Nick, Text}, State);
 parse_tokens([_Server, Reply, _Target, Channel, Text], State) 
@@ -258,9 +265,9 @@ parse_tokens([_Server, Reply, _Target, Channel, Text], State)
 	   Reply =:= nosuchchannel; Reply =:= channelisfull; Reply =:= toomanychannels; Reply =:= killdeny ->
 	event({Reply, Channel, Text}, State);
 parse_tokens([_Server, Reply, _Target, Text], State) when is_atom(Reply) ->
-	event({Reply, Text}, State);
+	event({Reply, undefined, Text}, State);
 parse_tokens(Tokens, State) ->
-	event({unknown, Tokens}, State).
+	event({unknown, undefined, Tokens}, State).
 
 parse_privmsg(Channel, User, [1] ++ "ACTION " ++ Action, State) ->
 	event({action, Channel, User, string:strip(Action, right, 1)}, State);

@@ -24,7 +24,8 @@ handle_event(customevent, {appeal, Chan, ?USER(Nick), Msg}, Irc) ->
 			irc_conn:chanmsg(Irc, Chan, "\\O/ Превед, " ++ Nick ++ "!!!");
 	   %% @TODO move to `bhv_suicide'
 	   FuckOff ->
-			erlbot:suicide(Irc, Nick);
+			%erlbot:suicide(Irc, Nick);
+			ok;
 	   Caress ->
 			irc_conn:chanmsg(Irc, Chan, "^_^");
 	   true ->

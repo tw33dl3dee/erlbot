@@ -7,20 +7,31 @@
 %%%-------------------------------------------------------------------
 -module(erlbot).
 
--export([blurp/2, show_uptime/2, comment/4]).
+-export([blurp/2, show_uptime/2, comment/4, dice/3, bash_quote/3, bash_search/3, 
+		 google_search/3, google_calc/3, google_trans/4, lurkmore_topic/3, identify/3]).
 
 -include("utf8.hrl").
+
+empty_msg_check([]) -> empty_error_msg();
+empty_msg_check([""]) -> empty_error_msg();
+empty_msg_check(S) -> S.
+
+empty_error_msg() ->
+	choice:make(["А вот хуй...",
+				 "<тут могла бы быть ваша реклама>",
+				 "Да хер его знает.",
+				 "Почувствуйте себя неудачником!"]).
 
 -define(BLURP_DELAY, 1000).   % msec
 -define(BLURP_REV_PROB, 40).  % 1/40th
 
-%% @TODO Move to async process
 blurp(Irc, Chan) ->
 	Words = ["Хамите", "Хо-хо!", "Знаменито", "Мрак", "Жуть", "Не учите меня жить", 
 			 "Как ребёнка", "Кр-р-расота!", "Толстый и красивый", "Поедем на извозчике",
 			 "Поедем на таксо", "У вас вся спина белая", "Подумаешь!", "Ого!"],
 	case choice:make([{1, do}, {?BLURP_REV_PROB, dont}]) of
 		do ->
+			timer:sleep(?BLURP_DELAY),
 			irc_conn:chanmsg(Irc, Chan, choice:make(Words)),
 			did;
 		dont ->
@@ -49,4 +60,56 @@ comment(join, Chan, Nick, Irc) ->
 comment(exit, Chan, Nick, Irc) ->
 	irc_conn:chanmsg(Irc, Chan, choice:make([["Нам будет нехватать тебя, ", Nick, "."], 
 											 "Гг, наконец-то он ушел."])),
+	{ok, undefined}.
+
+-define(DICE_TIMEOUT, 1000).
+
+dice(Irc, Chan, Max) ->
+	Res = choice:uniform(Max),
+	irc_conn:chanmsg(irc, Chan, "Кручу, верчу, наебать хочу..."),
+	timer:sleep(?DICE_TIMEOUT),
+	irc_conn:chanmsg(Irc, Chan, integer_to_list(Res)),
+	{ok, undefined}.
+
+-define(SCRIPT_DIR, "scripts").
+
+bash_quote(Irc, Chan, Num) ->
+	{success, Lines} = util:execvp("bash.pl", [integer_to_list(Num)], ?SCRIPT_DIR, []),
+	irc_conn:async_chanmsg(Irc, Chan, Lines),
+	{ok, undefined}.
+
+bash_search(Irc, Chan, Query) ->
+	{success, Lines} = util:execvp("bash-search.pl", [Query], ?SCRIPT_DIR, []),
+	irc_conn:async_chanmsg(Irc, Chan, Lines),
+	{ok, undefined}.
+
+google_search(Irc, Chan, Query) ->
+	{success, Lines} = util:execvp("google.pl", [Query], ?SCRIPT_DIR, []),
+	irc_conn:async_chanmsg(Irc, Chan, Lines),
+	{ok, undefined}.
+
+google_calc(Irc, Chan, Query) ->
+	{success, Lines} = util:execvp("gcalc.pl", [Query], ?SCRIPT_DIR, []),
+	irc_conn:async_chanmsg(Irc, Chan, Lines),
+	{ok, undefined}.
+
+google_trans(Irc, Chan, Dict, Word) ->
+	{success, Lines} = util:execvp("gdict.pl", [Word, Dict], ?SCRIPT_DIR, []),
+	irc_conn:async_chanmsg(Irc, Chan, Lines),
+	{ok, undefined}.
+
+lurkmore_topic(Irc, Chan, Topic) ->
+	Url = "http://lurkmore.ru/" ++ util:uri_encode(Topic),
+	irc_conn:action(Irc, Chan, ["доставил: ", Url]),
+	{ok, undefined}.
+
+identify(Irc, Chan, short) ->
+	irc_conn:action(Irc, Chan, "нядваноль"),
+	timer:sleep(500),
+	irc_conn:action(Irc, Chan, choice:make(["векторен и гипертекстов",
+											"металлическ и блестящ"])),
+	{ok, undefined};
+identify(Irc, Chan, long) ->
+	identify(Irc, Chan, short),
+	irc_conn:action(Irc, Chan, ["обитает по адресу: ", "http://tweedle-dee.org/bzr/erlbot"]),
 	{ok, undefined}.

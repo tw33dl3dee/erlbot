@@ -91,7 +91,7 @@ state_joined({quit, ?USER(Nick), _}, Chan) ->
 	{next_state, state_joined, remove_user(Nick, Chan)};
 state_joined({join, _, ?USER(Nick)}, Chan) ->
 	{next_state, state_joined, add_user(Nick, Chan)};
-state_joined({nick, ?USER(OldNick), NewNick}, Chan) ->
+state_joined({nick, NewNick, ?USER(OldNick)}, Chan) ->
 	{next_state, state_joined, rename_user(OldNick, NewNick, Chan)};
 state_joined({mode, _, _, Mode, Nick}, Chan) ->
 	{next_state, state_joined, change_mode(Nick, Mode, Chan)};

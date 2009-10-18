@@ -15,6 +15,8 @@
 %% gen_event callbacks
 -export([init/1, handle_event/2, handle_call/2, handle_info/2, terminate/2, code_change/3]).
 
+-include("irc.hrl").
+
 -record(state, {mod     :: atom()}).
 
 %%%-------------------------------------------------------------------
@@ -56,7 +58,7 @@ handle_event({Type, Event, Irc}, #state{mod = M} = State) ->
 			gen_event:notify(self(), {NewType, NewEvent, Irc}),
 			{ok, State};
 		{'EXIT', Reason} ->
-			gen_event:notify(self(), {exitevent, {M, Reason}, Irc}),
+			gen_event:notify(self(), {exitevent, {M, followup(Event), Reason}, Irc}),
 			{'EXIT', Reason}
 	end;
 handle_event(Event, State) ->
@@ -72,3 +74,13 @@ code_change(_Vsn, State, _Extra) ->
 %%%-------------------------------------------------------------------
 %%% Internal functions
 %%%-------------------------------------------------------------------
+
+%% Originator of the event (channel name or nick name) where stack trace or any other log may be sent.
+%% `undefined' if N/A.
+followup(Event) ->
+	case element(2, Event) of
+		undefined -> undefined;
+		?USER(Nick) -> Nick;
+		Chan when ?IS_CHAN(Chan) -> Chan;
+		Nick -> Nick
+	end.

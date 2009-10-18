@@ -1,11 +1,11 @@
 %%%-------------------------------------------------------------------
-%%% File    : bhv_skel.erl
+%%% File    : bhv_greet.erl
 %%% Author  : Ivan Korotkov <twee@tweedle-dee.org>
 %%% Description : 
 %%%
 %%% Created : 2 Oct 2009 by Ivan Korotkov <twee@tweedle-dee.org>
 %%%-------------------------------------------------------------------
--module(bhv_blurp).
+-module(bhv_greet).
 
 -behaviour(irc_behaviour).
 -export([handle_event/3]).
@@ -13,14 +13,8 @@
 -include("utf8.hrl").
 -include("irc.hrl").
 
-handle_event(customevent, {genmsg, Chan, _User, _Msg}, Irc) ->
-	erlbot:blurp(Irc, Chan),
-	{ok, undefined};
-handle_event(_, {Event, Chan, _, _, _}, Irc) when Event =:= mode; Event =:= mymode ->
-	erlbot:blurp(Irc, Chan),
-	{ok, undefined};
-handle_event(_, {nick, NewNick, _}, Irc) ->
-	irc_conn:each_channel(Irc, fun (Chan) -> erlbot:blurp(Irc, Chan) end, NewNick),
-	{ok, undefined};
+%% Will conflict with kick-rejoin
+handle_event(chanevent, {joined, Chan, _, _}, Irc) ->
+	erlbot:identify(Irc, Chan, short);
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.

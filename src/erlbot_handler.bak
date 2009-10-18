@@ -45,48 +45,6 @@ parse_privcmd(State, User, ["stat"]) ->
 parse_privcmd(State, User, ["hist"]) ->
 	show_history(State, User);
 
-empty_err_msg(X) when X < 0.25 ->
-	"А вот хуй...";
-empty_err_msg(X) when X < 0.5 ->
-	"<тут могла бы быть ваша реклама>";
-empty_err_msg(X) when X < 0.75 ->
-	"Да хер его знает.";
-empty_err_msg(_) ->
-	"Почувствуйте себя неудачником!".
-
-print_long_results(State, [""]) ->
-	cmd({chanmsg, [empty_err_msg(random_p:uniform())]}, State),
-	ok;
-print_long_results(State, Results) ->
-	lists:foreach(fun (S) -> cmd({chanmsg, [S]), timer:sleep(?MSG_MIN_DELAY) end, Results}, State),
-	ok.	
-
-privmsg_long_results(State, Nick, [""]) ->
-	cmd({privmsg, [Nick, "--"]}, State);
-privmsg_long_results(State, Nick, Results) ->
-	lists:foreach(fun (S) -> cmd({privmsg, [Nick, S]), timer:sleep(?PRIVMSG_MIN_DELAY) end, Results}, State),
-	ok.
-
-do_bash(State, Num) ->
-	BashCmd = lists:flatten(io_lib:format("~s '~b'", ["bash.pl", Num])),
-	{ok, Results} = regexp:split(yadbot_util:system(?SCRIPT_DIR, BashCmd), "\n"),
-	print_long_results(State, Results).
-
-do_bash_search(State, SearchQuery) ->
-	BashCmd = lists:flatten(io_lib:format("~s '~s'", ["bash-search.pl", sanitize(SearchQuery, $')])),  %'
-	{ok, Results} = regexp:split(yadbot_util:system(?SCRIPT_DIR, BashCmd), "\n"),
-	print_long_results(State, Results).
-
-do_google(State, SearchQuery) ->
-	GoogleCmd = lists:flatten(io_lib:format("~s '~s'", ["google.pl", sanitize(SearchQuery, $')])),  %'
-	{ok, Results} = regexp:split(yadbot_util:system(?SCRIPT_DIR, GoogleCmd), "\n"),
-	print_long_results(State, Results).
-
-do_gcalc(State, SearchQuery) ->
-	GoogleCmd = lists:flatten(io_lib:format("~s '~s'", ["gcalc.pl", sanitize(SearchQuery, $')])),  %'
-	{ok, Results} = regexp:split(yadbot_util:system(?SCRIPT_DIR, GoogleCmd), "\n"),
-	print_long_results(State, Results).
-
 do_wiki(State, Lang, SearchQuery) ->
 	WikiCmd = lists:flatten(io_lib:format("~s ~s '~s'", ["wiki.pl", Lang, sanitize(SearchQuery, $')])),  %'
 	{ok, Results} = regexp:split(yadbot_util:system(?SCRIPT_DIR, WikiCmd), "\n"),
@@ -116,11 +74,6 @@ do_dict(State, Server, Db, Word) ->
 	{ok, Results} = regexp:split(yadbot_util:system(DictCmd), "\n"),
 	print_long_results(State, Results).
 
-do_gdict(State, LangPair, Word) ->
-	GdictCmd = lists:flatten(io_lib:format("~s \"~s\" '~s'", ["gdict.pl", sanitize(Word, $"), LangPair])),  %"
-	{ok, Results} = regexp:split(yadbot_util:system(?SCRIPT_DIR, GdictCmd), "\n"),
-	print_long_results(State, Results).
-
 -define(LYNCH_FILE, "data/lynch.txt").
 
 do_lynch(State, Action) ->
@@ -143,14 +96,6 @@ do_jabberwock(State) ->
 %%	{ok, Lines} = regexp:split(binary_to_list(Data), "\n"),
 %%	lists:foreach(fun (L) -> cmd({chanmsg, [L]), timer:sleep(500) end, Lines}, State),
 %%	ok.
-
--define(DICE_TIMEOUT, 1000).
-
-do_dice(State, Max) ->
-	Res = random_p:uniform(Max),
-	cmd({chanmsg, ["Кручу, верчу, наебать хочу..."]}, State),
-	timer:sleep(?DICE_TIMEOUT),
-	cmd({chanmsg, [integer_to_list(Res)]}, State).
 
 show_help(State) ->	
 	cmd({me, ["-- ахуенно полезный и функциональный бот."]}, State),

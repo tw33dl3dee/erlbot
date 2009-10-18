@@ -9,8 +9,8 @@
 
 -behaviour(supervisor).
 
-%% External exports
--export([start_link/2, start_link/3, add_behaviour/2, irc_conn/1]).
+%% External API
+-export([start_link/2, start_link/3, add_behaviour/2, irc_conn/1, run/0, reload/0]).
 
 %% Internal entry points
 -export([start_link/1]).
@@ -20,11 +20,6 @@
 
 %% Testing interface
 -export([test/0, test/1]).
-
--include(".secret.hrl").
--define(CHILD_SHUTDOWN, 60000).
--define(MAX_R, 10).
--define(MAX_T, 10).
 
 %%%-------------------------------------------------------------------
 %%% API
@@ -37,7 +32,7 @@ start_link(ConnArgs, Behaviours) ->
 	{ok, SupPid} = supervisor:start_link(?MODULE, top),
 	start_irc(SupPid, ConnArgs, Behaviours).
 
-%% Unused for now.
+%% Currently unused.
 start_link(Level) ->
 	supervisor:start_link(?MODULE, Level).
 
@@ -51,11 +46,36 @@ irc_conn(SupRef) ->
 %%% Callback functions from supervisor
 %%%-------------------------------------------------------------------
 
+-define(CHILD_SHUTDOWN, 60000).
+-define(MAX_R, 10).
+-define(MAX_T, 10).
+
 init(_) ->
 	Throttle = {throttle, {throttle, start_link, []}, permanent, ?CHILD_SHUTDOWN, worker, [throttle]},
 	Choice = {choice, {choice, start_link, []}, permanent, ?CHILD_SHUTDOWN, worker, [choice]},
 	EvMgr = {ev_mgr, {gen_event, start_link, []}, permanent, ?CHILD_SHUTDOWN, worker, dynamic},
 	{ok, {{one_for_one, ?MAX_R, ?MAX_T}, [Choice, Throttle, EvMgr]}}.
+
+%%%-------------------------------------------------------------------
+%%% Conventional API (to be replaced with OTP application)
+%%%-------------------------------------------------------------------
+
+-include(".secret.hrl").
+
+run() ->
+	{ok, Pid} = start_link({local, erlbot}, 
+						   {"192.168.1.1", "nya", [{login, "nya"}, {oper_pass, ?MAGIC_WORD}, {autojoin, ["#pron", "#work", "#mstu"]}, {umode, "+F"}]}, 
+						   [bhv_err_print, bhv_log, bhv_test, bhv_appeal, bhv_chancmd, bhv_getop, bhv_pom, bhv_privcmd, bhv_comment, bhv_bash, 
+							bhv_google, bhv_lebedev, bhv_lojban, bhv_lurkmore, bhv_misc, bhv_wiki, bhv_blurp, bhv_giveop, bhv_greet]),
+	unlink(Pid),
+	Pid.
+
+%% Reload all modules under current working dir.
+reload() ->
+	{ok, Pwd} = file:get_cwd(),
+	[begin code:purge(Mod),
+		   code:load_file(Mod) 
+	 end || {Mod, ModPath} <- code:all_loaded(), is_list(ModPath), string:str(ModPath, Pwd) == 1].
 
 %%%-------------------------------------------------------------------
 %%% Internal functions
@@ -99,18 +119,11 @@ ev_mgr(SupRef) ->
 
 %%% Testing
 
-%% test_whereis(SupRef) ->
-%% 	io:format("then: ~p~n", [now()]),
-%% 	lists:map(fun (_) -> whereis_child(SupRef, handler) end, lists:seq(1, 1000000)),
-%% 	io:format("later: ~p~n", [now()]),
-%% 	lists:map(fun (_) -> whereis(?MODULE) end, lists:seq(1, 1000000)),
-%% 	io:format("now: ~p~n", [now()]).	
-
 test() ->
 	{ok, Pid} = start_link({local, erlbot}, 
 						   {"192.168.1.1", "yest", [{login, "nya"}, {oper_pass, ?MAGIC_WORD}, {autojoin, ["#test"]}, {umode, "+F"}]}, 
-						   [bhv_err_print, bhv_log, bhv_test, bhv_appeal, bhv_chancmd, bhv_getop, bhv_pom, bhv_privcmd, bhv_comment, 
-						   	bhv_bash, bhv_google, bhv_lebedev, bhv_lojban, bhv_lurkmore, bhv_misc, bhv_wiki, bhv_blurp, bhv_giveop]),
+						   [bhv_err_print, bhv_log, bhv_test, bhv_appeal, bhv_chancmd, bhv_getop, bhv_pom, bhv_privcmd, bhv_comment, bhv_bash, 
+							bhv_google, bhv_lebedev, bhv_lojban, bhv_lurkmore, bhv_misc, bhv_wiki, bhv_blurp, bhv_giveop, bhv_greet]),
 	unlink(Pid),
 	Pid.
 

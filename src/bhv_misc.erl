@@ -42,8 +42,9 @@ handle_event(cmdevent, {chancmd, Chan, _, ["dice", Max | _]}, Irc) ->
 			not_handled
 	end;
 handle_event(cmdevent, {chancmd, Chan, _, ["identify" | _]}, Irc) ->
-	irc_conn:action(Irc, Chan, "is twee's bot written in Erlang and Perl (http://tweedle-dee.org/svn/erlbot/)"),
-	{ok, undefined};
+	erlbot:identify(Irc, Chan, long);
+handle_event(cmdevent, {chancmd, Chan, _, ["id" | _]}, Irc) ->
+	erlbot:identify(Irc, Chan, long);
 handle_event(cmdevent, {chancmd, Chan, _, ["help" | _]}, Irc) ->
 	erlbot:help(Irc, Chan),
 	{ok, undefined};

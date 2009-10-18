@@ -10,7 +10,7 @@
 -behaviour(gen_server).
 
 %% External exports
--export([start_link/0, start/0, make/1]).
+-export([start_link/0, start/0, make/1, uniform/0, uniform/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -27,6 +27,12 @@ start() ->
 make(Choices) when is_list(Choices), length(Choices) > 1 ->
 	gen_server:call(?MODULE, {choose, Choices}).
 
+uniform() ->
+	gen_server:call(?MODULE, uniform).
+
+uniform(N) ->
+	gen_server:call(?MODULE, {uniform, N}).
+
 %%%-------------------------------------------------------------------
 %%% Callback functions from gen_server
 %%%-------------------------------------------------------------------
@@ -37,6 +43,10 @@ init([]) ->
 
 handle_call({choose, Choices}, _From, State) ->
 	{reply, choose(Choices), State};
+handle_call({uniform, N}, _From, State) ->
+	{reply, random:uniform(N), State};
+handle_call(uniform, _From, State) ->
+	{reply, random:uniform(), State};
 handle_call(_Request, _From, State) ->
 	{reply, nosuchcall, State}.
 
