@@ -1,11 +1,12 @@
 -module(util).
 -author("Ivan Korotkov <twee@tweedle-dee.org>").
 
--export([multiline/1, multiline/2, split/1, contains/2, set_flag/2, unset_flag/2]).
+-export([multiline/1, multiline/2, split/1, split/2, contains/2, set_flag/2, unset_flag/2]).
 -export([epoch/0, epoch/1]).
 -export([uri_encode/1]).
 -export([execvp/3, execvp/4, system/1, system/2, find_prog/2, signame/1]).
 -export([check_latin/1, count_latin/1, check_letter/1, count_letters/1]).
+-export([read_file/1]).
 
 -define(CRLF, "\r\n").
 
@@ -19,6 +20,9 @@ multiline(Format, Data) ->
 
 split(String) ->
 	re:split(String, "\s+", [unicode, {return, list}, trim]).
+
+split(String, Delim) ->
+	re:split(String, Delim, [unicode, {return, list}, trim]).
 
 contains(String, Pattern) ->
 	case re:run(String, Pattern, [unicode, caseless, {capture, none}]) of
@@ -158,24 +162,6 @@ signame(31) -> unused;
 signame(I) when I < 64 -> {rt, I - 32};
 signame(I) -> I.
 
-uri_encode(Atom) when is_atom(Atom) ->
-    uri_encode(atom_to_list(Atom));
-uri_encode(Int) when is_integer(Int) ->
-    uri_encode(integer_to_list(Int));
-uri_encode(String) ->
-    uri_encode(String, []).
-
-uri_encode([], Acc) ->
-    lists:reverse(Acc);
-uri_encode([C | Rest], Acc) when (C > 32) and (C < 128) ->
-    uri_encode(Rest, [C | Acc]);
-uri_encode([C | Rest], Acc) ->
-    <<Hi:4, Lo:4>> = <<C>>,
-    uri_encode(Rest, [hexdigit(Lo), hexdigit(Hi), $% | Acc]).
-
-hexdigit(C) when C < 10 -> $0 + C;
-hexdigit(C) when C < 16 -> $A + (C - 10).
-
 %% Life sucks, doesn't it?..
 check_latin(C) when C >= $a, C =< $z; C >= $A, C =< $Z; 
 					C =:= $`; C =:= $[; C =:= $]; C =:= ${; C =:= $}; C =:= $:; C =:= $;; 
@@ -195,3 +181,37 @@ count_latin(Str) ->
 
 count_letters(Str) ->
 	lists:foldl(fun(C, Count) -> Count + check_letter(C) end, 0, Str).
+
+uri_encode(Atom) when is_atom(Atom) ->
+    uri_encode(atom_to_list(Atom));
+uri_encode(Int) when is_integer(Int) ->
+    uri_encode(integer_to_list(Int));
+uri_encode(String) ->
+    uri_encode(String, []).
+
+uri_encode([], Acc) ->
+    lists:reverse(Acc);
+uri_encode([C | Rest], Acc) when (C > 32) and (C < 128) ->
+    uri_encode(Rest, [C | Acc]);
+uri_encode([C | Rest], Acc) ->
+    <<Hi:4, Lo:4>> = <<C>>,
+    uri_encode(Rest, [hexdigit(Lo), hexdigit(Hi), $% | Acc]).
+
+hexdigit(C) when C < 10 -> $0 + C;
+hexdigit(C) when C < 16 -> $A + (C - 10).
+
+read_file(FileName) ->
+	{ok, Io} = file:open(FileName, [read, raw, read_ahead]),
+	read_lines(Io).
+
+read_lines(Io) ->
+	read_lines(Io, file:read_line(Io), []).
+
+read_lines(Io, {ok, Line}, Lines) ->
+	read_lines(Io, file:read_line(Io), [Line | Lines]);
+read_lines(Io, eof, Lines) ->
+	file:close(Io),
+	{ok, lists:reverse(Lines)};
+read_lines(Io, Error, _) ->
+	file:close(Io),
+	Error.

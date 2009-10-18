@@ -14,7 +14,7 @@
 -include("irc.hrl").
 
 handle_event(chanevent, {joined, Chan, ?TOPIC(""), _}, Irc) ->
-	erlbot:lynch(Irc, Chan, topic),
+	%erlbot:lynch(Irc, Chan, topic),
 	{ok, undefined};
 handle_event(cmdevent, {chancmd, Chan, _, ["lynch", "topic" | _]}, Irc) ->
 	erlbot:lynch(Irc, Chan, topic),

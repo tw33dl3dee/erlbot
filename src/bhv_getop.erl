@@ -16,8 +16,8 @@
 
 -define(OP_BOT_NICK, "dumbot").
 
-handle_event(chanevent, {joined, _, _, _}, Irc) ->
-	irc_conn:privmsg(Irc, ?OP_BOT_NICK, ?MAGIC_WORD),
+handle_event(chanevent, {joined, Chan, _, _}, Irc) ->
+	irc_conn:privmsg(Irc, ?OP_BOT_NICK, [?MAGIC_WORD, " ", Chan]),
 	{ok, undefined};
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.

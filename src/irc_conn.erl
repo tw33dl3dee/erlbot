@@ -6,9 +6,6 @@
 -export([init/1, terminate/3, code_change/4, handle_info/3, handle_event/3, handle_sync_event/4]).
 -export([state_connecting/2, state_auth_nick/2, state_auth_oper/2, state_auth_end/2, state_connected/2, state_connected/3]).
 
-%% irc_proto
--export([handle_irc_event/2]).
-
 %% public interface
 -export([start/3, start_link/3,start/2, start_link/2]).
 -export([chanmsg/3, privmsg/3, join/2, part/2, quit/2, action/3, mode/4, umode/2, kick/4, topic/3, nick/2, command/2]).
@@ -35,7 +32,6 @@
 			   chan_fsms = dict:new() :: dict()}).  %% channame -> pid()
 
 -include("irc.hrl").
--include("irc_chan.hrl").
 
 %% public interface
 
@@ -140,10 +136,9 @@ async_privmsg(Irc, To, Lines) ->
 
 init({Host, Nick, Handler, Options}) ->
 	process_flag(trap_exit, true),
-	FsmPid = self(),
 	Conf = conf({Nick, Options}),
 	conn_throttle(Host, Conf),
-	{ok, IrcRef} = irc_proto:start_link(fun (Event) -> ?MODULE:handle_irc_event(Event, FsmPid) end, Host, Options),
+	{ok, IrcRef} = irc_proto:start_link(Host, Options),
 	{ok, state_connecting, #conn{nick = Nick, login = Conf#conf.login, conf = Conf, irc_ref = IrcRef, handler = Handler}}.
 
 conf({Nick, Options}) ->
@@ -185,6 +180,10 @@ handle_info({'DOWN', _, process, Pid, _}, StateName, StateData) ->
 	{next_state, StateName, StateData#conn{chan_fsms = Channels}};
 handle_info({'EXIT', _, Reason}, _StateName, StateData) when Reason =/= normal ->
 	{stop, Reason, StateData};
+handle_info({irc, IrcRef, Event}, StateName, #conn{irc_ref = IrcRef} = StateData) ->
+	io:format("event from ~p: ~p~n", [IrcRef, Event]),
+	send_event(Event),
+	{next_state, StateName, StateData};
 handle_info(_Info, StateName, StateData) ->
 	io:format("INFO: ~p~n", [_Info]),
 	{next_state, StateName, StateData}.
@@ -195,19 +194,14 @@ terminate(Reason, _StateName, _StateData) ->
 code_change(_Vsn, StateName, StateData, _Extra) ->
 	{ok, StateName, StateData}.
 
-%% irc_proto callbacks
-
 %% events that are handled via send_all_state_event
--define(ALL_STATE_EVENTS, [ping]).
+-define(IS_ALLSTATE_EVENT(Event), 
+		element(1, Event) =:= ping).
 
-handle_irc_event(Event, FsmPid) when is_tuple(Event) ->
-	io:format("event from ~p: ~p~n", [FsmPid, Event]),
-	handle_irc_event(Event, FsmPid, lists:member(element(1, Event), ?ALL_STATE_EVENTS)).
-
-handle_irc_event(Event, FsmPid, true) ->
-	gen_fsm:send_all_state_event(FsmPid, Event);
-handle_irc_event(Event, FsmPid, false) ->
-	gen_fsm:send_event(FsmPid, Event).
+send_event(Event) when ?IS_ALLSTATE_EVENT(Event) ->
+	gen_fsm:send_all_state_event(self(), Event);
+send_event(Event) ->
+	gen_fsm:send_event(self(), Event).
 
 %% Conns
 
@@ -314,15 +308,35 @@ myevent(Event, _) ->
 notify_raw_event(Event, Conn) ->
 	notify_event(myevent(Event, Conn#conn.nick), Conn).
 
-notify_event(Event, Conn) ->
-	notify_event(Event, lists:member(element(1, Event), ?CHAN_EVENTS), Conn).
+%% events that are propagated to channel FSM (channel name must be 2nd element in event tuple)
+-define(IS_CHAN_EVENT(Event), 
+		element(1, Event) =:= joining; 
+		element(1, Event) =:= chantopic; 
+		element(1, Event) =:= names; 
+		element(1, Event) =:= endofnames; 
+		element(1, Event) =:= parted; 
+		element(1, Event) =:= kicked; 
+		element(1, Event) =:= join; 
+		element(1, Event) =:= part; 
+		element(1, Event) =:= kick; 
+		element(1, Event) =:= mode; 
+		element(1, Event) =:= mymode; 
+		element(1, Event) =:= topic; 
+		element(1, Event) =:= mytopic).
+
+%% events that are propagated to ALL channel FSMs
+-define(IS_ALLCHAN_EVENT(Event),
+		element(1, Event) =:= quit;
+		element(1, Event) =:= nick).
 
 %% TODO: handle mymode here?..
-notify_event({mynick, Nick}, _, Conn) ->
+notify_event({mynick, Nick}, Conn) ->
 	Conn#conn{nick = Nick};
-notify_event(Event, true, Conn) ->
+notify_event(Event, Conn) when ?IS_CHAN_EVENT(Event) ->
 	notify_chanevent(Event, Conn);
-notify_event(Event, false, Conn) ->
+notify_event(Event, Conn) when ?IS_ALLCHAN_EVENT(Event) ->
+	notify_allchanevent(Event, Conn);
+notify_event(Event, Conn) ->
 	notify_genevent(Event, Conn).
 
 notify_chanevent({joining, Channel}, Conn) ->
@@ -333,6 +347,10 @@ notify_chanevent(Event, Conn) ->
 	Channel = element(2, Event),
 	Pid = dict:fetch(Channel, Conn#conn.chan_fsms),
 	notify(irc_chan:chan_event(Pid, Event), chanevent, Conn).
+
+notify_allchanevent(Event, Conn) ->
+	[irc_chan:chan_event(Pid, Event) || {_, Pid} <- dict:to_list(Conn#conn.chan_fsms)],
+	notify_genevent(Event, Conn).
 
 notify_genevent(Event, Conn) ->
 	notify(Event, genevent, Conn).

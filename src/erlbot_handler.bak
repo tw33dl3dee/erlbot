@@ -45,15 +45,6 @@ parse_privcmd(State, User, ["stat"]) ->
 parse_privcmd(State, User, ["hist"]) ->
 	show_history(State, User);
 
-do_wiki(State, Lang, SearchQuery) ->
-	WikiCmd = lists:flatten(io_lib:format("~s ~s '~s'", ["wiki.pl", Lang, sanitize(SearchQuery, $')])),  %'
-	{ok, Results} = regexp:split(yadbot_util:system(?SCRIPT_DIR, WikiCmd), "\n"),
-	print_long_results(State, Results).
-
-do_lurkmore(State, Word) ->
-	Url = "http://lurkmore.ru/" ++ yadbot_util:uri_encode(Word),
-	cmd({me, ["доставил: " ++ Url]}, State).
-
 do_jbofihe(State, Sentence) ->
 	FiheCmd = lists:flatten(io_lib:format("echo \"~s\" | jbofihe -x", [sanitize(Sentence, $")])),  %"
 	{ok, Results} = regexp:split(yadbot_util:system(FiheCmd), "\n"),
@@ -73,24 +64,6 @@ do_dict(State, Server, Db, Word) ->
 	DictCmd = lists:flatten(io_lib:format("~s -h '~s' -d '~s' \"~s\"", ["dict.rb", Server, Db, sanitize(Word, $")])),  %"
 	{ok, Results} = regexp:split(yadbot_util:system(DictCmd), "\n"),
 	print_long_results(State, Results).
-
--define(LYNCH_FILE, "data/lynch.txt").
-
-do_lynch(State, Action) ->
-	{ok, Data} = file:read_file(?LYNCH_FILE),
-	{ok, Lines} = regexp:split(binary_to_list(Data), "\n"),
-	LineNo = random_p:uniform(length(Lines)),
-	cmd({Action, [lists:nth(LineNo, Lines)]}, State),
-	ok.
-
--define(JABBERWOCK_FILE, "data/jabberwock.txt").
--define(JABBERWOCK_DELAY, 3000).
-
-do_jabberwock(State) ->
-	cmd({chanmsg, ["Кхм кхм."]}, State),
-	timer:sleep(?JABBERWOCK_DELAY),
-	cmd({chanmsg, ["А вот ХУЙ вам, мне лениво."]}, State),
-	ok.
 
 %%	{ok, Data} = file:read_file(?JABBERWOCK_FILE),
 %%	{ok, Lines} = regexp:split(binary_to_list(Data), "\n"),

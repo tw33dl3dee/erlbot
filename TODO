@@ -5,7 +5,7 @@
 * DONE Add own nick to mymode, mytopic.
 * DONE Close socket immediately on termination, print some error.
 * TODO Eliminate list flattening where possible (util:multiline remaining).
-* TODO ALL_CHAN_EVENTS.
+* DONE ALL_CHAN_EVENTS.
 * TODO Behaviour dependencies.
 * TODO Arbitrary async per-channel actions (i.e. user Fun).
 * DONE Disable \r\n anywhere else but in async_*

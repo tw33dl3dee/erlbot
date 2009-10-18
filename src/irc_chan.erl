@@ -13,8 +13,17 @@
 			   topic = {[], [], 0}  :: {list(), list(), integer()},   %% topic, author, ts
 			   users = []           :: [{atom(), list(), list()}]}).  %% type (op/user), nick, flags
 
--include("irc_chan.hrl").
 -include("irc.hrl").
+
+%% events that are NOT propagated back to irc_conn handlers (`noevent' reply is sent back)
+-define(IS_HIDDEN_EVENT(Event), 
+		element(1, Event) =:= joining;
+		element(1, Event) =:= chantopic;
+		element(1, Event) =:= names).
+
+%% events that are sent to channel FSM synchronously
+-define(IS_SYNC_EVENT(Event), 
+		element(1, Event) =:= endofnames).
 
 %%% Public interface
 
@@ -24,18 +33,15 @@ start(Name) ->
 start_link(Name) ->
 	gen_fsm:start_link(?MODULE, Name, []).
 
-chan_event(FsmRef, Event) ->
-	chan_event(FsmRef, Event, lists:member(element(1, Event), ?SYNC_CHAN_EVENTS)).
-
-chan_event(FsmRef, Event, true) ->
+chan_event(FsmRef, Event) when ?IS_SYNC_EVENT(Event) ->
 	gen_fsm:sync_send_event(FsmRef, Event, infinity);
-chan_event(FsmRef, Event, false) ->
+chan_event(FsmRef, Event) ->
 	gen_fsm:send_event(FsmRef, Event),
-	async_chan_event(Event, lists:member(element(1, Event), ?HIDDEN_CHAN_EVENTS)).
+	chan_event_reply(Event).
 
-async_chan_event(_, true) ->
+chan_event_reply(Event) when ?IS_HIDDEN_EVENT(Event) ->
 	noevent;
-async_chan_event(Event, false) ->
+chan_event_reply(Event) ->
 	Event.
 
 get_chan_info(FsmRef) ->

@@ -8,7 +8,8 @@
 -module(erlbot).
 
 -export([blurp/2, show_uptime/2, comment/4, dice/3, bash_quote/3, bash_search/3, 
-		 google_search/3, google_calc/3, google_trans/4, lurkmore_topic/3, identify/3]).
+		 google_search/3, google_calc/3, google_trans/4, lurkmore_topic/3, identify/3,
+		lynch/3, jabberwock/2]).
 
 -include("utf8.hrl").
 
@@ -111,5 +112,23 @@ identify(Irc, Chan, short) ->
 	{ok, undefined};
 identify(Irc, Chan, long) ->
 	identify(Irc, Chan, short),
-	irc_conn:action(Irc, Chan, ["обитает по адресу: ", "http://tweedle-dee.org/bzr/erlbot"]),
+	irc_conn:action(Irc, Chan, ["обитает по адресу: ", "http://tweedle-dee.org/bzr/erlbot/"]),
+	{ok, undefined}.
+
+-define(LYNCH_FILE, "data/lynch.txt").
+
+lynch(Irc, Chan, Action) ->
+	{ok, Data} = file:read_file(?LYNCH_FILE),
+	Lines = string:tokens(utf8:decode(Data), "\n"),
+	LineNo = choice:uniform(length(Lines)),
+	irc_conn:command(Irc, {Action, Chan, lists:nth(LineNo, Lines)}),
+	{ok, undefined}.
+
+-define(JABBERWOCK_FILE, "data/jabberwock.txt").
+-define(JABBERWOCK_DELAY, 3000).
+
+jabberwock(Irc, Chan) ->
+	irc_conn:chanmsg(Irc, Chan, "Кхм кхм."),
+	timer:sleep(?JABBERWOCK_DELAY),
+	irc_conn:chanmsg(Irc, Chan, "А вот ХУЙ вам, мне лениво."),
 	{ok, undefined}.

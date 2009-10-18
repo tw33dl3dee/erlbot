@@ -6,7 +6,7 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 %% public interface
--export([start_link/4, start/4, start_link/3, start/3, irc_command/2]).
+-export([start_link/3, start/3, start_link/2, start/2, irc_command/2]).
 
 %% @type irc_event() = {Type, Originator} | {Type, Originator, Arg1} | {Type, Originator, Arg1, Arg2} | etc
 %%              Type = atom()
@@ -20,7 +20,7 @@
 			   port          = 6667,
 			   maxsend       = 400}).
 
--record(state, {handler    :: function(),
+-record(state, {owner      :: pid(),
 				sock       :: port(),
 				ping       :: integer(),
 				maxsend    :: integer(),
@@ -34,15 +34,15 @@
 
 %% public interface
 
-start_link(Handler, Host, Options) ->
-	gen_server:start_link(?MODULE, {Handler, Host, Options}, []).
-start_link(ServerName, Handler, Host, Options) ->
-	gen_server:start_link(ServerName, ?MODULE, {Handler, Host, Options}, []).
+start_link(Host, Options) ->
+	gen_server:start_link(?MODULE, {self(), Host, Options}, []).
+start_link(ServerName, Host, Options) ->
+	gen_server:start_link(ServerName, ?MODULE, {self(), Host, Options}, []).
 
-start(Handler, Host, Options) ->
-	gen_server:start(?MODULE, {Handler, Host, Options}, []).
-start(ServerName, Handler, Host, Options) ->
-	gen_server:start(ServerName, ?MODULE, {Handler, Host, Options}, []).
+start(Host, Options) ->
+	gen_server:start(?MODULE, {self(), Host, Options}, []).
+start(ServerName, Host, Options) ->
+	gen_server:start(ServerName, ?MODULE, {self(), Host, Options}, []).
 
 irc_command(IrcRef, Cmd) ->
 	gen_server:cast(IrcRef, Cmd).
@@ -50,9 +50,9 @@ irc_command(IrcRef, Cmd) ->
 %% gen_server callbacks
 
 %% real connect is deferred to handle_info
-init({Handler, Host, Options}) ->
+init({Owner, Host, Options}) ->
 	process_flag(trap_exit, true),
-	self() ! {connect, Host, conf(Options), Handler},
+	self() ! {connect, Host, conf(Options), Owner},
 	{ok, undefined}.
 
 conf(Options) ->
@@ -91,14 +91,14 @@ handle_info({tcp_error, Sock, Reason}, State) when Sock == State#state.sock ->
 handle_info({tcp, Sock, Data}, State) when Sock == State#state.sock ->
 	{Event, NewState} = parse_line(utf8:decode(Data), State),
 	{noreply, notify(Event, NewState), NewState#state.ping};
-handle_info({connect, Host, Conf, Handler}, undefined) ->
+handle_info({connect, Host, Conf, Owner}, undefined) ->
 	{ok, State} = connect(Host, Conf),
-	{noreply, State#state{handler = Handler}, State#state.ping}.
+	{noreply, State#state{owner = Owner}, State#state.ping}.
 
 notify(noevent, State) ->
 	State;
-notify(Event, #state{handler = F} = State) ->
-	F(Event),
+notify(Event, #state{owner = Pid} = State) ->
+	Pid ! {irc, self(), Event},
 	State.
 
 connect(Host, Conf) ->
