@@ -8,10 +8,12 @@
 -module(bhv_lurkmore).
 
 -behaviour(irc_behaviour).
--export([handle_event/3]).
+-export([init/1, handle_event/3]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
+
+init(_) -> undefined.
 
 handle_event(cmdevent, {chancmd, Chan, _, [Cmd | Topic]}, Irc) when Cmd =:= "l"; Cmd =:= "л" ->
 	erlbot:lurkmore_topic(Irc, Chan, string:join(Topic, " ")),

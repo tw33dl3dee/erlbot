@@ -1,20 +1,4 @@
-
-%%%-------------------------------------------------------------------
-%%% Internal functions
-%%%-------------------------------------------------------------------
-
-%% update_stat(_, me, [User, Msg]) ->
-%% 	update_stat(User, Msg);
-%% update_stat(_, chanmsg, [User, Msg]) ->
-%% 	update_stat(User, Msg);
-%% update_stat(_, _, _) ->
-%% 	ok.
-
-
-%% update_history(Event, State) ->
-%% 	io:format("Histent: ~p~n", [histent_to_list({Event})]),
-%% 	Time = erlang:localtime(),
-%% 	State#state{history = lists:sublist([{Time, Event} | State#state.history], ?MAX_HIST_LEN)}.
+% -*- erlang -*-
 
 handle_chanevent({joined, Chan, Topic, Users}, #state{was_kicked = true, kicked_by = Kicker} = State) ->
 	cmd({chanmsg, [suicide_greeting(State, Kicker)]}, State),
@@ -64,11 +48,6 @@ do_dict(State, Server, Db, Word) ->
 	DictCmd = lists:flatten(io_lib:format("~s -h '~s' -d '~s' \"~s\"", ["dict.rb", Server, Db, sanitize(Word, $")])),  %"
 	{ok, Results} = regexp:split(yadbot_util:system(DictCmd), "\n"),
 	print_long_results(State, Results).
-
-%%	{ok, Data} = file:read_file(?JABBERWOCK_FILE),
-%%	{ok, Lines} = regexp:split(binary_to_list(Data), "\n"),
-%%	lists:foreach(fun (L) -> cmd({chanmsg, [L]), timer:sleep(500) end, Lines}, State),
-%%	ok.
 
 show_help(State) ->	
 	cmd({me, ["-- ахуенно полезный и функциональный бот."]}, State),
@@ -148,27 +127,9 @@ histent_to_list({kick, [Kicker, Nick, Reason]}) ->
 histent_to_list(_) ->
 	[].
 
-do_suicide(State, Nick, Delay) when (Delay < ?RECONN_MAX_TIMEOUT) and (Delay >= 0) ->
-	cmd({kick, [State#state.nick, suicide_msg(Nick, random_p:uniform())]}, State),
-	{ok, State#state{reconn_delay = Delay}};
-do_suicide(State, Nick, _) ->
-	cmd({chanmsg, [Nick ++ ": да хуй тебе."]}, State).
-
-do_suicide(State, Nick) ->
-	do_suicide(State, Nick, ?SUICIDE_TIMEOUT).
-
-suicide_msg(_, X) when X < 0.4 -> "Прощай, жестокий мир.";
-suicide_msg(Nick, X) when X < 0.8 -> "Сука ты, " ++ Nick ++ "!";
-suicide_msg(_, _) -> "И ты, Брут :(".
-
 suicide_greeting(State, Kicker) when State#state.nick == Kicker -> 
 	suicide_self_greeting(State, random_p:uniform());
 suicide_greeting(_, Kicker) -> ["Ты мудак, " ++ Kicker].
-
-suicide_self_greeting(State, X) when X < 0.5 ->
-	["Ты суицидальный мудак, " ++ State#state.nick];
-suicide_self_greeting(_, _) ->
-	["Мафия говорила, что она бессмертна..."].
 
 update_stat(User, Msg) ->
 	mnesia:sync_transaction(fun () -> update_stat_txn(User, Msg) end).

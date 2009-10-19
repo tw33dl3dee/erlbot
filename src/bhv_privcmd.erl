@@ -8,10 +8,12 @@
 -module(bhv_privcmd).
 
 -behaviour(irc_behaviour).
--export([handle_event/3]).
+-export([init/1, handle_event/3]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
+
+init(_) -> undefined.
 
 handle_event(genevent, {privmsg, User, Msg}, _Irc) ->
 	{new_event, cmdevent, {privcmd, User, util:split(Msg)}, undefined};

@@ -8,10 +8,12 @@
 -module(bhv_err_print).
 
 -behaviour(irc_behaviour).
--export([handle_event/3]).
+-export([init/1, handle_event/3]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
+
+init(_) -> undefined.
 
 handle_event(exitevent, {Bhv, Chan, Reason}, Irc) when ?IS_CHAN(Chan) ->
 	irc_conn:async_action(Irc, Chan, log(Bhv, Reason)),

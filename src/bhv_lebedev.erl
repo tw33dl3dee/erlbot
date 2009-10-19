@@ -8,13 +8,15 @@
 -module(bhv_lebedev).
 
 -behaviour(irc_behaviour).
--export([handle_event/3]).
+-export([init/1, handle_event/3]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
 
+init(_) -> undefined.
+
 handle_event(chanevent, {joined, Chan, ?TOPIC(""), _}, Irc) ->
-	%erlbot:lynch(Irc, Chan, topic),
+	erlbot:lynch(Irc, Chan, topic),
 	{ok, undefined};
 handle_event(cmdevent, {chancmd, Chan, _, ["lynch", "topic" | _]}, Irc) ->
 	erlbot:lynch(Irc, Chan, topic),

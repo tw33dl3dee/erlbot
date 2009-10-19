@@ -8,10 +8,12 @@
 -module(bhv_bash).
 
 -behaviour(irc_behaviour).
--export([handle_event/3]).
+-export([init/1, handle_event/3]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
+
+init(_) -> undefined.
 
 handle_event(cmdevent, {chancmd, Chan, ?USER(Nick), [[$# | Rest] | _]}, Irc) ->
 	case catch list_to_integer(Rest) of 
@@ -21,7 +23,7 @@ handle_event(cmdevent, {chancmd, Chan, ?USER(Nick), [[$# | Rest] | _]}, Irc) ->
 			erlbot:bash_quote(Irc, Chan, Num),
 			{ok, undefined};
 		_ ->
-			irc_conn:chanmsg(Irc, Chan, Nick ++ choice:make([", не еби мне моск", ", иди нахуй"])),
+			erlbot:fuckoff(Irc, Chan, Nick),
 			{ok, undefined}
 	end;
 handle_event(cmdevent, {chancmd, Chan, _, ["bash" | Rest]}, Irc) ->

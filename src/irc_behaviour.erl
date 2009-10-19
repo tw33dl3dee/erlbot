@@ -10,14 +10,18 @@
 -behaviour(gen_event).
 
 %% External exports
--export([add_behaviour/2, behaviour_info/1, modules/1]).
+-export([add_behaviour/2, add_behaviour/3, modules/1]).
+
+%% Meta-information
+-export([behaviour_info/1]).
 
 %% gen_event callbacks
 -export([init/1, handle_event/2, handle_call/2, handle_info/2, terminate/2, code_change/3]).
 
 -include("irc.hrl").
 
--record(state, {mod     :: atom()}).
+-record(state, {mod     :: atom(),    % Callback module
+				data    :: term()}).  % Callback state data
 
 %%%-------------------------------------------------------------------
 %%% API
@@ -25,12 +29,15 @@
 
 %% Special: define behaviour callbacks
 behaviour_info(callbacks) ->
-    [{handle_event,3}];
+    [{handle_event,3}, {init,1}];
 behaviour_info(_) ->
     undefined.
 
 add_behaviour(EvMgr, BhvMod) ->
 	event_sup:start_link(EvMgr, undef, ?MODULE, BhvMod).
+
+add_behaviour(EvMgr, BhvMod, BhvArgs) ->
+	event_sup:start_link(EvMgr, undef, ?MODULE, {BhvMod, BhvArgs}).
 
 modules(BhvMod) ->
 	[irc_behaviour, event_sup, BhvMod].
@@ -39,8 +46,10 @@ modules(BhvMod) ->
 %%% Callback functions from gen_event
 %%%-------------------------------------------------------------------
 
-init(BhvMod) ->
-	{ok, #state{mod = BhvMod}}.
+init(BhvMod) when is_atom(BhvMod) ->
+	{ok, #state{mod = BhvMod, data = BhvMod:init(undefined)}};
+init({BhvMod, BhvArgs}) when is_atom(BhvMod) ->
+	{ok, #state{mod = BhvMod, data = BhvMod:init(BhvArgs)}}.
 
 handle_info(_Info, State) ->
 	{ok, State}.
@@ -48,15 +57,18 @@ handle_info(_Info, State) ->
 handle_call(_Request, State) ->
 	{ok, nosuchcall, State}.
 
-handle_event({Type, Event, Irc}, #state{mod = M} = State) ->
-	case catch M:handle_event(Type, Event, Irc) of
+handle_event({Type, Event, Irc}, #state{mod = M, data = D} = State) ->
+	case catch M:handle_event(Type, Event, Irc#irc{data = D}) of
 		not_handled ->
 			{ok, State};
-		{ok, _} ->
-			{ok, State};
-		{new_event, NewType, NewEvent, _} ->
+		{ok, Data} ->
+			{ok, State#state{data = Data}};
+		{new_event, NewType, NewEvent, Data} ->
 			gen_event:notify(self(), {NewType, NewEvent, Irc}),
-			{ok, State};
+			{ok, State#state{data = Data}};
+		{delayed_event, Delay, NewType, NewEvent, Data} ->
+			timer:apply_after(Delay, gen_event, notify, [self(), {NewType, NewEvent, Irc}]),
+			{ok, State#state{data = Data}};
 		{'EXIT', Reason} ->
 			gen_event:notify(self(), {exitevent, {M, followup(Event), Reason}, Irc}),
 			{'EXIT', Reason}

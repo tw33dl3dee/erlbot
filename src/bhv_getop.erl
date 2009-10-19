@@ -8,13 +8,15 @@
 -module(bhv_getop).
 
 -behaviour(irc_behaviour).
--export([handle_event/3]).
+-export([init/1, handle_event/3]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
 -include(".secret.hrl").
 
 -define(OP_BOT_NICK, "dumbot").
+
+init(_) -> undefined.
 
 handle_event(chanevent, {joined, Chan, _, _}, Irc) ->
 	irc_conn:privmsg(Irc, ?OP_BOT_NICK, [?MAGIC_WORD, " ", Chan]),

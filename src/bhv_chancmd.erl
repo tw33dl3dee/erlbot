@@ -8,10 +8,12 @@
 -module(bhv_chancmd).
 
 -behaviour(irc_behaviour).
--export([handle_event/3]).
+-export([init/1, handle_event/3]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
+
+init(_) -> undefined.
 
 handle_event(genevent, {chanmsg, Chan, User, [$! | Cmd]}, _Irc) ->
 	{new_event, cmdevent, {chancmd, Chan, User, util:split(Cmd)}, undefined};

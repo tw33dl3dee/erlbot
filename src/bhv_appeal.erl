@@ -8,10 +8,12 @@
 -module(bhv_appeal).
 
 -behaviour(irc_behaviour).
--export([handle_event/3]).
+-export([init/1, handle_event/3]).
 
 -include("irc.hrl").
 -include("utf8.hrl").
+
+init(_) -> undefined.
 
 handle_event(customevent, {appeal, Chan, ?USER(Nick), Msg}, Irc) ->
 	Humiliation = util:contains(Msg, "(хуй|заткни)"),
@@ -19,18 +21,19 @@ handle_event(customevent, {appeal, Chan, ?USER(Nick), Msg}, Irc) ->
 	FuckOff = util:contains(Msg, "(уебись|сосн?и)"),
 	Caress = util:contains(Msg, "(няшка|кавай)"),
 	if Humiliation ->
-			irc_conn:chanmsg(Irc, Chan, Nick ++ ": хамишь, сцуко.");
+			irc_conn:chanmsg(Irc, Chan, Nick ++ ": хамишь, сцуко."),
+			{ok, undefined};
 	   Greeting ->
-			irc_conn:chanmsg(Irc, Chan, "\\O/ Превед, " ++ Nick ++ "!!!");
-	   %% @TODO move to `bhv_suicide'
+			irc_conn:chanmsg(Irc, Chan, "\\O/ Превед, " ++ Nick ++ "!!!"),
+			{ok, undefined};
 	   FuckOff ->
-			%erlbot:suicide(Irc, Nick);
-			ok;
+			{new_event, customevent, {suicide, Chan, Nick}, undefined};
 	   Caress ->
-			irc_conn:chanmsg(Irc, Chan, "^_^");
+			irc_conn:chanmsg(Irc, Chan, "^_^"),
+			{ok, undefined};
 	   true ->
-			irc_conn:chanmsg(Irc, Chan, "Ня!")
-	end,
-	{ok, undefined};
+			irc_conn:chanmsg(Irc, Chan, "Ня!"),
+			{ok, undefined}
+	end;
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.

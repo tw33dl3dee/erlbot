@@ -8,10 +8,12 @@
 -module(bhv_misc).
 
 -behaviour(irc_behaviour).
--export([handle_event/3]).
+-export([init/1, handle_event/3]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
+
+init(_) -> undefined.
 
 handle_event(cmdevent, {chancmd, Chan, ?USER(Nick), ["kickme" | _]}, Irc) ->
 	irc_conn:kick(Irc, Chan, Nick, choice:make([["Всегда пожалуйста, ", Nick], 
@@ -50,3 +52,8 @@ handle_event(cmdevent, {chancmd, Chan, _, ["help" | _]}, Irc) ->
 	{ok, undefined};
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.
+
+%%	{ok, Data} = file:read_file(?JABBERWOCK_FILE),
+%%	{ok, Lines} = regexp:split(binary_to_list(Data), "\n"),
+%%	lists:foreach(fun (L) -> cmd({chanmsg, [L]), timer:sleep(500) end, Lines}, State),
+%%	ok.

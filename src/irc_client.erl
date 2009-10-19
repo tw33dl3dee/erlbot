@@ -66,7 +66,8 @@ run() ->
 	{ok, Pid} = start_link({local, erlbot}, 
 						   {"192.168.1.1", "nya", [{login, "nya"}, {oper_pass, ?MAGIC_WORD}, {autojoin, ["#pron", "#work", "#mstu"]}, {umode, "+F"}]}, 
 						   [bhv_err_print, bhv_log, bhv_test, bhv_appeal, bhv_chancmd, bhv_getop, bhv_pom, bhv_privcmd, bhv_comment, bhv_bash, 
-							bhv_google, bhv_lebedev, bhv_lojban, bhv_lurkmore, bhv_misc, bhv_wiki, bhv_blurp, bhv_giveop, bhv_greet]),
+							bhv_google, bhv_lebedev, bhv_lojban, bhv_lurkmore, bhv_misc, bhv_wiki, bhv_blurp, bhv_giveop, bhv_greet, bhv_rejoin,
+						   	bhv_suicide]),
 	unlink(Pid),
 	Pid.
 
@@ -123,7 +124,8 @@ test() ->
 	{ok, Pid} = start_link({local, erlbot}, 
 						   {"192.168.1.1", "yest", [{login, "nya"}, {oper_pass, ?MAGIC_WORD}, {autojoin, ["#test", "#t"]}, {umode, "+F"}]}, 
 						   [bhv_err_print, bhv_log, bhv_test, bhv_appeal, bhv_chancmd, bhv_getop, bhv_pom, bhv_privcmd, bhv_comment, bhv_bash, 
-							bhv_google, bhv_lebedev, bhv_lojban, bhv_lurkmore, bhv_misc, bhv_wiki, bhv_blurp, bhv_giveop, bhv_greet]),
+							bhv_google, bhv_lebedev, bhv_lojban, bhv_lurkmore, bhv_misc, bhv_wiki, bhv_blurp, bhv_giveop, bhv_greet, bhv_rejoin,
+						   	bhv_suicide]),
 	unlink(Pid),
 	Pid.
 

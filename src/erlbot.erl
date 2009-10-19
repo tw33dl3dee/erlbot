@@ -9,7 +9,7 @@
 
 -export([blurp/2, show_uptime/2, comment/4, dice/3, bash_quote/3, bash_search/3, 
 		 google_search/3, google_calc/3, google_trans/4, lurkmore_topic/3, identify/3,
-		lynch/3, jabberwock/2]).
+		lynch/3, jabberwock/2, fuckoff/3]).
 
 -include("utf8.hrl").
 
@@ -132,3 +132,6 @@ jabberwock(Irc, Chan) ->
 	timer:sleep(?JABBERWOCK_DELAY),
 	irc_conn:chanmsg(Irc, Chan, "А вот ХУЙ вам, мне лениво."),
 	{ok, undefined}.
+
+fuckoff(Irc, Chan, Nick) ->
+	irc_conn:chanmsg(Irc, Chan, Nick ++ choice:make([", не еби мне моск", ", иди нахуй", ": да хуй тебе"])).

@@ -8,10 +8,12 @@
 -module(bhv_blurp).
 
 -behaviour(irc_behaviour).
--export([handle_event/3]).
+-export([init/1, handle_event/3]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
+
+init(_) -> undefined.
 
 handle_event(customevent, {genmsg, Chan, _User, _Msg}, Irc) ->
 	erlbot:blurp(Irc, Chan),
