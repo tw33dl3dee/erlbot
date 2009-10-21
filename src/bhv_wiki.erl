@@ -15,10 +15,10 @@
 
 init(_) -> undefined.
 
-handle_event(cmdevent, {chancmd, Chan, _, ["w" | Topic]}, Irc) ->
+handle_event(cmdevent, {chancmd, Chan, _, ["w" | Topic]}, Irc) when length(Topic) > 0 ->
 	erlbot:wiki_topic(Irc, Chan, "en", string:join(Topic, " ")),
 	{ok, undefined};
-handle_event(cmdevent, {chancmd, Chan, _, ["в" | Topic]}, Irc) ->
+handle_event(cmdevent, {chancmd, Chan, _, ["в" | Topic]}, Irc) when length(Topic) > 0 ->
 	erlbot:wiki_topic(Irc, Chan, "ru", string:join(Topic, " ")),
 	{ok, undefined};
 handle_event(_Type, _Event, _Irc) ->

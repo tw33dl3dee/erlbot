@@ -23,8 +23,6 @@ unless ( @ARGV ) {
 my $url = 'http://www.google.ru/search?num=1&q=' .
     uri_escape_utf8( join ' ' => @ARGV ) . "&ie=utf-8&oe=utf-8";
 
-#print "$url\n";
-
 my $ua = LWP::UserAgent->new( agent => 'Mozilla/5.0' );
 my $response = $ua->get( $url );
 
@@ -37,17 +35,15 @@ my $content = $response->decoded_content;
 
 #$content =~ s/\N{NO-BREAK SPACE}//g;
 
-my ( $result ) = $content =~ m|<td nowrap dir=ltr><h2 class=r.*><b>(.*?)</b></h2>|;
+my ($result) = $content =~ m|<td nowrap.*><h2 class=r.*><b>(.*?)</b></h2>|;
 
 #	print "$result\n";
 
-if ( $result ) {
+if ($result) {
     $result =~ s/<sup>/^/g;
     $result =~ s/&times;/x/g;
     $result =~ s/<.+?>//g;
 	$result =~ s/\N{NO-BREAK SPACE}/ /g;
 	$result =~ s/\N{LATIN CAPITAL LETTER A WITH CIRCUMFLEX}//g;
 	print "$result\n";
-} else {
-    print "No result\n";
 }

@@ -15,14 +15,14 @@
 
 init(_) -> undefined.
 
-handle_event(cmdevent, {chancmd, Chan, _, ["Jbo" | Sentence]}, Irc) ->
+handle_event(cmdevent, {chancmd, Chan, _, ["Jbo" | Sentence]}, Irc) when length(Sentence) > 0 ->
 	erlbot:jbofihe(Irc, Chan, string:join(Sentence, " ")),
 	{ok, undefined};
-handle_event(cmdevent, {chancmd, Chan, _, ["jbo" | Sentence]}, Irc) ->
+handle_event(cmdevent, {chancmd, Chan, _, ["jbo" | Sentence]}, Irc) when length(Sentence) > 0 ->
 	erlbot:cmafihe(Irc, Chan, string:join(Sentence, " ")),
 	{ok, undefined};
-handle_event(cmdevent, {chancmd, Chan, _, ["jvo" | Sentence]}, Irc) ->
-	erlbot:jvocuhadju(Irc, Chan, string:join(Sentence, " ")),
+handle_event(cmdevent, {chancmd, Chan, _, ["jvo" | Words]}, Irc) ->
+	erlbot:jvocuhadju(Irc, Chan, Words),
 	{ok, undefined};
 handle_event(cmdevent, {chancmd, Chan, _, ["en-jbo" | Words]}, Irc) ->
 	[erlbot:dict(Irc, Chan, "www.lojban.org", "en->jbo", Word) || Word <- Words],

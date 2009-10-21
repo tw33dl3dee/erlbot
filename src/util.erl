@@ -4,17 +4,15 @@
 -export([multiline/1, multiline/2, split/1, split/2, contains/2, set_flag/2, unset_flag/2]).
 -export([epoch/0, epoch/1]).
 -export([uri_encode/1]).
--export([execvp/3, execvp/4, system/1, system/2, find_prog/2, signame/1]).
+-export([execv/3, execv/4, execvp/2, execvp/3, system/1, system/2, find_prog/2, signame/1]).
 -export([check_latin/1, count_latin/1, check_letter/1, count_letters/1]).
 -export([read_file/1]).
 
--define(CRLF, "\r\n").
-
 multiline(Term) ->
-	string:tokens(lists:flatten(io_lib:print(Term)), ?CRLF).
+	string:tokens(lists:flatten(io_lib:print(Term)), io_lib:nl()).
 
 multiline(Format, Data) when is_list(Data) ->
-	string:tokens(lists:flatten(io_lib:format(Format, Data)), ?CRLF);
+	string:tokens(lists:flatten(io_lib:format(Format, Data)), io_lib:nl());
 multiline(Format, Data) ->
 	multiline(Format, [Data]).
 
@@ -55,26 +53,32 @@ find_prog(File, Dir) ->
 %% Exec shell command with given input.
 system(Command, Input) ->
 	UtfCmd = binary_to_list(utf8:encode(Command)),
-	Port = open_port({spawn, UtfCmd}, [{line, ?EXEC_LINE}, eof, exit_status, binary]),
+	Port = open_port({spawn, UtfCmd}, [{line, ?EXEC_LINE}, eof, exit_status, binary, stderr_to_stdout]),
 	send_input(Port, Input),
 	loop_port(Port, []).
 
 system(Command) -> system(Command, <<>>).
 
 %% Exec program (absolute path or relative to WD) with specified WD and Input.
-execvp(File, Args, Dir, Input) ->
+execv(File, Args, Dir, Input) ->
 	% If File is absolute, Dir will be ignored
 	Path = filename:absname(filename:join(Dir, File)),
-	io:format("exec ~s~n", [Path]),
 	execvp0(Path, [File | Args], Dir, Input).
 
-execvp(File, Args, Dir) -> execvp(File, Args, Dir, <<>>).
+execv(File, Args, Dir) -> execv(File, Args, Dir, <<>>).
+
+execvp(Program, Args, Input) ->
+	Path = find_prog(Program, nodir),
+	{ok, Pwd} = file:get_cwd(),
+	execvp0(Path, [Program | Args], Pwd, Input).	
+
+execvp(Program, Args) -> execvp(Program, Args, <<>>).
 
 %% Note that Args are expected to be utf8 while Arg0 is not.
 execvp0(Path, [Arg0 | Args], Dir, Input) ->
 	UtfArgs = [binary_to_list(utf8:encode(S)) || S <- Args],
-	Port = open_port({spawn_executable, Path}, [{arg0, Arg0}, {args, UtfArgs}, {cd, Dir}, 
-												{line, ?EXEC_LINE}, eof, exit_status, binary]),
+	Port = open_port({spawn_executable, Path}, [{arg0, Arg0}, {args, UtfArgs}, {cd, Dir}, {line, ?EXEC_LINE}, 
+												eof, exit_status, binary, stderr_to_stdout]),
 	send_input(Port, Input),
 	loop_port(Port, []).
 
@@ -186,7 +190,7 @@ uri_encode(Atom) when is_atom(Atom) ->
     uri_encode(atom_to_list(Atom));
 uri_encode(Int) when is_integer(Int) ->
     uri_encode(integer_to_list(Int));
-uri_encode(String) ->
+uri_encode(String) when is_list(String) ->
     uri_encode(String, []).
 
 uri_encode([], Acc) ->
@@ -194,8 +198,12 @@ uri_encode([], Acc) ->
 uri_encode([C | Rest], Acc) when (C > 32) and (C < 128) ->
     uri_encode(Rest, [C | Acc]);
 uri_encode([C | Rest], Acc) ->
-    <<Hi:4, Lo:4>> = <<C>>,
-    uri_encode(Rest, [hexdigit(Lo), hexdigit(Hi), $% | Acc]).
+    uri_encode(<<C/utf8>>, Rest, Acc).
+
+uri_encode(<<Hi:4, Lo:4, Rest/binary>>, S, Acc) ->
+	uri_encode(Rest, S, [hexdigit(Lo), hexdigit(Hi), $% | Acc]);
+uri_encode(<<>>, S, Acc)  ->
+	uri_encode(S, Acc).
 
 hexdigit(C) when C < 10 -> $0 + C;
 hexdigit(C) when C < 16 -> $A + (C - 10).

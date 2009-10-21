@@ -12,42 +12,11 @@ handle_chanevent({kicked, Chan, User, _Reason}, State) ->
 parse_cmd(State, User, ["stat"]) ->
 	show_stat(State, User#user.ident);
 
-parse_cmd(State, User, ["suicide", Delay]) ->
-	case catch list_to_integer(Delay) of
-		{'EXIT', _} -> 
-			ok;
-		X ->
-			do_suicide(State, User#user.nick, X*1000)
-	end;
-parse_cmd(State, User, ["suicide"]) ->
-	do_suicide(State, User#user.nick);
-
-
 parse_privcmd(State, User, ["stat"]) ->
 	show_stat(State, User#user.ident);
 
 parse_privcmd(State, User, ["hist"]) ->
 	show_history(State, User);
-
-do_jbofihe(State, Sentence) ->
-	FiheCmd = lists:flatten(io_lib:format("echo \"~s\" | jbofihe -x", [sanitize(Sentence, $")])),  %"
-	{ok, Results} = regexp:split(yadbot_util:system(FiheCmd), "\n"),
-	print_long_results(State, Results).
-	
-do_cmafihe(State, Sentence) ->
-	FiheCmd = lists:flatten(io_lib:format("echo \"~s\" | cmafihe", [sanitize(Sentence, $")])),  %"
-	{ok, Results} = regexp:split(yadbot_util:system(FiheCmd), "\n"),
-	print_long_results(State, Results).
-
-do_jvocuhadju(State, Sentence) ->
-	FiheCmd = lists:flatten(io_lib:format("jvocuhadju ~s", [sanitize(Sentence, $;)])),
-	{ok, Results} = regexp:split(yadbot_util:system(FiheCmd), "\n"),
-	print_long_results(State, Results).
-	
-do_dict(State, Server, Db, Word) ->
-	DictCmd = lists:flatten(io_lib:format("~s -h '~s' -d '~s' \"~s\"", ["dict.rb", Server, Db, sanitize(Word, $")])),  %"
-	{ok, Results} = regexp:split(yadbot_util:system(DictCmd), "\n"),
-	print_long_results(State, Results).
 
 show_help(State) ->	
 	cmd({me, ["-- ахуенно полезный и функциональный бот."]}, State),
@@ -146,31 +115,3 @@ update_stat_txn(#user{ident = Ident}, Msg) ->
 		Any ->
 			io:format("WARN: ~p", [Any])
 	end.
-
-strip_linefeeds([$\r | Tail]) ->
-	strip_linefeeds(Tail);
-strip_linefeeds([$\n | Tail]) ->
-	strip_linefeeds(Tail);
-strip_linefeeds([Char | Tail]) ->
-	[Char | strip_linefeeds(Tail) ];
-strip_linefeeds([]) ->
-	[].
-
-sanitize(String, $") ->
-	{ok, Res, _} = regexp:gsub(String, "\\\"", "'"),
-	Res;
-sanitize(String, $') ->
-	{ok, Res, _} = regexp:gsub(String, "\\'", "\""),
-	Res;
-sanitize(String, $;) ->
-	{ok, Res, _} = regexp:gsub(String, ";", ""),
-	{ok, Res2, _} = regexp:gsub(Res, "&", ""),
-	{ok, Res3, _} = regexp:gsub(Res2, "|", ""),
-	{ok, Res4, _} = regexp:gsub(Res3, ">", ""),
-	{ok, Res5, _} = regexp:gsub(Res4, "<", ""),
-	{ok, Res6, _} = regexp:gsub(Res5, "\\(", ""),
-	{ok, Res7, _} = regexp:gsub(Res6, "\\)", ""),
-	{ok, Res8, _} = regexp:gsub(Res7, "'", "\\'"),
-	{ok, Res9, _} = regexp:gsub(Res8, "\"", "\\\""),
-	Res9.
-

@@ -15,7 +15,7 @@
 
 init(_) -> undefined.
 
-handle_event(cmdevent, {chancmd, Chan, _, [Cmd | Topic]}, Irc) when Cmd =:= "l"; Cmd =:= "л" ->
+handle_event(cmdevent, {chancmd, Chan, _, [Cmd | Topic]}, Irc) when Cmd =:= "l" orelse Cmd =:= "л", length(Topic) > 0 ->
 	erlbot:lurkmore_topic(Irc, Chan, string:join(Topic, " ")),
 	{ok, undefined};
 handle_event(_Type, _Event, _Irc) ->

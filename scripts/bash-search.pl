@@ -21,12 +21,12 @@ eval
 	my $dom = new HTML::DOM;
 	$dom->parse_file($tmp_name);
 
-	print "TOP $MAX_QUOTES Bash.Org.Ru results for ".$ARGV[0].":\n";
-
 	my @spans = $dom->getElementsByTagName("span");
 	foreach (@spans) {
-		print("No results :(\n"), exit if ($_->className =~ /error/ and $_->innerHTML =~ /!$/)
+		exit if ($_->className =~ /error/ and $_->innerHTML =~ /!$/)
 	}
+
+	print "TOP $MAX_QUOTES Bash.Org.Ru results for ".$ARGV[0].":\n";
 
 	my @results = ();
 	my @divs1 = $dom->getElementById("quotes")->getElementsByTagName("div");

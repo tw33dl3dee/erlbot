@@ -7,17 +7,17 @@
 %%%-------------------------------------------------------------------
 -module(erlbot).
 
--export([blurp/2, show_uptime/2, comment/4, dice/3, bash_quote/3, bash_search/3, 
+-export([blurp/2, show_uptime/2, comment/4, dice/3, bash_quote/3, bash_search/3, empty_check/1,
 		 google_search/3, google_calc/3, google_trans/4, lurkmore_topic/3, identify/3,
-		lynch/3, jabberwock/2, fuckoff/3]).
+		 lynch/3, jabberwock/2, fuckoff/3, jbofihe/3, cmafihe/3, jvocuhadju/3, dict/5, help/2]).
 
 -include("utf8.hrl").
 
-empty_msg_check([]) -> empty_error_msg();
-empty_msg_check([""]) -> empty_error_msg();
-empty_msg_check(S) -> S.
+empty_check([]) -> [empty_msg()];
+empty_check([""]) -> [empty_msg()];
+empty_check(S) -> S.
 
-empty_error_msg() ->
+empty_msg() ->
 	choice:make(["А вот хуй...",
 				 "<тут могла бы быть ваша реклама>",
 				 "Да хер его знает.",
@@ -75,28 +75,28 @@ dice(Irc, Chan, Max) ->
 -define(SCRIPT_DIR, "scripts").
 
 bash_quote(Irc, Chan, Num) ->
-	{success, Lines} = util:execvp("bash.pl", [integer_to_list(Num)], ?SCRIPT_DIR, []),
-	irc_conn:async_chanmsg(Irc, Chan, Lines),
+	{success, Lines} = util:execv("bash.pl", [integer_to_list(Num)], ?SCRIPT_DIR, []),
+	irc_conn:async_chanmsg(Irc, Chan, empty_check(Lines)),
 	{ok, undefined}.
 
 bash_search(Irc, Chan, Query) ->
-	{success, Lines} = util:execvp("bash-search.pl", [Query], ?SCRIPT_DIR, []),
-	irc_conn:async_chanmsg(Irc, Chan, Lines),
+	{success, Lines} = util:execv("bash-search.pl", [Query], ?SCRIPT_DIR, []),
+	irc_conn:async_chanmsg(Irc, Chan, empty_check(Lines)),
 	{ok, undefined}.
 
 google_search(Irc, Chan, Query) ->
-	{success, Lines} = util:execvp("google.pl", [Query], ?SCRIPT_DIR, []),
-	irc_conn:async_chanmsg(Irc, Chan, Lines),
+	{success, Lines} = util:execv("google.pl", [Query], ?SCRIPT_DIR, []),
+	irc_conn:async_chanmsg(Irc, Chan, empty_check(Lines)),
 	{ok, undefined}.
 
 google_calc(Irc, Chan, Query) ->
-	{success, Lines} = util:execvp("gcalc.pl", [Query], ?SCRIPT_DIR, []),
-	irc_conn:async_chanmsg(Irc, Chan, Lines),
+	{success, Lines} = util:execv("gcalc.pl", [Query], ?SCRIPT_DIR, []),
+	irc_conn:async_chanmsg(Irc, Chan, empty_check(Lines)),
 	{ok, undefined}.
 
 google_trans(Irc, Chan, Dict, Word) ->
-	{success, Lines} = util:execvp("gdict.pl", [Word, Dict], ?SCRIPT_DIR, []),
-	irc_conn:async_chanmsg(Irc, Chan, Lines),
+	{success, Lines} = util:execv("gdict.pl", [Word, Dict], ?SCRIPT_DIR, []),
+	irc_conn:async_chanmsg(Irc, Chan, empty_check(Lines)),
 	{ok, undefined}.
 
 lurkmore_topic(Irc, Chan, Topic) ->
@@ -119,7 +119,7 @@ identify(Irc, Chan, long) ->
 
 lynch(Irc, Chan, Action) ->
 	{ok, Data} = file:read_file(?LYNCH_FILE),
-	Lines = string:tokens(utf8:decode(Data), "\n"),
+	Lines = string:tokens(utf8:decode(Data), "\r\n"),
 	LineNo = choice:uniform(length(Lines)),
 	irc_conn:command(Irc, {Action, Chan, lists:nth(LineNo, Lines)}),
 	{ok, undefined}.
@@ -135,3 +135,57 @@ jabberwock(Irc, Chan) ->
 
 fuckoff(Irc, Chan, Nick) ->
 	irc_conn:chanmsg(Irc, Chan, Nick ++ choice:make([", не еби мне моск", ", иди нахуй", ": да хуй тебе"])).
+
+jbofihe(Irc, Chan, Sentence) ->
+	{_, Lines} = util:system("head -n1 | jbofihe -x", [Sentence, $\n]),
+	irc_conn:async_chanmsg(Irc, Chan, Lines),
+	{ok, undefined}.
+
+cmafihe(Irc, Chan, Sentence) ->
+	{_, Lines} = util:system("head -n1 | cmafihe", [Sentence, $\n]),
+	irc_conn:async_chanmsg(Irc, Chan, Lines),
+	{ok, undefined}.
+
+jvocuhadju(Irc, Chan, Words) ->
+	{_, Lines} = util:execvp("jvocuhadju", Words),
+	irc_conn:async_chanmsg(Irc, Chan, Lines),
+	{ok, undefined}.
+
+dict(Irc, Chan, Server, Db, Word) ->
+	{success, Lines} = util:execv("dict.rb", ["-h", Server, "-d", Db, Word], ?SCRIPT_DIR),
+	irc_conn:async_chanmsg(Irc, Chan, empty_check(Lines)),
+	{ok, undefined}.
+
+-define(CHANCMDLIST, ["    #<номер> : цитата с Bash.Org.Ru",
+					  "    bash <строка> : поиск по цитатам Bash.Org.Ru",
+					  "    gg <строка> : поиск через Google REST Services",
+					  "    gc <выражение> : вычисление через Google Calculator",
+					  "    w <topic> : топик из Википедии (англ.)",
+					  "    в <топик> : топик из Википедии (рус.)",
+					  "    l|л <топик> : ссылка на Луркмор",
+					  "    Jbo <sentence> : трансляция с Ложбана",
+					  "    jbo <word>: разбор слова с Ложбана",
+					  "    jvo <word1> <word2>... : комбинирование слов в lujvo на Ложбане",
+					  "    en-jbo|jbo-en|en-ru|ru-en|de-ru|ru-de <слово> : словарный перевод",
+					  "    lynch : случайная цитата из линча Лебедева",
+					  "    lynchtopic|lynch topic : случайная цитата из линча Лебедева в топик",
+					  "    jabberwork : ну, Бармаглот",
+					  "    uptime  : аптайм бота",
+					  "    time : текущее время",
+					  "    ping : пинг бота (хз нах надо)",
+					  "    stat : статистика пользователей (-- пока не работает --)",
+					  "    dice <число> : бросок кубика (от 1 до N)",
+					  "    kickme : оригинальный способ уйти с канала",
+					  "    suicide <время> : нихуя не оригинальный способ выразить несогласие с ботом или просто плохое настроение",
+					  "    id|identify : дать боту возможность рассказать, кто он такой",
+					  "    help : вывести вот этот вот бля список команд."]).
+
+-define(PRIVCMDLIST, ["    hist : история (-- пока не работает --)",
+					  "    stat: статистика (-- пока не работает --)"]).
+
+help(Irc, Chan) ->
+	irc_conn:async_action(Irc, Chan, ["-- ахуенно полезный и функциональный бот.", "умеет:"]),
+	irc_conn:async_chanmsg(Irc, Chan, ["Команды канала:" | ?CHANCMDLIST]),
+	irc_conn:async_chanmsg(Irc, Chan, ["Приватные команды:" | ?PRIVCMDLIST]),
+	irc_conn:async_action(Irc, Chan, ["няшка =^_^="]),
+	ok.

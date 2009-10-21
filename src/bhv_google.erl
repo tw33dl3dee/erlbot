@@ -15,10 +15,10 @@
 
 init(_) -> undefined.
 
-handle_event(cmdevent, {chancmd, Chan, _, ["gg" | Rest]}, Irc) ->
+handle_event(cmdevent, {chancmd, Chan, _, ["gg" | Rest]}, Irc) when length(Rest) > 0 ->
 	erlbot:google_search(Irc, Chan, string:join(Rest, " ")),
 	{ok, undefined};
-handle_event(cmdevent, {chancmd, Chan, _, ["gc" | Rest]}, Irc) ->
+handle_event(cmdevent, {chancmd, Chan, _, ["gc" | Rest]}, Irc) when length(Rest) > 0 ->
 	erlbot:google_calc(Irc, Chan, string:join(Rest, " ")),
 	{ok, undefined};
 handle_event(cmdevent, {chancmd, Chan, _, [Lang | Words]}, Irc) 

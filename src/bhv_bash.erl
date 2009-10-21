@@ -26,7 +26,7 @@ handle_event(cmdevent, {chancmd, Chan, ?USER(Nick), [[$# | Rest] | _]}, Irc) ->
 			erlbot:fuckoff(Irc, Chan, Nick),
 			{ok, undefined}
 	end;
-handle_event(cmdevent, {chancmd, Chan, _, ["bash" | Rest]}, Irc) ->
+handle_event(cmdevent, {chancmd, Chan, _, ["bash" | Rest]}, Irc) when length(Rest) > 0 ->
 	erlbot:bash_search(Irc, Chan, string:join(Rest, " ")),
 	{ok, undefined};
 handle_event(_Type, _Event, _Irc) ->

@@ -12,7 +12,7 @@ my $res = REST::Google::Translate->new(
 	langpair => $lang
 	);
 
-die "response status failure" if $res->responseStatus != 200;
+die "Response status failure" if $res->responseStatus != 200;
 
 my $translated = $res->responseData->translatedText;
 

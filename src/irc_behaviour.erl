@@ -61,6 +61,8 @@ handle_event({Type, Event, Irc}, #state{mod = M, data = D} = State) ->
 	case catch M:handle_event(Type, Event, Irc#irc{data = D}) of
 		not_handled ->
 			{ok, State};
+		ok ->
+			{ok, State};
 		{ok, Data} ->
 			{ok, State#state{data = Data}};
 		{new_event, NewType, NewEvent, Data} ->
