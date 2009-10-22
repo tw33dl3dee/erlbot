@@ -13,9 +13,12 @@
 -include("irc.hrl").
 -include("utf8.hrl").
 
+-define(APPEAL_DELAY, 500).
+
 init(_) -> undefined.
 
 handle_event(customevent, {appeal, Chan, ?USER(Nick), Msg}, Irc) ->
+	timer:sleep(?APPEAL_DELAY),
 	Humiliation = util:contains(Msg, "(хуй|заткни)"),
 	Greeting = util:contains(Msg, "превед"),
 	FuckOff = util:contains(Msg, "(уебись|сосн?и)"),

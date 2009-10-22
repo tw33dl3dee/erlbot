@@ -2,7 +2,7 @@
 -author("Ivan Korotkov <twee@tweedle-dee.org>").
 
 %% External interfaces
--export([create_sequence/0, create_sequence/1, init_sequence/2, sequence/1, sequence/2]).
+-export([create_sequence/0, create_sequence/1, init_sequence/2, sequence/1, sequence/2, init_db/0, init_table/2]).
 
 -record(sequence, {table, idx}).
 
@@ -13,7 +13,8 @@ init_db() ->
 				 ok;
 			 E ->
 				 E
-		 end.
+		 end,
+	ok = mnesia:start().
 
 init_table(Name, TabDef) ->
 	ok = init_db(),

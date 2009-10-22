@@ -25,5 +25,7 @@ handle_event(chanevent, {part, Chan, ?USER(Nick), _}, Irc) ->
 handle_event(genevent, {quit, ?USER(Nick), _}, Irc) ->
 	irc_conn:each_channel(Irc, fun (Chan) -> erlbot:comment(exit, Chan, Nick, Irc) end, Nick),
 	{ok, undefined};
+handle_event(customevent, {genmsg, Chan, ?USER(Nick), _}, Irc) ->
+	erlbot:comment(message, Chan, Nick, Irc);
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.

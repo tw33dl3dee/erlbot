@@ -9,3 +9,6 @@ proc_super.erl
 proc_tabs.erl
 ./ebin/*
 ./Mnesia.*
+./log
+./log2
+./src/statistic*.erl

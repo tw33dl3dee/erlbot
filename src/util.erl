@@ -209,14 +209,20 @@ hexdigit(C) when C < 10 -> $0 + C;
 hexdigit(C) when C < 16 -> $A + (C - 10).
 
 read_file(FileName) ->
-	{ok, Io} = file:open(FileName, [read, raw, read_ahead]),
+	{ok, Io} = file:open(FileName, [read, raw, binary, read_ahead]),
 	read_lines(Io).
 
 read_lines(Io) ->
 	read_lines(Io, file:read_line(Io), []).
 
-read_lines(Io, {ok, Line}, Lines) ->
-	read_lines(Io, file:read_line(Io), [Line | Lines]);
+read_lines(Io, {ok, Bin}, Lines) ->
+	S = byte_size(Bin) - 1,
+	case Bin of 
+		<<Line:S/binary, $\n:8>> ->
+			read_lines(Io, file:read_line(Io), [Line | Lines]);
+		_ ->
+			read_lines(Io, file:read_line(Io), [Bin | Lines])
+	end;
 read_lines(Io, eof, Lines) ->
 	file:close(Io),
 	{ok, lists:reverse(Lines)};

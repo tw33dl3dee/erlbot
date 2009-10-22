@@ -17,7 +17,7 @@
 			   login     = [] :: list(),      %% login field in USER and OPER commands (defaults to nick)
 			   long_name = [] :: list(),      %% long name in USER command (defaults to nick)
 			   oper_pass = [] :: list(),      %% password in OPER command (won't do OPER if not specified)
-			   umode    = [] :: list(),      %% umode spec to request initially (like, "+F")
+			   umode     = [] :: list(),      %% umode spec to request initially (like, "+F")
 			   autojoin  = [] :: [list()],    %% channels to join automatically
 			   msg_interval = 200,            %% minimal interval between messages when sending long bulks
 			   conn_rate    = {2, 16000}}).   %% maximum connection rate

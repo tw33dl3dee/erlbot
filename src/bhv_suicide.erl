@@ -13,7 +13,8 @@
 -include("utf8.hrl").
 -include("irc.hrl").
 
-%% Data is a dict mapping Channel -> {KickerNick, KickTime}
+%% Data is a dict mapping Channel -> {KickerNick, KickTime} and User -> 'disabled'
+%% for those who can't command bot to suicide
 init(_) -> dict:new().
 
 -define(MAX_SUICIDE_TIME, 60).
@@ -39,7 +40,7 @@ handle_event(cmdevent, {chancmd, Chan, ?USER(Nick), ["suicide", Secs]}, Irc) ->
 			suicide(Irc, Chan, Nick, S);
 		_ ->
 			erlbot:fuckoff(Irc, Chan, Nick),
-			not_handled
+			ok
 	end;
 handle_event(chanevent, {kicked, Chan, ?USER(Nick), _}, #irc{nick = Nick, data = Data}) ->
 	case dict:find(Chan, Data) of 
@@ -48,12 +49,27 @@ handle_event(chanevent, {kicked, Chan, ?USER(Nick), _}, #irc{nick = Nick, data =
 		error ->
 			not_handled
 	end;
+handle_event(customevent, {suicide_disable, Who}, #irc{data = Data}) ->
+	{ok, dict:store(Who, disabled, Data)};
+handle_event(customevent, {suicide_disable, Who, Timeout}, #irc{data = Data}) ->
+	{delayed_event, Timeout, customevent, {suicide_enable, Who}, dict:store(Who, disabled, Data)};
+handle_event(customevent, {suicide_enable, all}, #irc{data = Data}) ->
+	{ok, dict:filter(fun (K, _) when ?IS_CHAN(K) -> true; 
+						 (_, _)                  -> false end, Data)};
+handle_event(customevent, {suicide_enable, Who}, #irc{data = Data}) ->
+	{ok, dict:erase(Who, Data)};
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.
 
 suicide(#irc{nick = Nick, data = Data} = Irc, Chan, Kicker, Secs) ->
-	irc_conn:kick(Irc, Chan, Nick, suicide_reason(Kicker)),
-	{ok, dict:store(Chan, {Kicker, Secs}, Data)}.
+	case dict:find(Kicker, Data) of
+		{ok, disabled} ->
+			erlbot:fuckoff(Irc, Chan, Kicker),
+			ok;
+		error ->
+			irc_conn:kick(Irc, Chan, Nick, suicide_reason(Kicker)),
+			{ok, dict:store(Chan, {Kicker, Secs}, Data)}
+	end.
 
 suicide_reason(Kicker) ->
 	choice:make([{2, "Прощай, жестокий мир."},
