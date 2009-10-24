@@ -45,7 +45,7 @@ wait(Id, MaxCount, Period, PreWait) ->
 			% if race happens, last `times' element is not yet removed but we ignore it
 			ok = gen_server:call(?MODULE, {wait, Id, MaxCount + 1, Period}, infinity),
 			{ok, waited, Delay}
-	end.	
+	end.
 
 cancel(Id) ->
 	gen_server:call(?MODULE, {cancel, Id}, infinity).

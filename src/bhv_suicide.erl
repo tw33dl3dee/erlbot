@@ -13,12 +13,18 @@
 -include("utf8.hrl").
 -include("irc.hrl").
 
-%% Data is a dict mapping Channel -> {KickerNick, KickTime} and User -> 'disabled'
-%% for those who can't command bot to suicide
+%% Data is a dict mapping Channel -> {KickerNick, KickTime} and User -> 'disabled' | KickPoints
+%% where 'disabled' means that User cannot kick bot, KickPoints is user's penalty for kicking bot.
 init(_) -> dict:new().
 
 -define(MAX_SUICIDE_TIME, 60).
--define(DEFAULT_SUICIDE_TIME, 30).
+-define(DEFAULT_SUICIDE_TIME, 60).
+
+-define(MAX_KICKS, 2).             % how many subsequent kicks allowed (KickPoints can't exceed `MAX_KICKS'*`POINTS_PER_KICK')
+-define(POINTS_PER_KICK, 10).      % kick cost (each `genmsg' decreases KickPoints by 1, each kick increases by this value)
+-define(SUICIDE_DISABLE_TIMEOUT, 120000).  % how long user is incapable of kicking bot after exceeding his KickPoints
+
+-define(MAX_KICK_POINTS, ((?MAX_KICKS - 1)*?POINTS_PER_KICK)).
 
 handle_event(chanevent, {joined, Chan, _, _}, Irc) ->
 	case dict:find(Chan, Irc#irc.data) of
@@ -50,26 +56,59 @@ handle_event(chanevent, {kicked, Chan, ?USER(Nick), _}, #irc{nick = Nick, data =
 			not_handled
 	end;
 handle_event(customevent, {suicide_disable, Who}, #irc{data = Data}) ->
-	{ok, dict:store(Who, disabled, Data)};
+	disable(Who, Data);
 handle_event(customevent, {suicide_disable, Who, Timeout}, #irc{data = Data}) ->
-	{delayed_event, Timeout, customevent, {suicide_enable, Who}, dict:store(Who, disabled, Data)};
+	disable(Timeout, Who, Data);
 handle_event(customevent, {suicide_enable, all}, #irc{data = Data}) ->
-	{ok, dict:filter(fun (K, _) when ?IS_CHAN(K) -> true; 
-						 (_, _)                  -> false end, Data)};
+	enable_all(Data);
 handle_event(customevent, {suicide_enable, Who}, #irc{data = Data}) ->
-	{ok, dict:erase(Who, Data)};
+	enable(Who, Data);
+handle_event(customevent, {genmsg, _, ?USER(Nick), _}, #irc{data = Data}) ->
+	case dict:find(Nick, Data) of
+		{ok, KickPoints} when is_integer(KickPoints) ->
+			{ok, dict:store(Nick, KickPoints - 1, Data)};
+		_ ->
+			not_handled
+	end;
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.
 
-suicide(#irc{nick = Nick, data = Data} = Irc, Chan, Kicker, Secs) ->
+suicide(#irc{data = Data} = Irc, Chan, Kicker, Secs) ->
 	case dict:find(Kicker, Data) of
 		{ok, disabled} ->
 			erlbot:fuckoff(Irc, Chan, Kicker),
 			ok;
+		{ok, KickPoints} when KickPoints > ?MAX_KICK_POINTS ->
+			irc_conn:chanmsg(Irc, Chan, disabled_reason(Kicker)),
+			disable(?SUICIDE_DISABLE_TIMEOUT, Kicker, Data);
+		{ok, KickPoints} ->
+			commit(Irc, Chan, Kicker, Secs, dict:store(Kicker, KickPoints + ?POINTS_PER_KICK, Data));
 		error ->
-			irc_conn:kick(Irc, Chan, Nick, suicide_reason(Kicker)),
-			{ok, dict:store(Chan, {Kicker, Secs}, Data)}
+			commit(Irc, Chan, Kicker, Secs, dict:store(Kicker, ?POINTS_PER_KICK, Data))
 	end.
+
+commit(#irc{nick = Nick} = Irc, Chan, Kicker, Secs, Data) ->
+	irc_conn:kick(Irc, Chan, Nick, suicide_reason(Kicker)),
+	{ok, dict:store(Chan, {Kicker, Secs}, Data)}.
+
+enable(Who, Data) ->
+	{ok, dict:erase(Who, Data)}.
+
+enable_all(Data) ->	
+	{ok, dict:filter(fun (K, _) when ?IS_CHAN(K) -> true; 
+						 (_, _)                  -> false end, Data)}.
+
+disable(Who, Data) ->
+	{ok, dict:store(Who, disabled, Data)}.
+
+disable(Timeout, Who, Data) ->
+	{delayed_event, Timeout, customevent, {suicide_enable, Who}, dict:store(Who, disabled, Data)}.
+
+disabled_reason(Nick) ->
+	choice:make([[Nick, ", имей совесть, десу."],
+				 [Nick, ", ты не охуел?"],
+				 ["Да ебись ты конем, ", Nick],
+				 [Nick, ": цыц, бля, разгалделся тут"]]).
 
 suicide_reason(Kicker) ->
 	choice:make([{2, "Прощай, жестокий мир."},

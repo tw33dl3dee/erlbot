@@ -48,7 +48,7 @@ show_uptime(Irc, Chan) ->
 	irc_conn:chanmsg(Irc, Chan, io_lib:format("Uptime: ~b day(s), ~2..0b:~2..0b:~2..0b", [Day, Hour, Min, Sec])),
 	ok.
 
--define(COMMENT_REV_PROB, 50).  % 1/100th
+-define(COMMENT_REV_PROB, 50).  % 1/50th
 
 comment(topic, Chan, Nick, Irc) ->
 	ok = irc_conn:chanmsg(Irc, Chan, choice:make([["Говенный топег, ", Nick, "."], 
@@ -69,10 +69,8 @@ comment(message, Chan, Nick, Irc) ->
 							  [pos, Nick, ": лови пиченьку."],
 							  [neg, Nick, " -- дятел. ^_^"],
 							  [pos, Nick, ", ты гений!"]]) of
-				[neg | Msg] ->
-					comment(neg, Chan, Nick, Msg, Irc);
-				[pos | Msg] ->
-					comment(pos, Chan, Nick, Msg, Irc)
+				[Emotion | Msg] ->
+					comment(Emotion, Chan, Nick, Msg, Irc)
 			end;
         dont ->
             ok
