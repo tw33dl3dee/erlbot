@@ -13,19 +13,56 @@
 -include("utf8.hrl").
 -include("irc.hrl").
 
-init(_) -> undefined.
+%% Data is dict mapping Channel -> {RemainingLines, StartTime}
+init(_) -> dict:new().
 
-handle_event(genevent, {chanmsg, Chan, User, [$! | Cmd]}, _Irc) ->
-	{new_event, cmdevent, {chancmd, Chan, User, util:split(Cmd)}, undefined};
+-define(MAX_LINES, 2).        %% How many lines after `selfevent' are considered possible appeal.
+-define(APPEAL_TIMEOUT, 30).  %% How much time (in sec) can pass after bot stops accepting smart appeal
+
+% User command ends smart appeal
+handle_event(genevent, {chanmsg, Chan, User, [$! | Cmd]}, #irc{data = Data}) ->
+	{new_event, cmdevent, {chancmd, Chan, User, util:split(Cmd)}, dict:erase(Chan, Data)};
 handle_event(genevent, {chanmsg, Chan, User, Msg}, Irc) ->
-	AppealRE = io_lib:format("^[ \t]*~s[:, ](.*)", [Irc#irc.nick]), %"
+	AppealRE = io_lib:format("^\\s*~s[:, ](.*)", [Irc#irc.nick]), %"
 	case re:run(Msg, AppealRE, [unicode, {capture, all_but_first, list}]) of
 		{match, [Rest]} ->
-			{new_event, customevent, {appeal, Chan, User, Rest}, undefined};
+			% Real appeal doesn't start anything (anyway most probably bot answers later)
+			{new_event, customevent, {appeal, Chan, User, Rest}, Irc#irc.data};
 		nomatch ->
-			{new_event, customevent, {genmsg, Chan, User, Msg}, undefined}
+			check_genmsg(Chan, User, Msg, Irc)
 	end;
-handle_event(genevent, {action, Chan, User, Action}, _Irc) ->
-	{new_event, customevent, {genmsg, Chan, User, Action}, undefined};
+handle_event(genevent, {action, Chan, User, Action}, Irc) ->
+	check_genmsg(Chan, User, Action, Irc);
+% Own channel message starts smart appeal. 
+% @TODO Any other start causes?
+handle_event(selfevent, {Cmd, Chan, _}, #irc{data = Data}) when Cmd =:= chanmsg; Cmd =:= action ->
+	{ok, dict:store(Chan, {?MAX_LINES, erlang:now()}, Data)};
+% Currently unused.
+handle_event(customevent, {cancel_appeal, Chan}, #irc{data = Data}) ->
+	{ok, dict:erase(Chan, Data)};
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.
+
+check_genmsg(Chan, User, Msg, #irc{data = Data}) ->
+	{M2, S2, _} = Now = erlang:now(),
+	case dict:find(Chan, Data) of
+		error ->
+			{new_event, customevent, {genmsg, Chan, User, Msg}, Data};
+		{ok, {0, _}} ->
+			{new_event, customevent, {genmsg, Chan, User, Msg}, dict:erase(Chan, Data)};
+		% More than `APPEAL_TIMEOUT' seconds has passed since smart appeal started, cancel it
+		{ok, {_, {M1, S1, _}}} when ((M2-M1)*1000000 + S2-S1) > ?APPEAL_TIMEOUT ->
+			{new_event, customevent, {genmsg, Chan, User, Msg}, dict:erase(Chan, Data)};
+		{ok, {X, _}} ->
+			check_maybe_appeal(Chan, User, Msg, dict:store(Chan, {X - 1, Now}, Data))
+	end.
+
+check_maybe_appeal(Chan, User, Msg, Data) ->
+	AnyAppealRE = "^\\s*" ?NICK_REGEX ":'.*",
+	case re:run(Msg, AnyAppealRE, [unicode, {capture, none}]) of
+		match ->
+			%% If appeal to another user detected, cancel smart appeal
+			{ok, dict:erase(Chan, Data)};
+		nomatch ->
+			{new_event, customevent, {maybe_appeal, Chan, User, Msg}, Data}
+	end.

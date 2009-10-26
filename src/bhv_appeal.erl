@@ -18,25 +18,31 @@
 init(_) -> undefined.
 
 handle_event(customevent, {appeal, Chan, ?USER(Nick), Msg}, Irc) ->
-	timer:sleep(?APPEAL_DELAY),
-	Humiliation = util:contains(Msg, "(хуй|заткни)"),
+	appeal(yes, Chan, Nick, Msg, Irc);
+handle_event(customevent, {maybe_appeal, Chan, ?USER(Nick), Msg}, Irc) ->
+	appeal(maybe, Chan, Nick, Msg, Irc);
+handle_event(_Type, _Event, _Irc) ->
+	not_handled.
+
+appeal(Prob, Chan, Nick, Msg, Irc) ->
+	Humiliation = util:contains(Msg, "(суч?ка|хуй|заткни)"),
 	Greeting = util:contains(Msg, "превед"),
 	FuckOff = util:contains(Msg, "(уебись|сосн?и)"),
 	Caress = util:contains(Msg, "(няшка|кавай)"),
 	if Humiliation ->
-			irc_conn:chanmsg(Irc, Chan, Nick ++ ": хамишь, сцуко."),
-			{ok, undefined};
+			react(Irc, Chan, [Nick, ": хамишь, сцуко."]);
 	   Greeting ->
-			irc_conn:chanmsg(Irc, Chan, "\\O/ Превед, " ++ Nick ++ "!!!"),
-			{ok, undefined};
+			react(Irc, Chan, ["\\O/ Превед, ", Nick, "!!!"]);
 	   FuckOff ->
-			{new_event, customevent, {suicide, Chan, Nick}, undefined};
+			{delayed_event, ?APPEAL_DELAY, customevent, {suicide, Chan, Nick}, undefined};
 	   Caress ->
-			irc_conn:chanmsg(Irc, Chan, "^_^"),
-			{ok, undefined};
+			react(Irc, Chan, "^_^");
+	   Prob =:= yes ->
+			react(Irc, Chan, "Ня!");
 	   true ->
-			irc_conn:chanmsg(Irc, Chan, "Ня!"),
-			{ok, undefined}
-	end;
-handle_event(_Type, _Event, _Irc) ->
-	not_handled.
+			not_handled
+	end.
+
+react(Irc, Chan, Msg) ->
+	timer:sleep(?APPEAL_DELAY),
+	ok = irc_conn:chanmsg(Irc, Chan, Msg).

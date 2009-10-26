@@ -10,7 +10,7 @@
 -behaviour(supervisor).
 
 %% External API
--export([start_link/2, start_link/3, add_behaviour/2, irc_conn/1, run/0, reload/0]).
+-export([start_link/2, start_link/3, add_behaviour/2, remove_behaviour/2, irc_conn/1, run/0, reload/0]).
 
 %% Internal entry points
 -export([start_link/1]).
@@ -39,6 +39,10 @@ start_link(Level) ->
 add_behaviour(SupRef, BhvMod) ->
 	{ok, _} = supervisor:start_child(SupRef, bhv_spec(SupRef, BhvMod)).
 
+remove_behaviour(SupRef, BhvMod) ->
+	ok = supervisor:terminate_child(SupRef, BhvMod),
+	supervisor:delete_child(SupRef, BhvMod).
+
 irc_conn(SupRef) ->
 	whereis_child(SupRef, irc_conn).
 
@@ -62,12 +66,14 @@ init(_) ->
 
 -include(".secret.hrl").
 
+-define(BEHAVIOURS, [bhv_err_print, bhv_log, bhv_test, bhv_appeal, bhv_chancmd, bhv_getop, bhv_pom, bhv_privcmd, bhv_comment, bhv_bash,
+					 bhv_google, bhv_lebedev, bhv_lojban, bhv_lurkmore, bhv_misc, bhv_wiki, bhv_blurp, bhv_giveop, bhv_greet, bhv_rejoin,
+					 bhv_suicide, bhv_history]).
+
 run() ->
 	{ok, Pid} = start_link({local, erlbot}, 
 						   {"192.168.1.1", "nya", [{login, "nya"}, {oper_pass, ?MAGIC_WORD}, {autojoin, ["#pron", "#work", "#mstu"]}, {umode, "+F"}]}, 
-						   [bhv_err_print, bhv_log, bhv_test, bhv_appeal, bhv_chancmd, bhv_getop, bhv_pom, bhv_privcmd, bhv_comment, bhv_bash, 
-							bhv_google, bhv_lebedev, bhv_lojban, bhv_lurkmore, bhv_misc, bhv_wiki, bhv_blurp, bhv_giveop, bhv_greet, bhv_rejoin,
-						   	bhv_suicide]),
+						   ?BEHAVIOURS),
 	unlink(Pid),
 	Pid.
 
@@ -123,9 +129,7 @@ ev_mgr(SupRef) ->
 test() ->
 	{ok, Pid} = start_link({local, erlbot}, 
 						   {"192.168.1.1", "yest", [{login, "nya"}, {oper_pass, ?MAGIC_WORD}, {autojoin, ["#test", "#t"]}, {umode, "+F"}]}, 
-						   [bhv_err_print, bhv_log, bhv_test, bhv_appeal, bhv_chancmd, bhv_getop, bhv_pom, bhv_privcmd, bhv_comment, bhv_bash, 
-							bhv_google, bhv_lebedev, bhv_lojban, bhv_lurkmore, bhv_misc, bhv_wiki, bhv_blurp, bhv_giveop, bhv_greet, bhv_rejoin,
-						   	bhv_suicide]),
+						   ?BEHAVIOURS),
 	unlink(Pid),
 	Pid.
 

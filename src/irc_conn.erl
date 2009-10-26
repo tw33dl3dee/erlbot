@@ -265,7 +265,7 @@ state_connected({async_irc_command, Cmd, Channel, Lines}, Conn) ->
 	{next_state, state_connected, Conn};
 state_connected({irc_command, Cmd}, Conn) ->
 	irc_command(Cmd, Conn),
-	{next_state, state_connected, Conn};
+	{next_state, state_connected, notify_selfevent(Cmd, Conn)};
 state_connected(Event, Conn) ->
 	{next_state, state_connected, notify_raw_event(Event, Conn)}.
 
@@ -354,6 +354,9 @@ notify_allchanevent(Event, Conn) ->
 
 notify_genevent(Event, Conn) ->
 	notify(Event, genevent, Conn).
+
+notify_selfevent(Event, Conn) ->
+	notify(Event, selfevent, Conn).
 
 notify(noevent, _, Conn) ->
 	Conn;

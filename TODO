@@ -9,3 +9,4 @@
 * TODO Behaviour dependencies.
 * TODO Arbitrary async per-channel actions (i.e. user Fun).
 * DONE Disable \r\n anywhere else but in async_*
+* TODO Own nick in parted, joined, kicked events, maybe in selfevents.
