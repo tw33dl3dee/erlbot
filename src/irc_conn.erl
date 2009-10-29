@@ -26,6 +26,7 @@
 			   nick_suffix = 1        :: integer(), %% suffix appended to nick on nick collision
 			   login                  :: list(),    %% actual login used
 			   is_oper   = false      :: boolean(),
+			   umode     = []         :: [atom()],  %% actual umodes set
 			   conf                   :: #conf{},
 			   irc_ref                :: pid(),
 			   handler                :: function(),
@@ -196,7 +197,8 @@ code_change(_Vsn, StateName, StateData, _Extra) ->
 
 %% events that are handled via send_all_state_event
 -define(IS_ALLSTATE_EVENT(Event), 
-		element(1, Event) =:= ping).
+		element(1, Event) =:= ping;
+		element(1, Event) =:= umode).
 
 send_event(Event) when ?IS_ALLSTATE_EVENT(Event) ->
 	gen_fsm:send_all_state_event(self(), Event);
@@ -207,8 +209,8 @@ send_event(Event) ->
 
 handle_event({ping, _, Server}, StateName, StateData) ->
 	{next_state, StateName, pong(Server, StateData)};
-handle_event(_Event, StateName, StateData) ->
-	{next_state, StateName, StateData}.
+handle_event(Event, StateName, StateData) ->
+	{next_state, StateName, notify_raw_event(Event, StateData)}.
 
 handle_sync_event(_Event, _From, StateName, StateData) ->
 	{reply, ok, StateName, StateData}.
@@ -219,7 +221,7 @@ state_connecting(_, Conn) ->
 	{next_state, state_connecting, Conn}.
 
 state_auth_nick(Event, Conn) when element(1, Event) =:= erroneusnickname;
-								   element(1, Event) =:= nicknameinuse ->
+								  element(1, Event) =:= nicknameinuse ->
 	{next_state, state_auth_nick, auth_login(next_nick(Conn))};
 state_auth_nick({myinfo, _, _, _, _, _}, #conn{conf = Conf} = Conn) ->
 	case Conf#conf.oper_pass of
@@ -232,7 +234,7 @@ state_auth_nick(_, Conn) ->
 	{next_state, state_auth_nick, Conn}.
 
 state_auth_oper(Event, Conn) when element(1, Event) =:= nooperhost;
-								   element(1, Event) =:= passwdmismatch -> 
+								  element(1, Event) =:= passwdmismatch -> 
 	{next_state, state_connected, autojoin(Conn)};
 state_auth_oper({youreoper, _, _}, Conn) ->
 	{next_state, state_connected, autojoin(retry_nick(set_umode(Conn#conn{is_oper = true})))};
@@ -332,6 +334,8 @@ notify_raw_event(Event, Conn) ->
 %% TODO: handle mymode here?..
 notify_event({mynick, Nick}, Conn) ->
 	Conn#conn{nick = Nick};
+notify_event({umode, _, Mode}, Conn) ->
+	apply_umode(Mode, Conn);
 notify_event(Event, Conn) when ?IS_CHAN_EVENT(Event) ->
 	notify_chanevent(Event, Conn);
 notify_event(Event, Conn) when ?IS_ALLCHAN_EVENT(Event) ->
@@ -402,9 +406,42 @@ autojoin(Conn, [Channel | Rest]) ->
 autojoin(Conn, []) ->
 	Conn.
 
-msg_throttle(#conn{conf = #conf{msg_interval = T}}) ->
-	timer:sleep(T).
+-define(MIN_MSG_THROTTLE, 1).  %% Throttle delay (in msec) used when no flood restrictions are appplied.
+
+msg_throttle(#conn{conf = #conf{msg_interval = T}, umode = M}) ->
+	case lists:member(nofloodlimits, M) of
+		true  -> timer:sleep(?MIN_MSG_THROTTLE);
+		false -> timer:sleep(T)
+	end.
 
 pong(Server, Conn) ->
 	irc_command({pong, Server}, Conn),
 	Conn.
+
+apply_umode([$- | Modes], Conn) ->
+	remove_umodes(Modes, Conn#conn.umode, Conn);
+apply_umode([$+ | Modes], Conn) ->
+	add_umodes(Modes, Conn#conn.umode, Conn);
+apply_umode(Modes, Conn) ->
+	add_umodes(Modes, Conn#conn.umode, Conn).
+
+add_umodes([], Current, Conn) ->
+	Conn#conn{umode = Current};
+add_umodes([Mode | Rest], Current, Conn) ->
+	case irc_modes:umode_to_atom(Mode) of 
+		undefined ->
+			add_umodes(Rest, Current, Conn);
+		M ->
+			add_umodes(Rest, util:set_flag(M, Current), Conn)
+	end.
+
+remove_umodes([], Current, Conn) ->
+	Conn#conn{umode = Current};
+remove_umodes([Mode | Rest], Current, Conn) ->
+	case irc_modes:umode_to_atom(Mode) of 
+		undefined ->
+			remove_umodes(Rest, Current, Conn);
+		M ->
+			remove_umodes(Rest, util:unset_flag(M, Current), Conn)
+	end.
+

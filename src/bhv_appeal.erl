@@ -19,30 +19,34 @@ init(_) -> undefined.
 
 handle_event(customevent, {appeal, Chan, ?USER(Nick), Msg}, Irc) ->
 	appeal(yes, Chan, Nick, Msg, Irc);
-handle_event(customevent, {maybe_appeal, Chan, ?USER(Nick), Msg}, Irc) ->
-	appeal(maybe, Chan, Nick, Msg, Irc);
+handle_event(customevent, {maybe_appeal, From, ?USER(Nick), Msg}, Irc) ->
+	appeal(maybe, From, Nick, Msg, Irc);
+handle_event(cmdevent, {privcmd, ?USER(Nick) = User, Words}, _Irc) ->
+	{new_event, customevent, {maybe_appeal, Nick, User, string:join(Words, " ")}, undefined};
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.
 
-appeal(Prob, Chan, Nick, Msg, Irc) ->
+% From may be user nickname or channel name
+appeal(Prob, From, Nick, Msg, Irc) ->
 	Humiliation = util:contains(Msg, "(суч?ка|хуй|заткни)"),
 	Greeting = util:contains(Msg, "превед"),
 	FuckOff = util:contains(Msg, "(уебись|сосн?и)"),
 	Caress = util:contains(Msg, "(няшка|кавай)"),
 	if Humiliation ->
-			react(Irc, Chan, [Nick, ": хамишь, сцуко."]);
+			react(Irc, From, [Nick, ": хамишь, сцуко."]);
 	   Greeting ->
-			react(Irc, Chan, ["\\O/ Превед, ", Nick, "!!!"]);
-	   FuckOff ->
-			{delayed_event, ?APPEAL_DELAY, customevent, {suicide, Chan, Nick}, undefined};
+			react(Irc, From, ["\\O/ Превед, ", Nick, "!!!"]);
+	   FuckOff, ?IS_CHAN(From) ->
+			{delayed_event, ?APPEAL_DELAY, customevent, {suicide, From, Nick}, undefined};
 	   Caress ->
-			react(Irc, Chan, "^_^");
+			react(Irc, From, "^_^");
 	   Prob =:= yes ->
-			react(Irc, Chan, "Ня!");
+			react(Irc, From, "Ня!");
 	   true ->
 			not_handled
 	end.
 
-react(Irc, Chan, Msg) ->
+react(Irc, From, Msg) ->
 	timer:sleep(?APPEAL_DELAY),
-	ok = irc_conn:chanmsg(Irc, Chan, Msg).
+	%% @attention Bot will not start smart-appeal because using privmsg here.
+	ok = irc_conn:privmsg(Irc, From, Msg).

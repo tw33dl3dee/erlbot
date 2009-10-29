@@ -58,7 +58,7 @@ check_genmsg(Chan, User, Msg, #irc{data = Data}) ->
 	end.
 
 check_maybe_appeal(Chan, User, Msg, Data) ->
-	AnyAppealRE = "^\\s*" ?NICK_REGEX ":'.*",
+	AnyAppealRE = "^\\s*" ?NICK_REGEX ":.*",
 	case re:run(Msg, AnyAppealRE, [unicode, {capture, none}]) of
 		match ->
 			%% If appeal to another user detected, cancel smart appeal
