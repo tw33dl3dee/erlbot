@@ -7,6 +7,7 @@
 -export([execv/3, execv/4, execvp/2, execvp/3, system/1, system/2, find_prog/2, signame/1]).
 -export([check_latin/1, count_latin/1, check_letter/1, count_letters/1]).
 -export([read_file/1]).
+-export([add_days/2, add_seconds/2, valid_datetime/1]).
 
 multiline(Term) ->
 	string:tokens(lists:flatten(io_lib:print(Term)), io_lib:nl()).
@@ -229,3 +230,16 @@ read_lines(Io, eof, Lines) ->
 read_lines(Io, Error, _) ->
 	file:close(Io),
 	Error.
+
+add_days(Date, Days) ->
+	G = calendar:date_to_gregorian_days(Date),
+	calendar:gregorian_days_to_date(G + Days).
+
+add_seconds(DateTime, Seconds) ->
+	G = calendar:datetime_to_gregorian_seconds(DateTime),
+	calendar:gregorian_seconds_to_datetime(G + Seconds).
+
+valid_datetime({Date, {H, M, S}}) when H >= 0, H < 24, M >= 0, M < 60, S >= 0, S < 60 ->
+	calendar:valid_date(Date);
+valid_datetime(_) ->
+	false.

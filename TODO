@@ -8,5 +8,6 @@
 * DONE ALL_CHAN_EVENTS.
 * TODO Behaviour dependencies.
 * TODO Arbitrary async per-channel actions (i.e. user Fun).
+* TODO Async private messages ordering.
 * DONE Disable \r\n anywhere else but in async_*
 * TODO Own nick in parted, joined, kicked events, maybe in selfevents.
