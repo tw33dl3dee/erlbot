@@ -28,7 +28,8 @@ handle_event(msgevent, {_, Chan, ?USER(Nick), Msg}, #irc{data = Data}) ->
 handle_event(cmdevent, {chancmd, Chan, _, ["xlit"]}, Irc) ->
 	case dict:find(Chan, Irc#irc.data) of
 		{ok, Hist} ->
-			xlit(Irc, Chan, lists:reverse(Hist));
+			xlit(Irc, Chan, lists:reverse(Hist)),
+			{ok, dict:erase(Chan, Irc#irc.data)};
 		error ->
 			not_handled
 	end;
