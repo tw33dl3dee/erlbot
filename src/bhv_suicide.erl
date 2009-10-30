@@ -18,7 +18,7 @@
 init(_) -> dict:new().
 
 -define(MAX_SUICIDE_TIME, 60).
--define(DEFAULT_SUICIDE_TIME, 60).
+-define(DEFAULT_SUICIDE_TIME, 30).
 
 -define(MAX_KICKS, 2).             % how many subsequent kicks allowed (KickPoints can't exceed `MAX_KICKS'*`POINTS_PER_KICK')
 -define(POINTS_PER_KICK, 10).      % kick cost (each `genmsg' decreases KickPoints by 1, each kick increases by this value)
@@ -63,7 +63,7 @@ handle_event(customevent, {suicide_enable, all}, #irc{data = Data}) ->
 	enable_all(Data);
 handle_event(customevent, {suicide_enable, Who}, #irc{data = Data}) ->
 	enable(Who, Data);
-handle_event(customevent, {genmsg, _, ?USER(Nick), _}, #irc{data = Data}) ->
+handle_event(msgevent, {_, _, ?USER(Nick), _}, #irc{data = Data}) ->
 	case dict:find(Nick, Data) of
 		{ok, KickPoints} when is_integer(KickPoints) ->
 			{ok, dict:store(Nick, KickPoints - 1, Data)};

@@ -11,3 +11,4 @@
 * TODO Async private messages ordering.
 * DONE Disable \r\n anywhere else but in async_*
 * TODO Own nick in parted, joined, kicked events, maybe in selfevents.
+* TODO Async messaging shall produce selfevents.

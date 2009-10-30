@@ -5,7 +5,6 @@
 -export([epoch/0, epoch/1]).
 -export([uri_encode/1]).
 -export([execv/3, execv/4, execvp/2, execvp/3, system/1, system/2, find_prog/2, signame/1]).
--export([check_latin/1, count_latin/1, check_letter/1, count_letters/1]).
 -export([read_file/1]).
 -export([add_days/2, add_seconds/2, valid_datetime/1]).
 
@@ -166,26 +165,6 @@ signame(30) -> pwr;
 signame(31) -> unused;
 signame(I) when I < 64 -> {rt, I - 32};
 signame(I) -> I.
-
-%% Life sucks, doesn't it?..
-check_latin(C) when C >= $a, C =< $z; C >= $A, C =< $Z; 
-					C =:= $`; C =:= $[; C =:= $]; C =:= ${; C =:= $}; C =:= $:; C =:= $;; 
-					C =:= $'; C =:= $"; C =:= $,; C =:= $<; C =:= $.; C =:= $>; C =:= $/; C =:= $? ->
-	1;
-check_latin(_) ->
-	0.
-
-check_letter(C) when C == $\ ; C >= $0, C =< $9; C == $!; C == $!; C == $%; C == $^; 
-					 C == $*; C == $(; C == $); C == $_; C == $-; C == $=; C == $+ ->
-	0;
-check_letter(_) ->
-	1.
-
-count_latin(Str) ->
-	lists:foldl(fun(C, Count) -> Count + check_latin(C) end, 0, Str).
-
-count_letters(Str) ->
-	lists:foldl(fun(C, Count) -> Count + check_letter(C) end, 0, Str).
 
 uri_encode(Atom) when is_atom(Atom) ->
     uri_encode(atom_to_list(Atom));

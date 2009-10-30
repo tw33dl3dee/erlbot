@@ -73,6 +73,10 @@ handle_event({Type, Event, Irc}, #state{mod = M, data = D} = State) ->
 			{ok, State#state{data = Data}};
 		{'EXIT', Reason} ->
 			gen_event:notify(self(), {exitevent, {M, followup(Event), Reason}, Irc}),
+			{'EXIT', Reason};
+		Unexpected ->
+			Reason = {unexpected_retval, Unexpected},
+			gen_event:notify(self(), {exitevent, {M, followup(Event), Reason}, Irc}),
 			{'EXIT', Reason}
 	end;
 handle_event(Event, State) ->

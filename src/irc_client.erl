@@ -68,7 +68,7 @@ init(_) ->
 
 -define(BEHAVIOURS, [bhv_err_print, bhv_log, bhv_test, bhv_appeal, bhv_chancmd, bhv_getop, bhv_pom, bhv_privcmd, bhv_comment, bhv_bash,
 					 bhv_google, bhv_lebedev, bhv_lojban, bhv_lurkmore, bhv_misc, bhv_wiki, bhv_blurp, bhv_giveop, bhv_greet, bhv_rejoin,
-					 bhv_suicide, bhv_history]).
+					 bhv_suicide, bhv_history, bhv_stat, bhv_xlit]).
 
 run() ->
 	{ok, Pid} = start_link({local, erlbot}, 

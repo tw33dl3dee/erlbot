@@ -137,18 +137,18 @@ parse_number(S) ->
 	end.
 
 parse_time([$- | HH], MM) ->
-	convert_time(-list_to_integer(HH), -list_to_integer(MM));
+	convert_time_rel(list_to_integer(HH), list_to_integer(MM));
 parse_time(HH, MM) ->
-	convert_time(list_to_integer(HH), list_to_integer(MM)).
+	convert_time_abs(list_to_integer(HH), list_to_integer(MM)).
 
-%% When time is negative, it's offset from now;
-convert_time(HH, MM) when {HH, MM} < {0, 0} ->
+%% Relative time offset
+convert_time_rel(HH, MM) ->
 	Diff = HH*3600 + MM*60,
-	{time, util:add_seconds(erlang:universaltime(), Diff)};
-%% Otherwise, compare HMS with current time.
-convert_time(HH, MM) when HH >= 0, HH < 24, MM >= 0, MM < 60 ->
+	{time, util:add_seconds(erlang:universaltime(), -Diff)}.
+
+convert_time_abs(HH, MM) when HH >= 0, HH < 24, MM >= 0, MM < 60 ->
 	convert_time(HH, MM, erlang:localtime());
-convert_time(_, _) ->
+convert_time_abs(_, _) ->
 	undefined.
 
 %% If requested HMS less than current, it's today's time;

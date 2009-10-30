@@ -15,7 +15,8 @@
 
 init(_) -> undefined.
 
-handle_event(customevent, {genmsg, Chan, _User, _Msg}, Irc) ->
+%% Bot can react to any `genmsg', direct or induced from `maybe_appeal'.
+handle_event(_, {genmsg, Chan, _User, _Msg}, Irc) ->
 	erlbot:blurp(Irc, Chan),
 	{ok, undefined};
 handle_event(_, {Event, Chan, _, _, _}, Irc) when Event =:= mode; Event =:= mymode ->

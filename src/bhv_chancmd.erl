@@ -27,7 +27,7 @@ handle_event(genevent, {chanmsg, Chan, User, Msg}, Irc) ->
 	case re:run(Msg, AppealRE, [unicode, {capture, all_but_first, list}]) of
 		{match, [Rest]} ->
 			% Real appeal doesn't start anything (anyway most probably bot answers later)
-			{new_event, customevent, {appeal, Chan, User, Rest}, Irc#irc.data};
+			{new_event, msgevent, {appeal, Chan, User, Rest}, Irc#irc.data};
 		nomatch ->
 			check_genmsg(Chan, User, Msg, Irc)
 	end;
@@ -47,12 +47,12 @@ check_genmsg(Chan, User, Msg, #irc{data = Data}) ->
 	{M2, S2, _} = Now = erlang:now(),
 	case dict:find(Chan, Data) of
 		error ->
-			{new_event, customevent, {genmsg, Chan, User, Msg}, Data};
+			{new_event, msgevent, {genmsg, Chan, User, Msg}, Data};
 		{ok, {0, _}} ->
-			{new_event, customevent, {genmsg, Chan, User, Msg}, dict:erase(Chan, Data)};
+			{new_event, msgevent, {genmsg, Chan, User, Msg}, dict:erase(Chan, Data)};
 		% More than `APPEAL_TIMEOUT' seconds has passed since smart appeal started, cancel it
 		{ok, {_, {M1, S1, _}}} when ((M2-M1)*1000000 + S2-S1) > ?APPEAL_TIMEOUT ->
-			{new_event, customevent, {genmsg, Chan, User, Msg}, dict:erase(Chan, Data)};
+			{new_event, msgevent, {genmsg, Chan, User, Msg}, dict:erase(Chan, Data)};
 		{ok, {X, _}} ->
 			check_maybe_appeal(Chan, User, Msg, dict:store(Chan, {X - 1, Now}, Data))
 	end.
@@ -64,5 +64,5 @@ check_maybe_appeal(Chan, User, Msg, Data) ->
 			%% If appeal to another user detected, cancel smart appeal
 			{ok, dict:erase(Chan, Data)};
 		nomatch ->
-			{new_event, customevent, {maybe_appeal, Chan, User, Msg}, Data}
+			{new_event, msgevent, {maybe_appeal, Chan, User, Msg}, Data}
 	end.
