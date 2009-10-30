@@ -29,8 +29,11 @@ while ($count-- && defined($_ = <STDIN>)) {
 
 	#utf8::downgrade $s;
 
-	print $s if 
-		$lang1 eq 'Rus' && $lang2 eq 'Rus' && 
+	if ($lang1 eq 'Rus' && $lang2 eq 'Rus' && 
 		$enc1 eq 'koi8-r' && $enc2 eq 'windows-1251' 
-		&& ($charcount1 > 0.5*length($i1)) && ($charcount2 > 0.5*length($i2));
+		&& ($charcount1 > 0.5*length($i1)) && ($charcount2 > 0.5*length($i2))) {
+		print $s;
+	} else {
+		print "\n";
+	}
 }
