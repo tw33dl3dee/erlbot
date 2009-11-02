@@ -40,8 +40,13 @@ xlit(Irc, Chan, Hist) ->
 	{Nicks, Misspelled} = lists:unzip([{Nick, [L, $\n]} || {Nick, L} <- Hist, is_misspelled(L)]),
 	Arg1 = integer_to_list(length(Misspelled)),
 	{success, Xlitted} = util:execv("xlit2.pl", [Arg1], ?SCRIPT_DIR, Misspelled),
+	ok = show_xlitted(Irc, Chan, Xlitted, Nicks).
+
+show_xlitted(Irc, Chan, Xlitted, Nicks) when length(Xlitted) =/= length(Nicks) ->
+	irc_conn:chanmsg(Irc, Chan, "Усе поломалось, насяльника :(");
+show_xlitted(Irc, Chan, Xlitted, Nicks) ->
 	Out = [["#XLIT: <", Nick, "> ", L] || {L, Nick} <- lists:zip(Xlitted, Nicks), length(L) > 0],
-	ok = irc_conn:async_chanmsg(Irc, Chan, Out).
+	irc_conn:async_chanmsg(Irc, Chan, Out).
 
 -define(MIN_LATINS_RATIO, 0.5).  % Minimum ratio of latin letters that line must contain.
 
