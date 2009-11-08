@@ -8,7 +8,7 @@
 -module(erlbot).
 
 -export([blurp/2, show_uptime/2, comment/4, dice/3, bash_quote/3, bash_search/3, empty_check/1,
-		 google_search/3, google_calc/3, google_trans/4, lurkmore_topic/3, identify/3,
+		 google_search/3, google_calc/3, google_trans/4, wiki_topic/4, lurkmore_topic/3, identify/3,
 		 lynch/3, jabberwock/2, fuckoff/3, jbofihe/3, cmafihe/3, jvocuhadju/3, dict/5, help/2]).
 
 -include("utf8.hrl").
@@ -97,27 +97,32 @@ dice(Irc, Chan, Max) ->
 -define(SCRIPT_DIR, "scripts").
 
 bash_quote(Irc, Chan, Num) ->
-	{success, Lines} = util:execv("bash.pl", [integer_to_list(Num)], ?SCRIPT_DIR, []),
+	{success, Lines} = util:execv("bash.pl", [integer_to_list(Num)], ?SCRIPT_DIR),
 	irc_conn:async_chanmsg(Irc, Chan, empty_check(Lines)),
 	{ok, undefined}.
 
 bash_search(Irc, Chan, Query) ->
-	{success, Lines} = util:execv("bash-search.pl", [Query], ?SCRIPT_DIR, []),
+	{success, Lines} = util:execv("bash-search.pl", [Query], ?SCRIPT_DIR),
 	irc_conn:async_chanmsg(Irc, Chan, empty_check(Lines)),
 	{ok, undefined}.
 
 google_search(Irc, Chan, Query) ->
-	{success, Lines} = util:execv("google.pl", [Query], ?SCRIPT_DIR, []),
+	{success, Lines} = util:execv("google.pl", [Query], ?SCRIPT_DIR),
 	irc_conn:async_chanmsg(Irc, Chan, empty_check(Lines)),
 	{ok, undefined}.
 
 google_calc(Irc, Chan, Query) ->
-	{success, Lines} = util:execv("gcalc.pl", [Query], ?SCRIPT_DIR, []),
+	{success, Lines} = util:execv("gcalc.pl", [Query], ?SCRIPT_DIR),
 	irc_conn:async_chanmsg(Irc, Chan, empty_check(Lines)),
 	{ok, undefined}.
 
 google_trans(Irc, Chan, Dict, Word) ->
-	{success, Lines} = util:execv("gdict.pl", [Word, Dict], ?SCRIPT_DIR, []),
+	{success, Lines} = util:execv("gdict.pl", [Word, Dict], ?SCRIPT_DIR),
+	irc_conn:async_chanmsg(Irc, Chan, empty_check(Lines)),
+	{ok, undefined}.
+
+wiki_topic(Irc, Chan, Lang, SearchQuery) ->
+	{success, Lines} = util:execv("wiki.pl", [Lang, SearchQuery], ?SCRIPT_DIR),
 	irc_conn:async_chanmsg(Irc, Chan, empty_check(Lines)),
 	{ok, undefined}.
 
