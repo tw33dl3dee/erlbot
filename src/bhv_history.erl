@@ -57,7 +57,7 @@ handle_event(chanevent, {joined, Chan, Topic, _}, Irc) ->
 handle_event(chanevent, {part, Chan, ?USER2(Nick, Ident), Reason}, _Irc) ->
 	save_histent(Chan, Ident, {part, Nick, Reason});
 handle_event(chanevent, {parted, Chan}, Irc) ->
-	save_histent(Chan, me, {part, me(Irc), []});  %% fixme(Irc)
+	save_histent(Chan, me, {part, me(Irc), []});
 handle_event(chanevent, {quit, Chan, ?USER2(Nick, Ident), Reason}, _Irc) ->
 	save_histent(Chan, Ident, {quit, Nick, Reason});
 handle_event(chanevent, {kick, Chan, ?USER2(Nick1, Ident), Nick2, Reason}, _Irc) ->
@@ -68,6 +68,8 @@ handle_event(chanevent, {mode, Chan, ?USER2(Nick1, Ident), Mode, Nick2}, _Irc) -
 	save_histent(Chan, Ident, {mode, Nick1, Mode, Nick2});
 handle_event(chanevent, {mymode, Chan, ?USER2(Nick, Ident), Mode, _}, Irc) ->
 	save_histent(Chan, Ident, {mode, Nick, Mode, me(Irc)});
+handle_event(chanevent, {nick, Chan, Nick2, ?USER2(Nick1, Ident)}, _Irc) ->
+	save_histent(Chan, Ident, {nick, Nick1, Nick2});
 handle_event(cmdevent, {privcmd, ?USER(Nick), ["hist", Chan | Rest]}, Irc) when ?IS_CHAN(Chan) ->
 	show_history(Nick, Chan, Rest, Irc);
 handle_event(cmdevent, {privcmd, ?USER(Nick), ["hist" | _]}, Irc) ->
@@ -256,6 +258,8 @@ event_to_list({kick, Nick1, Nick2, Reason}) ->
 	["## ", Nick1, " пнул нахуй ", Nick2, " (", Reason, ")"];
 event_to_list({mode, Nick1, Nick2, Mode}) ->
 	["## ", Nick1, " дал ", Nick2, " права ", Mode];
+event_to_list({nick, Nick1, Nick2}) ->
+	["@@ ", Nick1, " ныне известен как ", Nick2];
 event_to_list(Ev) ->
 	["??? какая-то Неведомая Ебанная Хуйня: ", io_lib:format("~p", [Ev])].
 

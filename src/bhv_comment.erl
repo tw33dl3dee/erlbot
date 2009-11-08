@@ -21,10 +21,8 @@ handle_event(chanevent, {join, Chan, ?USER(Nick)}, Irc) ->
 	erlbot:comment(join, Chan, Nick, Irc);
 handle_event(chanevent, {part, Chan, ?USER(Nick), _}, Irc) ->
 	erlbot:comment(exit, Chan, Nick, Irc);
-%% prevent Nick from being removed from channels FSM _after_ this point
-handle_event(genevent, {quit, ?USER(Nick), _}, Irc) ->
-	irc_conn:each_channel(Irc, fun (Chan) -> erlbot:comment(exit, Chan, Nick, Irc) end, Nick),
-	{ok, undefined};
+handle_event(chanevent, {quit, Chan, ?USER(Nick), _}, Irc) ->
+	erlbot:comment(exit, Chan, Nick, Irc);
 %% Bot can comment any `genmsg', direct or induced from `maybe_appeal'.
 handle_event(_, {genmsg, Chan, ?USER(Nick), _}, Irc) ->
 	erlbot:comment(message, Chan, Nick, Irc);

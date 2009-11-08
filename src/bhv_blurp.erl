@@ -22,8 +22,8 @@ handle_event(_, {genmsg, Chan, _User, _Msg}, Irc) ->
 handle_event(_, {Event, Chan, _, _, _}, Irc) when Event =:= mode; Event =:= mymode ->
 	erlbot:blurp(Irc, Chan),
 	{ok, undefined};
-handle_event(_, {nick, NewNick, _}, Irc) ->
-	irc_conn:each_channel(Irc, fun (Chan) -> erlbot:blurp(Irc, Chan) end, NewNick),
+handle_event(_, {nick, Chan, _, _}, Irc) ->
+	erlbot:blurp(Irc, Chan),
 	{ok, undefined};
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.

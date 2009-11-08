@@ -343,22 +343,36 @@ notify_event(Event, Conn) when ?IS_ALLCHAN_EVENT(Event) ->
 notify_event(Event, Conn) ->
 	notify_genevent(Event, Conn).
 
+%% Sends event to all channel FSMs, gathers replies and resends them to handler
+notify_allchanevent(Event, Conn) ->
+	EvList = [irc_chan:chan_event(Pid, Event) || {_, Pid} <- dict:to_list(Conn#conn.chan_fsms)],
+	notify_anyevents(EvList, Conn).
+
+%% Events received from channel FSMs may be either `chanevent' or `genevent'
+%% `chanevent' must have channel name as it's 2nd element.
+%% It will NOT be propagated to channel FSM again (as it was received directly from it)
+notify_anyevents([Event | Rest], Conn) when ?IS_CHAN(element(2, Event)) ->
+	notify_anyevents(Rest, notify(Event, chanevent, Conn));
+notify_anyevents([Event | Rest], Conn) ->
+	notify_anyevents(Rest, notify_genevent(Event, Conn));
+notify_anyevents([], Conn) ->
+	Conn.
+
+%% `joining' is a special event that starts new channel FSM
 notify_chanevent({joining, Channel}, Conn) ->
 	{ok, Pid} = irc_chan:start_link(Channel),
 	erlang:monitor(process, Pid),
 	Conn#conn{chan_fsms = dict:store(Channel, Pid, Conn#conn.chan_fsms)};
+%% Any other `chanevent' is propagated to FSM as is
 notify_chanevent(Event, Conn) ->
 	Channel = element(2, Event),
 	Pid = dict:fetch(Channel, Conn#conn.chan_fsms),
 	notify(irc_chan:chan_event(Pid, Event), chanevent, Conn).
 
-notify_allchanevent(Event, Conn) ->
-	[irc_chan:chan_event(Pid, Event) || {_, Pid} <- dict:to_list(Conn#conn.chan_fsms)],
-	notify_genevent(Event, Conn).
-
 notify_genevent(Event, Conn) ->
 	notify(Event, genevent, Conn).
 
+%% Each IRC command performed is sent back to handler as `selfevent'
 notify_selfevent(Event, Conn) ->
 	notify(Event, selfevent, Conn).
 

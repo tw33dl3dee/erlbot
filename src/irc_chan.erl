@@ -23,7 +23,9 @@
 
 %% events that are sent to channel FSM synchronously
 -define(IS_SYNC_EVENT(Event), 
-		element(1, Event) =:= endofnames).
+		element(1, Event) =:= endofnames;
+		element(1, Event) =:= quit;
+		element(1, Event) =:= nick).
 
 %%% Public interface
 
@@ -93,12 +95,8 @@ state_joined({kick, _, _, Nick, _}, Chan) ->
 	{next_state, state_joined, remove_user(Nick, Chan)};
 state_joined({part, _, ?USER(Nick), _}, Chan) ->
 	{next_state, state_joined, remove_user(Nick, Chan)};
-state_joined({quit, ?USER(Nick), _}, Chan) ->
-	{next_state, state_joined, remove_user(Nick, Chan)};
 state_joined({join, _, ?USER(Nick)}, Chan) ->
 	{next_state, state_joined, add_user(Nick, Chan)};
-state_joined({nick, NewNick, ?USER(OldNick)}, Chan) ->
-	{next_state, state_joined, rename_user(OldNick, NewNick, Chan)};
 state_joined({mode, _, _, Mode, Nick}, Chan) ->
 	{next_state, state_joined, change_mode(Nick, Mode, Chan)};
 state_joined({mymode, _, _, Mode, MyNick}, Chan) ->
@@ -114,7 +112,11 @@ state_joined(_, Chan) ->
 	{next_state, state_joined, Chan}.
 
 state_joined(chan_info, _From, Chan) ->
-	{reply, chan_info(Chan, as_info), state_joined, Chan}.
+	{reply, chan_info(Chan, as_info), state_joined, Chan};
+state_joined({nick, NewNick, ?USER(OldNick) = User}, _From, Chan) ->
+	{reply, {nick, Chan#chan.name, NewNick, User}, state_joined, rename_user(OldNick, NewNick, Chan)};
+state_joined({quit, ?USER(Nick) = User, Reason}, _From, Chan) ->
+	{reply, {quit, Chan#chan.name, User, Reason}, state_joined, remove_user(Nick, Chan)}.
 
 chan_info(#chan{name = Name, topic = Topic, users = Users}, as_event) ->
 	{joined, Name, Topic, Users};

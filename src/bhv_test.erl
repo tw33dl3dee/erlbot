@@ -16,7 +16,7 @@ handle_event(genevent, {chanmsg, Chan, ?USER(Nick), "@"}, Irc) ->
 handle_event(genevent, {privmsg, ?USER(_), "@"}, _Irc) ->
 	1 = 2,
 	{ok, undefined};
-handle_event(genevent, {nick, "test", ?USER(_)}, _Irc) ->
+handle_event(genevent, {nick, _, "test", ?USER(_)}, _Irc) ->
 	1 = 2,
 	{ok, undefined};
 handle_event(_, _, _) ->
