@@ -114,25 +114,41 @@ state_joined(_, Chan) ->
 state_joined(chan_info, _From, Chan) ->
 	{reply, chan_info(Chan, as_info), state_joined, Chan};
 state_joined({nick, NewNick, ?USER(OldNick) = User}, _From, Chan) ->
-	{reply, {nick, Chan#chan.name, NewNick, User}, state_joined, rename_user(OldNick, NewNick, Chan)};
+	case rename_user(OldNick, NewNick, Chan) of
+		{ok, NewChan} ->
+			{reply, {nick, Chan#chan.name, NewNick, User}, state_joined, NewChan};
+		error ->
+			{reply, noevent, state_joined, Chan}
+	end;
 state_joined({quit, ?USER(Nick) = User, Reason}, _From, Chan) ->
-	{reply, {quit, Chan#chan.name, User, Reason}, state_joined, remove_user(Nick, Chan)}.
+	case remove_user(Nick, Chan) of
+		{ok, NewChan} ->
+			{reply, {quit, Chan#chan.name, User, Reason}, state_joined, NewChan};
+		error ->
+			{reply, noevent, state_joined, Chan}
+	end.
 
 chan_info(#chan{name = Name, topic = Topic, users = Users}, as_event) ->
 	{joined, Name, Topic, Users};
 chan_info(#chan{name = Name, topic = Topic, users = Users}, as_info) ->
 	{Name, Topic, Users}.
 
-remove_user(Nick, #chan{users = Users} = Chan) ->
-	Chan#chan{users = lists:keydelete(Nick, 2, Users)}.
+remove_user(Nick, Chan) ->
+	case lists:keytake(Nick, 2, Chan#chan.users) of 
+		{value, _, Rest} -> {ok, Chan#chan{users = Rest}};
+		false            -> error
+	end.
 
 add_user(Nick, #chan{users = Users} = Chan) ->
 	Chan#chan{users = [{user, Nick, []} | Users]}.
 
 rename_user(OldNick, NewNick, Chan) ->
-	NewUsers = lists:map(fun ({T, N, F}) when N =:= OldNick -> {T, NewNick, F};
-							 (User)                         -> User end, Chan#chan.users),
-	Chan#chan{users = NewUsers}.
+	case lists:mapfoldl(fun ({T, N, F}, _) when N =:= OldNick -> {{T, NewNick, F}, true};
+							 (User, Found)                    -> {User, Found} end, 
+						false, Chan#chan.users) of
+		{NewUsers, true} -> {ok, Chan#chan{users = NewUsers}};
+		{_, false}       -> error
+	end.
 
 change_mode(Nick, [$- | Mode], Chan) ->
 	remove_mode(Nick, Mode, Chan);
