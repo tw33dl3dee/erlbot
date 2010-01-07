@@ -7,8 +7,8 @@
 %%%-------------------------------------------------------------------
 -module(erlbot).
 
--export([blurp/2, show_uptime/2, comment/4, dice/3, bash_quote/3, bash_search/3, empty_check/1,
-		 google_search/3, google_calc/3, google_trans/4, wiki_topic/4, lurkmore_topic/3, identify/3,
+-export([blurp/2, show_uptime/2, comment/4, dice/3, bash_quote/3, bash_search/3, empty_check/1, error_msg/0,
+		 google_search/3, google_calc/3, google_trans/4, lurkmore_topic/3, identify/3,
 		 lynch/3, jabberwock/2, fuckoff/3, jbofihe/3, cmafihe/3, jvocuhadju/3, dict/5, help/2]).
 
 -include("utf8.hrl").
@@ -21,7 +21,11 @@ empty_msg() ->
 	choice:make(["А вот хуй...",
 				 "<тут могла бы быть ваша реклама>",
 				 "Да хер его знает.",
+				 "Нихуйа не найдено",
 				 "Почувствуйте себя неудачником!"]).
+
+error_msg() -> 
+	"Усе поломалось, насяльника :(".
 
 -define(BLURP_DELAY, 1000).   % msec
 -define(BLURP_REV_PROB, 40).  % 1/40th
@@ -121,11 +125,6 @@ google_trans(Irc, Chan, Dict, Word) ->
 	irc_conn:async_chanmsg(Irc, Chan, empty_check(Lines)),
 	{ok, undefined}.
 
-wiki_topic(Irc, Chan, Lang, SearchQuery) ->
-	{success, Lines} = util:execv("wiki.pl", [Lang, SearchQuery], ?SCRIPT_DIR),
-	irc_conn:async_chanmsg(Irc, Chan, empty_check(Lines)),
-	{ok, undefined}.
-
 lurkmore_topic(Irc, Chan, Topic) ->
 	Url = "http://lurkmore.ru/" ++ util:uri_encode(Topic),
 	irc_conn:action(Irc, Chan, ["доставил: ", Url]),
@@ -140,6 +139,8 @@ identify(Irc, Chan, short) ->
 identify(Irc, Chan, long) ->
 	identify(Irc, Chan, short),
 	irc_conn:action(Irc, Chan, ["обитает по адресу: ", "http://tweedle-dee.org/bzr/erlbot/"]),
+	irc_conn:chanmsg(Irc, Chan, ["Советы и предложения постить сюды: ", 
+								 "http://redmine.tweedle-dee.org/projects/erlbot/issues/new"]),
 	{ok, undefined}.
 
 -define(LYNCH_FILE, "data/lynch.txt").

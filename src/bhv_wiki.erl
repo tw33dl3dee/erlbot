@@ -12,14 +12,33 @@
 
 -include("utf8.hrl").
 -include("irc.hrl").
+-include("erlbot_common.hrl").
 
 init(_) -> undefined.
 
 handle_event(cmdevent, {chancmd, Chan, _, ["w" | Topic]}, Irc) when length(Topic) > 0 ->
-	erlbot:wiki_topic(Irc, Chan, "en", string:join(Topic, " ")),
-	{ok, undefined};
+	wiki_topic(Irc, Chan, "en", Topic);
 handle_event(cmdevent, {chancmd, Chan, _, ["в" | Topic]}, Irc) when length(Topic) > 0 ->
-	erlbot:wiki_topic(Irc, Chan, "ru", string:join(Topic, " ")),
-	{ok, undefined};
+	wiki_topic(Irc, Chan, "ru", Topic);
+handle_event(cmdevent, {chancmd, Chan, _, ["ww" | Topic]}, Irc) when length(Topic) > 0 ->
+	wiki_search(Irc, Chan, "en", Topic);
+handle_event(cmdevent, {chancmd, Chan, _, ["вв" | Topic]}, Irc) when length(Topic) > 0 ->
+	wiki_search(Irc, Chan, "ru", Topic);
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.
+
+wiki_topic(Irc, Chan, Lang, SearchQuery) ->
+	case util:execv("wiki.py", ["-l", Lang | SearchQuery], ?SCRIPT_DIR) of
+		{success, Lines} ->
+			ok = irc_conn:async_chanmsg(Irc, Chan, erlbot:empty_check(Lines));
+		{{failure, 1}, Trace} ->
+			ok = irc_conn:async_chanmsg(Irc, Chan, [erlbot:error_msg() | Trace])
+	end.
+
+wiki_search(Irc, Chan, Lang, SearchQuery) ->
+	case util:execv("wiki.py", ["-l", Lang, "-s" | SearchQuery], ?SCRIPT_DIR) of
+		{success, Lines} ->
+			ok = irc_conn:async_chanmsg(Irc, Chan, erlbot:empty_check(Lines));
+		{{failure, 1}, Trace} ->
+			ok = irc_conn:async_chanmsg(Irc, Chan, [erlbot:error_msg() | Trace])
+	end.
