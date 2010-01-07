@@ -12,3 +12,4 @@ proc_tabs.erl
 ./log*
 ./src/statistic*.erl
 ./src/s[0-9]*.erl
+./tmp

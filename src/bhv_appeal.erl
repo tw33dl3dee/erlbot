@@ -33,16 +33,20 @@ appeal(Type, From, ?USER(Nick) = User, Msg, Irc) ->
 	Greeting = util:contains(Msg, "превед"),
 	FuckOff = util:contains(Msg, "(у?ебись|сосн?и)"),
 	Caress = util:contains(Msg, "(няшка|кавай)"),
+	Criticism = util:contains(Msg, "тупа+я +пи+зда"),
 	if Humiliation ->
-			react(Irc, From, [Nick, ": хамишь, сцуко."]);
+			%% @attention Bot will not start smart-appeal because using privmsg here and later.
+			react(Irc, From, privmsg, [Nick, ": хамишь, сцуко."]);
 	   Greeting ->
-			react(Irc, From, ["\\O/ Превед, ", Nick, "!!!"]);
+			react(Irc, From, privmsg,["\\O/ Превед, ", Nick, "!!!"]);
 	   FuckOff, ?IS_CHAN(From) ->
 			{delayed_event, ?APPEAL_DELAY, customevent, {suicide, From, Nick}, undefined};
 	   Caress ->
-			react(Irc, From, "^_^");
+			react(Irc, From, privmsg, "^_^");
+	   Criticism ->
+			react(Irc, From, action, "тупая пизда v_v");
 	   Type =:= direct ->
-			react(Irc, From, "Ня!");
+			react(Irc, From, privmsg, "Ня!");
 	   Type =:= {indirect, chan} ->
 			%% Induced `genmsg' is `customevent' which means that `msgevent' 
 			%% (as `genmsg', `appeal' or `maybe_appeal') occurs once per user message
@@ -51,7 +55,6 @@ appeal(Type, From, ?USER(Nick) = User, Msg, Irc) ->
 			not_handled
 	end.
 
-react(Irc, From, Msg) ->
+react(Irc, From, How, Msg) ->
 	timer:sleep(?APPEAL_DELAY),
-	%% @attention Bot will not start smart-appeal because using privmsg here.
-	ok = irc_conn:privmsg(Irc, From, Msg).
+	ok = irc_conn:How(Irc, From, Msg).

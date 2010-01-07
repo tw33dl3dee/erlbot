@@ -20,10 +20,10 @@
 				chars  :: integer()}).
 
 init(_) -> 	
-	{atomic, ok} = db_util:init_table(lstat, [{disc_copies, [node()]},
-											  {attributes, record_info(fields, lstat)}]),
-	{atomic, ok} = db_util:init_table(cstat, [{disc_copies, [node()]},
-											  {attributes, record_info(fields, cstat)}]),
+	ok = db_util:init_table(lstat, [{disc_copies, [node()]},
+									{attributes, record_info(fields, lstat)}]),
+	ok = db_util:init_table(cstat, [{disc_copies, [node()]},
+									{attributes, record_info(fields, cstat)}]),
 	undefined.
 
 %% We could use either `genevent' for counting (which includes public commands to bot) or

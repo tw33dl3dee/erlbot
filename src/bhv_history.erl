@@ -27,15 +27,15 @@
 
 init(_) -> 
 	db_util:create_sequence(),
-	{atomic, ok} = db_util:init_table(user, [{disc_copies, [node()]},
-											 {index, [#user.ident]},
-											 {attributes, record_info(fields, user)}]),
-	{atomic, ok} = db_util:init_table(chan, [{disc_copies, [node()]},
-											 {index, [#chan.name]},
-											 {attributes, record_info(fields, chan)}]),
-	{atomic, ok} = db_util:init_table(histent, [{disc_copies, [node()]},
-												{type, ordered_set},
-												{attributes, record_info(fields, histent)}]),
+	ok = db_util:init_table(user, [{disc_copies, [node()]},
+								   {index, [#user.ident]},
+								   {attributes, record_info(fields, user)}]),
+	ok = db_util:init_table(chan, [{disc_copies, [node()]},
+								   {index, [#chan.name]},
+								   {attributes, record_info(fields, chan)}]),
+	ok = db_util:init_table(histent, [{disc_copies, [node()]},
+									  {type, ordered_set},
+									  {attributes, record_info(fields, histent)}]),
 	undefined.
 
 handle_event(genevent, {chanmsg, Chan, ?USER2(Nick, Ident), Msg}, _Irc) ->

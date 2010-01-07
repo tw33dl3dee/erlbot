@@ -23,7 +23,8 @@ init_table(Name, TabDef) ->
 						   {atomic, ok};
 					   E ->
 						   E
-				   end.
+				   end,
+	ok = mnesia:wait_for_tables([Name], infinity).
 
 create_sequence() ->
 	create_sequence([node()]).

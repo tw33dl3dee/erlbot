@@ -1,0 +1,7 @@
+#!/usr/bin/env escript 
+%% -*- erlang -*-
+%%! -smp enable -name nya -pa ebin
+
+main(Args) ->
+	irc_client:run(),
+	timer:sleep(infinity).
