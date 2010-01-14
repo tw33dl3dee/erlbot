@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2.6
 
 import httplib, urllib
 import yaml, json
@@ -64,13 +64,11 @@ class Wiki(object):
             conn = httplib.HTTPConnection(site)
             conn.request('GET', url)
             resp = conn.getresponse()
-        # @attention Replace with httplib.HTTPException in 2.6
-        except Exception, e:
+        except httplib.HTTPException, e:
             raise RuntimeError, "Connect to %s failed: %s" % (site, e.args[1])
         if resp.status != httplib.OK:
             raise RuntimeError, "GET %s: %s" % (url, resp.reason)
-        # @attention Replace with loads() in 2.6
-        return json.read(resp.read())
+        return json.loads(resp.read())
 
     def get_page(self, topic):
         """Fetches page (first section only) from Wikipedia as plain text

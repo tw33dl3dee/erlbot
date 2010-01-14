@@ -21,7 +21,7 @@ handle_event(chanevent, {joined, Chan, _, _}, Irc) ->
 		true ->
 			not_handled;
 		false ->
-			erlbot:identify(Irc, Chan, short),
+			erlbot:identify(Irc, Chan, greet),
 			{ok, [Chan | Irc#irc.data]}
 	end;
 handle_event(_Type, _Event, _Irc) ->

@@ -16,14 +16,53 @@
 init(_) -> undefined.
 
 %% Bot can react to any `genmsg', direct or induced from `maybe_appeal'.
-handle_event(_, {genmsg, Chan, _User, _Msg}, Irc) ->
-	erlbot:blurp(Irc, Chan),
+handle_event(_, {genmsg, Chan, _User, Msg}, Irc) ->
+	blurp(Irc, Chan, Msg),
 	{ok, undefined};
 handle_event(_, {Event, Chan, _, _, _}, Irc) when Event =:= mode; Event =:= mymode ->
-	erlbot:blurp(Irc, Chan),
+	blurp(Irc, Chan, none),
 	{ok, undefined};
 handle_event(_, {nick, Chan, _, _}, Irc) ->
-	erlbot:blurp(Irc, Chan),
+	blurp(Irc, Chan, none),
 	{ok, undefined};
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.
+
+-define(BLURP_DELAY, 1000).   % msec
+
+-define(BLURP_GENERIC, [40,   % 1/40th probability of comment
+						"Хамите", "Хо-хо!", "Знаменито", "Мрак", "Жуть", "Не учите меня жить", 
+						"Как ребёнка", "Кр-р-расота!", "Толстый и красивый", "Поедем на извозчике",
+						"Поедем на таксо", "У вас вся спина белая", "Подумаешь!", "Ого!"]).
+
+%% Neither I am a good author for such comments
+-define(BLURP_CTX, [["квак", 10,  % 1/10
+					 "Пры-ы-ы-ыжка!", "Заперчатили... =(", "Кваку фтопку, Диабла лучше!"],
+					["диабл", 5,  % 1/5
+					 "Энтерпрайзно сосем!", "А слабо 99-й левел на классике?", "Я таких рун не видел..."]]).
+
+blurp(Irc, Chan, Message) ->
+	[RevProb | Words] = match_ctx(Message),
+	case choice:make([{1, do}, {RevProb - 1, dont}]) of
+		do ->
+			timer:sleep(?BLURP_DELAY),
+			irc_conn:chanmsg(Irc, Chan, choice:make(Words)),
+			did;
+		dont ->
+			didnt
+	end.
+
+match_ctx(none) ->
+	?BLURP_GENERIC;
+match_ctx(Message) ->
+	match_ctx(Message, ?BLURP_CTX).
+
+match_ctx(_, []) ->
+	match_ctx(none);
+match_ctx(Msg, [[Pattern | Matches] | Rest]) ->
+	case util:contains(Msg, Pattern) of
+		true ->
+			Matches;
+		false ->
+			match_ctx(Msg, Rest)
+	end.

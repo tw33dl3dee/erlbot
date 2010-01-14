@@ -10,7 +10,7 @@
 -behaviour(gen_server).
 
 %% External exports
--export([start_link/0, start/0, make/1, uniform/0, uniform/1]).
+-export([start_link/0, start/0, make/1, uniform/0, uniform/1, uniform/2]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
@@ -25,13 +25,18 @@ start() ->
 	gen_server:start({local, ?MODULE}, choice, [], []).
 
 make(Choices) when is_list(Choices), length(Choices) > 1 ->
-	gen_server:call(?MODULE, {choose, Choices}).
+	gen_server:call(?MODULE, {choose, Choices});
+make([OnlyChoice]) ->
+	OnlyChoice.
 
 uniform() ->
 	gen_server:call(?MODULE, uniform).
 
 uniform(N) ->
 	gen_server:call(?MODULE, {uniform, N}).
+
+uniform(Min, Max) ->
+	uniform(Max - Min + 1) + Min - 1.
 
 %%%-------------------------------------------------------------------
 %%% Callback functions from gen_server

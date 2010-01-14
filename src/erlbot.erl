@@ -7,7 +7,7 @@
 %%%-------------------------------------------------------------------
 -module(erlbot).
 
--export([blurp/2, show_uptime/2, comment/4, dice/3, bash_quote/3, bash_search/3, empty_check/1, error_msg/0,
+-export([show_uptime/2, comment/4, dice/3, bash_quote/3, bash_search/3, empty_check/1, error_msg/0,
 		 google_search/3, google_calc/3, google_trans/4, lurkmore_topic/3, identify/3,
 		 lynch/3, jabberwock/2, fuckoff/3, jbofihe/3, cmafihe/3, jvocuhadju/3, dict/5, help/2]).
 
@@ -26,22 +26,6 @@ empty_msg() ->
 
 error_msg() -> 
 	"Усе поломалось, насяльника :(".
-
--define(BLURP_DELAY, 1000).   % msec
--define(BLURP_REV_PROB, 40).  % 1/40th
-
-blurp(Irc, Chan) ->
-	Words = ["Хамите", "Хо-хо!", "Знаменито", "Мрак", "Жуть", "Не учите меня жить", 
-			 "Как ребёнка", "Кр-р-расота!", "Толстый и красивый", "Поедем на извозчике",
-			 "Поедем на таксо", "У вас вся спина белая", "Подумаешь!", "Ого!"],
-	case choice:make([{1, do}, {?BLURP_REV_PROB - 1, dont}]) of
-		do ->
-			timer:sleep(?BLURP_DELAY),
-			irc_conn:chanmsg(Irc, Chan, choice:make(Words)),
-			did;
-		dont ->
-			didnt
-	end.
 
 show_uptime(Irc, Chan) ->
 	{Uptime, _} = statistics(wall_clock),
@@ -130,6 +114,43 @@ lurkmore_topic(Irc, Chan, Topic) ->
 	irc_conn:action(Irc, Chan, ["доставил: ", Url]),
 	{ok, undefined}.
 
+-define(GREETINGS, ["shaking...",
+					"liquefying bytes... ",
+					"homogenizing goo... ",
+					"testing ozone... ",
+					"processing... ",
+					"spinning violently around the y-axis... ",
+					"iodizing... ",
+					"stretching images... ",
+					"reconstituting sounds... ",
+					"faithfully re-imagining... ",
+					"scraping funds... ",
+					"applying innovation... ",
+					"constructing emotional depth... ",
+					"debating games as art... ",
+					"placating publishers.., ",
+					"meticulously diagramming fun... ",
+					"filtering moral... ",
+					"testing for perfection... ",
+					"revolving independence... ",
+					"tokenizing innovation... ",
+					"self affirming... ",
+					"dissolving relationships... ",
+					"deterministically simulating the future... ",
+					"exceeding cpu quota... ",
+					"swapping time and space... ",
+					"embiggening prototypes... ",
+					"sandbagging expectations... ",
+					"challenging everything... ",
+					"distilling beauty... ",
+					"blitting powers of two... ",
+					"manufacturing social responsibility... ",
+					"bending the spoon... ",
+					"constructing non-linear narrative..."]).
+
+-define(MIN_GREETS, 3).
+-define(MAX_GREETS, 6).
+
 identify(Irc, Chan, short) ->
 	irc_conn:action(Irc, Chan, "нядваноль"),
 	timer:sleep(500),
@@ -141,7 +162,11 @@ identify(Irc, Chan, long) ->
 	irc_conn:action(Irc, Chan, ["обитает по адресу: ", "http://tweedle-dee.org/bzr/erlbot/"]),
 	irc_conn:chanmsg(Irc, Chan, ["Советы и предложения постить сюды: ", 
 								 "http://redmine.tweedle-dee.org/projects/erlbot/issues/new"]),
-	{ok, undefined}.
+	{ok, undefined};
+identify(Irc, Chan, greet) ->
+	NumGreets = choice:uniform(?MIN_GREETS, ?MAX_GREETS),
+	Greets = [choice:make(?GREETINGS) || _I <- lists:seq(1, NumGreets)],
+	ok = irc_conn:async_action(Irc, Chan, Greets).
 
 -define(LYNCH_FILE, "data/lynch.txt").
 
