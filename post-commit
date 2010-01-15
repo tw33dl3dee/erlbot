@@ -1,3 +1,3 @@
 #!/bin/sh
 
-./bcast nya@home.tweedle-dee.org action r`bzr revno`
+tools/bcast nya@home.tweedle-dee.org action "r`bzr log -r-1 --line`"
