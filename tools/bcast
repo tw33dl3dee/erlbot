@@ -1,0 +1,14 @@
+#!/usr/bin/env escript 
+%% -*- erlang -*-
+%%! -pa ebin -name rpcclient
+
+main([Node, How, What]) ->
+	Method = list_to_atom(How),
+	case rpc:call(list_to_atom(Node), irc_conn, each_channel, [irc, fun (Chan) -> irc_conn:Method(irc, Chan, What) end]) of
+		{badrpc, Reason} ->
+			io:format(standard_error, "RPC call failed: ~p~n", [Reason]);
+		Res ->
+			io:format("~p~n", [Res])
+	end;
+main(_) ->
+	io:format("Usage: ~ts <node> action|chanmsg <message>~n", [filename:basename(escript:script_name())]).

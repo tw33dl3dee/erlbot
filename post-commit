@@ -1,0 +1,3 @@
+#!/bin/sh
+
+./bcast nya@home.tweedle-dee.org action r`bzr revno`
