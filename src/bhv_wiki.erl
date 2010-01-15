@@ -1,5 +1,5 @@
 %%%-------------------------------------------------------------------
-%%% File    : bhv_google.erl
+%%% File    : bhv_wiki.erl
 %%% Author  : Ivan Korotkov <twee@tweedle-dee.org>
 %%% Description : 
 %%%
@@ -12,7 +12,7 @@
 
 -include("utf8.hrl").
 -include("irc.hrl").
--include("erlbot_common.hrl").
+-include("bhv_common.hrl").
 
 init(_) -> undefined.
 
@@ -30,15 +30,15 @@ handle_event(_Type, _Event, _Irc) ->
 wiki_topic(Irc, Chan, Lang, SearchQuery) ->
 	case util:execv("wiki.py", ["-l", Lang | SearchQuery], ?SCRIPT_DIR) of
 		{success, Lines} ->
-			ok = irc_conn:async_chanmsg(Irc, Chan, erlbot:empty_check(Lines));
+			ok = irc_conn:async_chanmsg(Irc, Chan, bhv_common:empty_check(Lines));
 		{{failure, 1}, Trace} ->
-			ok = irc_conn:async_chanmsg(Irc, Chan, [erlbot:error_msg() | Trace])
+			ok = bhv_common:error(Irc, Chan, Trace)
 	end.
 
 wiki_search(Irc, Chan, Lang, SearchQuery) ->
 	case util:execv("wiki.py", ["-l", Lang, "-s" | SearchQuery], ?SCRIPT_DIR) of
 		{success, Lines} ->
-			ok = irc_conn:async_chanmsg(Irc, Chan, erlbot:empty_check(Lines));
+			ok = irc_conn:async_chanmsg(Irc, Chan, bhv_common:empty_check(Lines));
 		{{failure, 1}, Trace} ->
-			ok = irc_conn:async_chanmsg(Irc, Chan, [erlbot:error_msg() | Trace])
+			ok = bhv_common:error(Irc, Chan, Trace)
 	end.

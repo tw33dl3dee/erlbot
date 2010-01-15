@@ -12,19 +12,35 @@
 
 -include("utf8.hrl").
 -include("irc.hrl").
+-include("bhv_common.hrl").
 
 init(_) -> undefined.
 
 handle_event(cmdevent, {chancmd, Chan, _, ["gg" | Rest]}, Irc) when length(Rest) > 0 ->
-	erlbot:google_search(Irc, Chan, string:join(Rest, " ")),
+	google_search(Irc, Chan, string:join(Rest, " ")),
 	{ok, undefined};
 handle_event(cmdevent, {chancmd, Chan, _, ["gc" | Rest]}, Irc) when length(Rest) > 0 ->
-	erlbot:google_calc(Irc, Chan, string:join(Rest, " ")),
+	google_calc(Irc, Chan, string:join(Rest, " ")),
 	{ok, undefined};
 handle_event(cmdevent, {chancmd, Chan, _, [Lang | Words]}, Irc) 
   when Lang =:= "en-ru"; Lang =:= "ru-en"; Lang =:= "de-ru"; Lang =:= "ru-de" ->
 	Dict = [case C of $- -> $|; C -> C end || C <- Lang],
-	[erlbot:google_trans(Irc, Chan, Dict, Word) || Word <- Words],
+	[google_trans(Irc, Chan, Dict, Word) || Word <- Words],
 	{ok, undefined};
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.
+
+google_search(Irc, Chan, Query) ->
+	{success, Lines} = util:execv("google.pl", [Query], ?SCRIPT_DIR),
+	irc_conn:async_chanmsg(Irc, Chan, bhv_common:empty_check(Lines)),
+	{ok, undefined}.
+
+google_calc(Irc, Chan, Query) ->
+	{success, Lines} = util:execv("gcalc.pl", [Query], ?SCRIPT_DIR),
+	irc_conn:async_chanmsg(Irc, Chan, bhv_common:empty_check(Lines)),
+	{ok, undefined}.
+
+google_trans(Irc, Chan, Dict, Word) ->
+	{success, Lines} = util:execv("gdict.pl", [Word, Dict], ?SCRIPT_DIR),
+	irc_conn:async_chanmsg(Irc, Chan, bhv_common:empty_check(Lines)),
+	{ok, undefined}.

@@ -61,30 +61,6 @@ init(_) ->
 	{ok, {{one_for_one, ?MAX_R, ?MAX_T}, [Choice, Throttle, EvMgr]}}.
 
 %%%-------------------------------------------------------------------
-%%% Conventional API (to be replaced with OTP application)
-%%%-------------------------------------------------------------------
-
--include(".secret.hrl").
-
--define(BEHAVIOURS, [bhv_err_print, bhv_log, bhv_test, bhv_appeal, bhv_chancmd, bhv_getop, bhv_pom, bhv_privcmd, bhv_comment, bhv_bash,
-					 bhv_google, bhv_lebedev, bhv_lojban, bhv_lurkmore, bhv_misc, bhv_wiki, bhv_blurp, bhv_giveop, bhv_greet, bhv_rejoin,
-					 bhv_suicide, bhv_history, bhv_stat, bhv_xlit]).
-
-run() ->
-	{ok, Pid} = start_link({local, erlbot}, 
-						   {"192.168.1.1", "nya", [{login, "nya"}, {oper_pass, ?MAGIC_WORD}, {autojoin, ["#pron", "#work", "#mstu"]}, {umode, "+F"}]}, 
-						   ?BEHAVIOURS),
-	%unlink(Pid),
-	Pid.
-
-%% Reload all modules under current working dir.
-reload() ->
-	{ok, Pwd} = file:get_cwd(),
-	[begin true          = code:soft_purge(Mod),
-		   {module, Mod} = code:load_file(Mod) 
-	 end || {Mod, ModPath} <- code:all_loaded(), is_list(ModPath), string:str(ModPath, Pwd) == 1].
-
-%%%-------------------------------------------------------------------
 %%% Internal functions
 %%%-------------------------------------------------------------------
 
@@ -124,7 +100,35 @@ whereis_child([], _, []) ->
 ev_mgr(SupRef) ->
 	whereis_child(SupRef, ev_mgr).
 
+%%%-------------------------------------------------------------------
+%%% Conventional API (to be replaced with OTP application)
+%%%-------------------------------------------------------------------
+
+-include(".secret.hrl").
+
+-define(BEHAVIOURS, [bhv_err_print, bhv_log, bhv_appeal, bhv_chancmd, bhv_getop, bhv_pom, bhv_privcmd, bhv_comment, bhv_bash,
+					 bhv_google, bhv_lebedev, bhv_lojban, bhv_lurkmore, bhv_misc, bhv_wiki, bhv_blurp, bhv_giveop, bhv_greet, bhv_rejoin,
+					 bhv_suicide, bhv_history, bhv_stat, bhv_xlit]).
+
+run() ->
+	{ok, Pid} = start_link({local, erlbot}, 
+						   {"192.168.1.1", "nya", [{login, "nya"}, {oper_pass, ?MAGIC_WORD}, {autojoin, ["#pron", "#work", "#mstu"]}, {umode, "+F"}]}, 
+						   ?BEHAVIOURS),
+	%unlink(Pid),
+	Pid.
+
+%% Reload all modules under current working dir.
+reload() ->
+	{ok, Pwd} = file:get_cwd(),
+	[begin io:format("Reloading ~p...~n", [Mod]),
+		   true          = code:soft_purge(Mod),
+		   {module, Mod} = code:load_file(Mod),
+		   Mod
+	 end || {Mod, ModPath} <- code:all_loaded(), is_list(ModPath), string:str(ModPath, Pwd) == 1].
+
+%%%-------------------------------------------------------------------
 %%% Testing
+%%%-------------------------------------------------------------------
 
 test() ->
 	{ok, Pid} = start_link({local, erlbot}, 

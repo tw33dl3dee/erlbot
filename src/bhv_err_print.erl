@@ -1,5 +1,5 @@
 %%%-------------------------------------------------------------------
-%%% File    : bhv_skel.erl
+%%% File    : bhv_err_print.erl
 %%% Author  : Ivan Korotkov <twee@tweedle-dee.org>
 %%% Description : 
 %%%
@@ -12,6 +12,7 @@
 
 -include("utf8.hrl").
 -include("irc.hrl").
+-include("bhv_common.hrl").
 
 init(_) -> undefined.
 

@@ -12,6 +12,7 @@
 
 -include("irc.hrl").
 -include("utf8.hrl").
+-include("bhv_common.hrl").
 
 -define(APPEAL_DELAY, 500).
 
@@ -33,7 +34,7 @@ appeal(Type, From, ?USER(Nick) = User, Msg, Irc) ->
 	Greeting = util:contains(Msg, "превед"),
 	FuckOff = util:contains(Msg, "(у?ебись|сосн?и)"),
 	Caress = util:contains(Msg, "(няшка|кавай)"),
-	Criticism = util:contains(Msg, "тупа+я +пи+зда"),
+	Criticism = util:contains(Msg, "(тупа+я +пи+зда|пи+зда +тупа+я)"),
 	if Humiliation ->
 			%% @attention Bot will not start smart-appeal because using privmsg here and later.
 			react(Irc, From, privmsg, [Nick, ": хамишь, сцуко."]);

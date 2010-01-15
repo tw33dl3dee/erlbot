@@ -12,6 +12,7 @@
 
 -include("utf8.hrl").
 -include("irc.hrl").
+-include("bhv_common.hrl").
 
 %% Data is a dict mapping Channel -> {KickerNick, KickTime} and User -> 'disabled' | KickPoints
 %% where 'disabled' means that User cannot kick bot, KickPoints is user's penalty for kicking bot.
@@ -45,7 +46,7 @@ handle_event(cmdevent, {chancmd, Chan, ?USER(Nick), ["suicide", Secs]}, Irc) ->
 		S when S > 0, S < ?MAX_SUICIDE_TIME->
 			suicide(Irc, Chan, Nick, S);
 		_ ->
-			erlbot:fuckoff(Irc, Chan, Nick),
+			bhv_common:fuckoff(Irc, Chan, Nick),
 			ok
 	end;
 handle_event(chanevent, {kicked, Chan, ?USER(Nick), _}, #irc{nick = Nick, data = Data}) ->
@@ -76,7 +77,7 @@ handle_event(_Type, _Event, _Irc) ->
 suicide(#irc{data = Data} = Irc, Chan, Kicker, Secs) ->
 	case dict:find(Kicker, Data) of
 		{ok, disabled} ->
-			erlbot:fuckoff(Irc, Chan, Kicker),
+			bhv_common:fuckoff(Irc, Chan, Kicker),
 			ok;
 		{ok, KickPoints} when KickPoints > ?MAX_KICK_POINTS ->
 			irc_conn:chanmsg(Irc, Chan, disabled_reason(Kicker)),

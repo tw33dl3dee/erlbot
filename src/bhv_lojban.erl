@@ -1,5 +1,5 @@
 %%%-------------------------------------------------------------------
-%%% File    : bhv_google.erl
+%%% File    : bhv_lojban.erl
 %%% Author  : Ivan Korotkov <twee@tweedle-dee.org>
 %%% Description : 
 %%%
@@ -12,23 +12,44 @@
 
 -include("utf8.hrl").
 -include("irc.hrl").
+-include("bhv_common.hrl").
 
 init(_) -> undefined.
 
 handle_event(cmdevent, {chancmd, Chan, _, ["Jbo" | Sentence]}, Irc) when length(Sentence) > 0 ->
-	erlbot:jbofihe(Irc, Chan, string:join(Sentence, " ")),
+	jbofihe(Irc, Chan, string:join(Sentence, " ")),
 	{ok, undefined};
 handle_event(cmdevent, {chancmd, Chan, _, ["jbo" | Sentence]}, Irc) when length(Sentence) > 0 ->
-	erlbot:cmafihe(Irc, Chan, string:join(Sentence, " ")),
+	cmafihe(Irc, Chan, string:join(Sentence, " ")),
 	{ok, undefined};
 handle_event(cmdevent, {chancmd, Chan, _, ["jvo" | Words]}, Irc) ->
-	erlbot:jvocuhadju(Irc, Chan, Words),
+	jvocuhadju(Irc, Chan, Words),
 	{ok, undefined};
 handle_event(cmdevent, {chancmd, Chan, _, ["en-jbo" | Words]}, Irc) ->
-	[erlbot:dict(Irc, Chan, "www.lojban.org", "en->jbo", Word) || Word <- Words],
+	[dict(Irc, Chan, "www.lojban.org", "en->jbo", Word) || Word <- Words],
 	{ok, undefined};
 handle_event(cmdevent, {chancmd, Chan, _, ["jbo-en" | Words]}, Irc) ->
-	[erlbot:dict(Irc, Chan, "www.lojban.org", "jbo->en", Word) || Word <- Words],
+	[dict(Irc, Chan, "www.lojban.org", "jbo->en", Word) || Word <- Words],
 	{ok, undefined};
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.
+
+jbofihe(Irc, Chan, Sentence) ->
+	{_, Lines} = util:system("head -n1 | jbofihe -x", [Sentence, $\n]),
+	irc_conn:async_chanmsg(Irc, Chan, Lines),
+	{ok, undefined}.
+
+cmafihe(Irc, Chan, Sentence) ->
+	{_, Lines} = util:system("head -n1 | cmafihe", [Sentence, $\n]),
+	irc_conn:async_chanmsg(Irc, Chan, Lines),
+	{ok, undefined}.
+
+jvocuhadju(Irc, Chan, Words) ->
+	{_, Lines} = util:execvp("jvocuhadju", Words),
+	irc_conn:async_chanmsg(Irc, Chan, Lines),
+	{ok, undefined}.
+
+dict(Irc, Chan, Server, Db, Word) ->
+	{success, Lines} = util:execv("dict.rb", ["-h", Server, "-d", Db, Word], ?SCRIPT_DIR),
+	irc_conn:async_chanmsg(Irc, Chan, bhv_common:empty_check(Lines)),
+	{ok, undefined}.

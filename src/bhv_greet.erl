@@ -12,6 +12,7 @@
 
 -include("utf8.hrl").
 -include("irc.hrl").
+-include("bhv_common.hrl").
 
 %% List of channels already presented ourselves on.
 init(_) -> [].
@@ -21,7 +22,7 @@ handle_event(chanevent, {joined, Chan, _, _}, Irc) ->
 		true ->
 			not_handled;
 		false ->
-			erlbot:identify(Irc, Chan, greet),
+			bhv_common:identify(Irc, Chan, greet),
 			{ok, [Chan | Irc#irc.data]}
 	end;
 handle_event(_Type, _Event, _Irc) ->

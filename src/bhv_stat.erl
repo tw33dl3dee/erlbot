@@ -12,6 +12,8 @@
 
 -include("utf8.hrl").
 -include("irc.hrl").
+-include("bhv_common.hrl").
+
 -include_lib("stdlib/include/qlc.hrl").
 
 -record(lstat, {ident  :: list(),

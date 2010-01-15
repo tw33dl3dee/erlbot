@@ -12,7 +12,7 @@
 
 -include("utf8.hrl").
 -include("irc.hrl").
--include("erlbot_common.hrl").
+-include("bhv_common.hrl").
 
 init(_) -> undefined.
 

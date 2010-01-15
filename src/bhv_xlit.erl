@@ -12,7 +12,7 @@
 
 -include("utf8.hrl").
 -include("irc.hrl").
--include("erlbot_common.hrl").
+-include("bhv_common.hrl").
 
 init(_) -> dict:new().
 
@@ -43,7 +43,7 @@ xlit(Irc, Chan, Hist) ->
 	ok = show_xlitted(Irc, Chan, Xlitted, Nicks).
 
 show_xlitted(Irc, Chan, Xlitted, Nicks) when length(Xlitted) =/= length(Nicks) ->
-	irc_conn:chanmsg(Irc, Chan, erlbot:error_msg());
+	ok = bhv_common:error(Irc, Chan, [io_lib:format("~p =/= ~p", [length(Xlitted), length(Nicks)])]);
 show_xlitted(Irc, Chan, Xlitted, Nicks) ->
 	Out = [["#XLIT: <", Nick, "> ", L] || {L, Nick} <- lists:zip(Xlitted, Nicks), length(L) > 0],
 	irc_conn:async_chanmsg(Irc, Chan, Out).

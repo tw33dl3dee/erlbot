@@ -12,6 +12,7 @@
 
 -include("utf8.hrl").
 -include("irc.hrl").
+-include("bhv_common.hrl").
 
 %% Data is dict mapping Channel -> {RemainingLines, StartTime}
 init(_) -> dict:new().
