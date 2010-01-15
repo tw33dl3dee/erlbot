@@ -17,5 +17,5 @@
 init(_) -> undefined.
 
 handle_event(Type, Event, _Irc) ->
-	io:format("*** ~p: ~p~n", [Type, Event]),
-	{ok, undefined}.
+	ok = io:format("*** ~p: ~p~n", [Type, Event]).
+

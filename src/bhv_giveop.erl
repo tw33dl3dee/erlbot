@@ -19,6 +19,6 @@ init(_) -> undefined.
 
 handle_event(cmdevent, {privcmd, ?USER(Nick), [?MAGIC_WORD]}, Irc) ->
 	irc_conn:each_channel(Irc, fun (Chan) -> irc_conn:mode(Irc, Chan, Nick, "+o") end, Nick),
-	{ok, undefined};
+	ok;
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.

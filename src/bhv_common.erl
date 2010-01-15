@@ -25,13 +25,13 @@ empty_msg() ->
 				 "Почувствуйте себя неудачником!"]).
 
 error(Irc, Chan, Trace) -> 
-	irc_conn:async_chanmsg(Irc, Chan, [error_msg() | Trace]).
+	ok = irc_conn:async_chanmsg(Irc, Chan, [error_msg() | Trace]).
 
 error_msg() -> 
 	choice:make(["Усе поломалось, насяльника :("]).
 
 fuckoff(Irc, Chan, Nick) ->
-	irc_conn:chanmsg(Irc, Chan, Nick ++ fuckoff_msg()).
+	ok = irc_conn:chanmsg(Irc, Chan, Nick ++ fuckoff_msg()).
 
 fuckoff_msg() ->
 	choice:make([", не еби мне моск.", 
@@ -79,15 +79,13 @@ fuckoff_msg() ->
 identify(Irc, Chan, short) ->
 	irc_conn:action(Irc, Chan, "нядваноль"),
 	timer:sleep(500),
-	irc_conn:action(Irc, Chan, choice:make(["векторен и гипертекстов",
-											"металлическ и блестящ"])),
-	{ok, undefined};
+	ok = irc_conn:action(Irc, Chan, choice:make(["векторен и гипертекстов",
+												 "металлическ и блестящ"]));
 identify(Irc, Chan, long) ->
 	identify(Irc, Chan, short),
 	irc_conn:action(Irc, Chan, ["обитает по адресу: ", "http://tweedle-dee.org/bzr/erlbot/"]),
-	irc_conn:chanmsg(Irc, Chan, ["Советы и предложения постить сюды: ", 
-								 "http://redmine.tweedle-dee.org/projects/erlbot/issues/new"]),
-	{ok, undefined};
+	ok = irc_conn:chanmsg(Irc, Chan, ["Советы и предложения постить сюды: ", 
+									  "http://redmine.tweedle-dee.org/projects/erlbot/issues/new"]);
 identify(Irc, Chan, greet) ->
 	NumGreets = choice:uniform(?MIN_GREETS, ?MAX_GREETS),
 	Greets = [choice:make(?GREETINGS) || _I <- lists:seq(1, NumGreets)],

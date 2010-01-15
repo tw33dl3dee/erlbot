@@ -17,17 +17,13 @@
 init(_) -> undefined.
 
 handle_event(chanevent, {joined, Chan, ?TOPIC(""), _}, Irc) ->
-	lynch(Irc, Chan, topic),
-	{ok, undefined};
+	lynch(Irc, Chan, topic);
 handle_event(cmdevent, {chancmd, Chan, _, ["lynch", "topic" | _]}, Irc) ->
-	lynch(Irc, Chan, topic),
-	{ok, undefined};
+	lynch(Irc, Chan, topic);
 handle_event(cmdevent, {chancmd, Chan, _, ["lynchtopic" | _]}, Irc) ->
-	lynch(Irc, Chan, topic),
-	{ok, undefined};
+	lynch(Irc, Chan, topic);
 handle_event(cmdevent, {chancmd, Chan, _, ["lynch" | _]}, Irc) ->
-	lynch(Irc, Chan, chanmsg),
-	{ok, undefined};
+	lynch(Irc, Chan, chanmsg);
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.
 
@@ -37,5 +33,4 @@ lynch(Irc, Chan, Action) ->
 	{ok, Data} = file:read_file(?LYNCH_FILE),
 	Lines = string:tokens(utf8:decode(Data), "\r\n"),
 	LineNo = choice:uniform(length(Lines)),
-	irc_conn:command(Irc, {Action, Chan, lists:nth(LineNo, Lines)}),
-	{ok, undefined}.
+	ok = irc_conn:command(Irc, {Action, Chan, lists:nth(LineNo, Lines)}).

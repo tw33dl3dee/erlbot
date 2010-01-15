@@ -17,12 +17,10 @@
 init(_) -> undefined.
 
 handle_event(cmdevent, {chancmd, Chan, _, [Cmd | Topic]}, Irc) when Cmd =:= "l" orelse Cmd =:= "л", length(Topic) > 0 ->
-	lurkmore_topic(Irc, Chan, string:join(Topic, " ")),
-	{ok, undefined};
+	lurkmore_topic(Irc, Chan, string:join(Topic, " "));
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.
 
 lurkmore_topic(Irc, Chan, Topic) ->
 	Url = "http://lurkmore.ru/" ++ util:uri_encode(Topic),
-	irc_conn:action(Irc, Chan, ["доставил: ", Url]),
-	{ok, undefined}.
+	ok = irc_conn:action(Irc, Chan, ["доставил: ", Url]).

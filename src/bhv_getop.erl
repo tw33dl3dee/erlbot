@@ -20,7 +20,6 @@
 init(_) -> undefined.
 
 handle_event(chanevent, {joined, Chan, _, _}, Irc) ->
-	irc_conn:privmsg(Irc, ?OP_BOT_NICK, [?MAGIC_WORD, " ", Chan]),
-	{ok, undefined};
+	ok = irc_conn:privmsg(Irc, ?OP_BOT_NICK, [?MAGIC_WORD, " ", Chan]);
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.

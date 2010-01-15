@@ -19,13 +19,13 @@ init(_) -> undefined.
 %% Bot can react to any `genmsg', direct or induced from `maybe_appeal'.
 handle_event(_, {genmsg, Chan, _User, Msg}, Irc) ->
 	blurp(Irc, Chan, Msg),
-	{ok, undefined};
+	ok;
 handle_event(_, {Event, Chan, _, _, _}, Irc) when Event =:= mode; Event =:= mymode ->
 	blurp(Irc, Chan, none),
-	{ok, undefined};
+	ok;
 handle_event(_, {nick, Chan, _, _}, Irc) ->
 	blurp(Irc, Chan, none),
-	{ok, undefined};
+	ok;
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.
 

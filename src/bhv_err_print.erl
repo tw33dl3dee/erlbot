@@ -17,11 +17,9 @@
 init(_) -> undefined.
 
 handle_event(exitevent, {Bhv, Chan, Reason}, Irc) when ?IS_CHAN(Chan) ->
-	irc_conn:async_action(Irc, Chan, log(Bhv, Reason)),
-	{ok, undefined};
+	ok = irc_conn:async_action(Irc, Chan, log(Bhv, Reason));
 handle_event(exitevent, {Bhv, Nick, Reason}, Irc) when Nick =/= undefined ->
-	irc_conn:async_privmsg(Irc, Nick, log(Bhv, Reason)),
-	{ok, undefined};
+	ok = irc_conn:async_privmsg(Irc, Nick, log(Bhv, Reason));
 handle_event(_, _, _) ->
 	not_handled.
 

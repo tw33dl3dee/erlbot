@@ -17,7 +17,6 @@
 init(_) -> undefined.
 
 handle_event(customevent, {rejoin, Chan}, Irc) ->
-	irc_conn:join(Irc, Chan),
-	{ok, undefined};
+	ok = irc_conn:join(Irc, Chan);
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.
