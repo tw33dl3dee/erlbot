@@ -8,13 +8,17 @@
 -module(bhv_wiki).
 
 -behaviour(irc_behaviour).
--export([init/1, handle_event/3]).
+-export([init/1, help/1, handle_event/3]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
 -include("bhv_common.hrl").
 
 init(_) -> undefined.
+
+help(_) -> 
+	["!w|в <топик> : топик из Википедии (англ./рус.)",
+	 "!ww|вв <топик> : поиск в Википедии (англ./рус.)"].
 
 handle_event(cmdevent, {chancmd, Chan, _, ["w" | Topic]}, Irc) when length(Topic) > 0 ->
 	wiki_topic(Irc, Chan, "en", Topic);

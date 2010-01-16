@@ -51,8 +51,8 @@ irc_conn(SupRef) ->
 %%%-------------------------------------------------------------------
 
 -define(CHILD_SHUTDOWN, 60000).
--define(MAX_R, 10).
--define(MAX_T, 10).
+-define(MAX_R, 1000).
+-define(MAX_T, 1).
 
 init(_) ->
 	Throttle = {throttle, {throttle, start_link, []}, permanent, ?CHILD_SHUTDOWN, worker, [throttle]},
@@ -107,8 +107,8 @@ ev_mgr(SupRef) ->
 -include(".secret.hrl").
 
 -define(BEHAVIOURS, [bhv_err_print, bhv_log, bhv_appeal, bhv_chancmd, bhv_getop, bhv_pom, bhv_privcmd, bhv_comment, bhv_bash,
-					 bhv_google, bhv_lebedev, bhv_lojban, bhv_lurkmore, bhv_misc, bhv_wiki, bhv_blurp, bhv_giveop, bhv_greet, bhv_rejoin,
-					 bhv_suicide, bhv_history, bhv_stat, bhv_xlit]).
+					 bhv_google, bhv_help, bhv_lebedev, bhv_lojban, bhv_lurkmore, bhv_misc, bhv_wiki, bhv_blurp, bhv_giveop, bhv_greet, 
+					 bhv_rejoin, bhv_suicide, bhv_history, bhv_stat, bhv_xlit]).
 
 run() ->
 	{ok, Pid} = start_link({local, erlbot}, 

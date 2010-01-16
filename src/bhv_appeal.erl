@@ -8,7 +8,7 @@
 -module(bhv_appeal).
 
 -behaviour(irc_behaviour).
--export([init/1, handle_event/3]).
+-export([init/1, help/1, handle_event/3]).
 
 -include("irc.hrl").
 -include("utf8.hrl").
@@ -17,6 +17,8 @@
 -define(APPEAL_DELAY, 500).
 
 init(_) -> undefined.
+
+help(_) -> none.
 
 handle_event(msgevent, {appeal, Chan, User, Msg}, Irc) ->
 	appeal(direct, Chan, User, Msg, Irc);

@@ -8,7 +8,7 @@
 -module(bhv_giveop).
 
 -behaviour(irc_behaviour).
--export([init/1, handle_event/3]).
+-export([init/1, help/1, handle_event/3]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
@@ -16,6 +16,9 @@
 -include(".secret.hrl").
 
 init(_) -> undefined.
+
+%% Only Gods shall know about this service, not mere mortals.
+help(_) -> none.
 
 handle_event(cmdevent, {privcmd, ?USER(Nick), [?MAGIC_WORD]}, Irc) ->
 	irc_conn:each_channel(Irc, fun (Chan) -> irc_conn:mode(Irc, Chan, Nick, "+o") end, Nick),

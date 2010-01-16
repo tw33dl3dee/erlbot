@@ -8,7 +8,7 @@
 -module(bhv_stat).
 
 -behaviour(irc_behaviour).
--export([init/1, handle_event/3]).
+-export([init/1, help/1, handle_event/3]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
@@ -27,6 +27,10 @@ init(_) ->
 	ok = db_util:init_table(cstat, [{disc_copies, [node()]},
 									{attributes, record_info(fields, cstat)}]),
 	undefined.
+
+help(_) ->
+	["!stat : статистика пользователей",
+	 "/msg stat : пофапать на статистику тайно"].
 
 %% We could use either `genevent' for counting (which includes public commands to bot) or
 %% `msgevent' (which excludes "<botnick>: " part from appeals.

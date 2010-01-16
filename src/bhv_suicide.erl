@@ -8,7 +8,7 @@
 -module(bhv_suicide).
 
 -behaviour(irc_behaviour).
--export([init/1, handle_event/3]).
+-export([init/1, help/1, handle_event/3]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
@@ -17,6 +17,9 @@
 %% Data is a dict mapping Channel -> {KickerNick, KickTime} and User -> 'disabled' | KickPoints
 %% where 'disabled' means that User cannot kick bot, KickPoints is user's penalty for kicking bot.
 init(_) -> dict:new().
+
+help(_) ->
+	["!suicide <время в сек> : нихуя не оригинальный способ выразить несогласие с ботом или просто плохое настроение"].
 
 -define(MAX_SUICIDE_TIME, 60).
 -define(DEFAULT_SUICIDE_TIME, 30).

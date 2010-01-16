@@ -8,13 +8,22 @@
 -module(bhv_misc).
 
 -behaviour(irc_behaviour).
--export([init/1, handle_event/3]).
+-export([init/1, help/1, handle_event/3]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
 -include("bhv_common.hrl").
 
 init(_) -> undefined.
+
+help(_) -> 
+	["!jabberwork : ну, Бармаглот (до сих пор нерабочий. кстати)",
+	 "!uptime  : аптайм бота",
+	 "!time : текущее время",
+	 "!ping : пинг бота (хз нах надо)",
+	 "!dice <число> : бросок кубика (от 1 до N)",
+	 "!kickme : оригинальный способ уйти с канала",
+	 "!id|identify : дать боту возможность рассказать, кто он такой"].
 
 handle_event(cmdevent, {chancmd, Chan, ?USER(Nick), ["kickme" | _]}, Irc) ->
 	ok = irc_conn:kick(Irc, Chan, Nick, choice:make([["Всегда пожалуйста, ", Nick], 
@@ -42,8 +51,6 @@ handle_event(cmdevent, {chancmd, Chan, _, ["identify" | _]}, Irc) ->
 	bhv_common:identify(Irc, Chan, long);
 handle_event(cmdevent, {chancmd, Chan, _, ["id" | _]}, Irc) ->
 	bhv_common:identify(Irc, Chan, long);
-handle_event(cmdevent, {chancmd, Chan, _, ["help" | _]}, Irc) ->
-	help(Irc, Chan);
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.
 
@@ -75,36 +82,3 @@ jabberwock(Irc, Chan) ->
 %%	{ok, Lines} = regexp:split(binary_to_list(Data), "\n"),
 %%	lists:foreach(fun (L) -> cmd({chanmsg, [L]), timer:sleep(500) end, Lines}, State),
 %%	ok.
-
--define(CHANCMDLIST, ["    #<номер> : цитата с Bash.Org.Ru",
-					  "    bash <строка> : поиск по цитатам Bash.Org.Ru",
-					  "    gg <строка> : поиск через Google REST Services",
-					  "    gc <выражение> : вычисление через Google Calculator",
-					  "    w <topic> : топик из Википедии (англ.)",
-					  "    в <топик> : топик из Википедии (рус.)",
-					  "    l|л <топик> : ссылка на Луркмор",
-					  "    Jbo <sentence> : трансляция с Ложбана",
-					  "    jbo <word>: разбор слова с Ложбана",
-					  "    jvo <word1> <word2>... : комбинирование слов в lujvo на Ложбане",
-					  "    en-jbo|jbo-en|en-ru|ru-en|de-ru|ru-de <слово> : словарный перевод",
-					  "    lynch : случайная цитата из линча Лебедева",
-					  "    lynchtopic|lynch topic : случайная цитата из линча Лебедева в топик",
-					  "    jabberwork : ну, Бармаглот",
-					  "    uptime  : аптайм бота",
-					  "    time : текущее время",
-					  "    ping : пинг бота (хз нах надо)",
-					  "    stat : статистика пользователей (-- пока не работает --)",
-					  "    dice <число> : бросок кубика (от 1 до N)",
-					  "    kickme : оригинальный способ уйти с канала",
-					  "    suicide <время> : нихуя не оригинальный способ выразить несогласие с ботом или просто плохое настроение",
-					  "    id|identify : дать боту возможность рассказать, кто он такой",
-					  "    help : вывести вот этот вот бля список команд."]).
-
--define(PRIVCMDLIST, ["    hist : история (-- пока не работает --)",
-					  "    stat: статистика (-- пока не работает --)"]).
-
-help(Irc, Chan) ->
-	irc_conn:async_action(Irc, Chan, ["-- ахуенно полезный и функциональный бот.", "умеет:"]),
-	irc_conn:async_chanmsg(Irc, Chan, ["Команды канала:" | ?CHANCMDLIST]),
-	irc_conn:async_chanmsg(Irc, Chan, ["Приватные команды:" | ?PRIVCMDLIST]),
-	ok = irc_conn:async_action(Irc, Chan, ["няшка =^_^="]).

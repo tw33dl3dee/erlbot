@@ -8,13 +8,18 @@
 -module(bhv_google).
 
 -behaviour(irc_behaviour).
--export([init/1, handle_event/3]).
+-export([init/1, help/1, handle_event/3]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
 -include("bhv_common.hrl").
 
 init(_) -> undefined.
+
+help(_) -> 
+	["!gg <строка> : поиск через Google REST Services"
+	 "!gc <выражение> : вычисление через Google Calculator",
+	 "!en-ru|ru-en|de-ru|ru-de <слово> : перевод через Google Translate"].
 
 handle_event(cmdevent, {chancmd, Chan, _, ["gg" | Rest]}, Irc) when length(Rest) > 0 ->
 	google_search(Irc, Chan, string:join(Rest, " "));

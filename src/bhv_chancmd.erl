@@ -8,7 +8,7 @@
 -module(bhv_chancmd).
 
 -behaviour(irc_behaviour).
--export([init/1, handle_event/3]).
+-export([init/1, help/1, handle_event/3]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
@@ -16,6 +16,8 @@
 
 %% Data is dict mapping Channel -> {RemainingLines, StartTime}
 init(_) -> dict:new().
+
+help(_) -> none.
 
 -define(MAX_LINES, 2).        %% How many lines after `selfevent' are considered possible appeal.
 -define(APPEAL_TIMEOUT, 30).  %% How much time (in sec) can pass after bot stops accepting smart appeal

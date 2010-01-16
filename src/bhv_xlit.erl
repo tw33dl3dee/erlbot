@@ -8,13 +8,16 @@
 -module(bhv_xlit).
 
 -behaviour(irc_behaviour).
--export([init/1, handle_event/3]).
+-export([init/1, help/1, handle_event/3]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
 -include("bhv_common.hrl").
 
 init(_) -> dict:new().
+
+help(_) ->
+	["!xlit : транслитерация последних предложений, набранных в ошибочной раскладке (англ. -> рус.)"].
 
 -define(MAX_XLIT_LINES, 5).
 

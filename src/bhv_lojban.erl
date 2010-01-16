@@ -8,13 +8,19 @@
 -module(bhv_lojban).
 
 -behaviour(irc_behaviour).
--export([init/1, handle_event/3]).
+-export([init/1, help/1, handle_event/3]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
 -include("bhv_common.hrl").
 
 init(_) -> undefined.
+
+help(_) -> 
+	["!Jbo <sentence> : трансляция с Ложбана",
+	 "!jbo <word>: разбор слова на Ложбане",
+	 "!jvo <word1> <word2>... : комбинирование слов в lujvo на Ложбане",
+	 "!en-jbo|jbo-en <word> : перевод слова с Ложбана"].
 
 handle_event(cmdevent, {chancmd, Chan, _, ["Jbo" | Sentence]}, Irc) when length(Sentence) > 0 ->
 	jbofihe(Irc, Chan, string:join(Sentence, " "));

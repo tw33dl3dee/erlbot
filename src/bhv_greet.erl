@@ -8,7 +8,7 @@
 -module(bhv_greet).
 
 -behaviour(irc_behaviour).
--export([init/1, handle_event/3]).
+-export([init/1, help/1, handle_event/3]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
@@ -16,6 +16,8 @@
 
 %% List of channels already presented ourselves on.
 init(_) -> [].
+
+help(_) -> none.
 
 handle_event(chanevent, {joined, Chan, _, _}, Irc) ->
 	case lists:member(Chan, Irc#irc.data) of

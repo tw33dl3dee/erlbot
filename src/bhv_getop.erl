@@ -8,7 +8,7 @@
 -module(bhv_getop).
 
 -behaviour(irc_behaviour).
--export([init/1, handle_event/3]).
+-export([init/1, help/1, handle_event/3]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
@@ -18,6 +18,8 @@
 -define(OP_BOT_NICK, "dumbot").
 
 init(_) -> undefined.
+
+help(_) -> none.
 
 handle_event(chanevent, {joined, Chan, _, _}, Irc) ->
 	ok = irc_conn:privmsg(Irc, ?OP_BOT_NICK, [?MAGIC_WORD, " ", Chan]);

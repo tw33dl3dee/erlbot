@@ -8,13 +8,17 @@
 -module(bhv_lebedev).
 
 -behaviour(irc_behaviour).
--export([init/1, handle_event/3]).
+-export([init/1, help/1, handle_event/3]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
 -include("bhv_common.hrl").
 
 init(_) -> undefined.
+
+help(_) -> 
+	["!lynch : случайная цитата из линча Лебедева",
+	 "!lynchtopic|lynch topic : случайная цитата из линча Лебедева в топик"].
 
 handle_event(chanevent, {joined, Chan, ?TOPIC(""), _}, Irc) ->
 	lynch(Irc, Chan, topic);

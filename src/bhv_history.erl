@@ -8,7 +8,7 @@
 -module(bhv_history).
 
 -behaviour(irc_behaviour).
--export([init/1, handle_event/3]).
+-export([init/1, help/1, handle_event/3]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
@@ -39,6 +39,14 @@ init(_) ->
 									  {type, ordered_set},
 									  {attributes, record_info(fields, histent)}]),
 	undefined.
+
+help(_) ->
+	["!hist <время> : история событий на канале (в приват)",
+	 "/msg hist <канал> <время> : то же самое, но чтоб никто не узнал"].
+
+verbose_help() ->
+	["    <время> может задаваться как h.mm, h:mm, -h.mm, -h:mm",
+	 "    (отрицательное время считается от текущего)"].
 
 handle_event(genevent, {chanmsg, Chan, ?USER2(Nick, Ident), Msg}, _Irc) ->
 	save_histent(Chan, Ident, {chanmsg, Nick, Msg});
@@ -80,6 +88,11 @@ handle_event(cmdevent, {chancmd, Chan, ?USER(Nick), ["hist" | Rest]}, Irc) ->
 	show_history(Nick, Chan, Rest, Irc);
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.
+
+give_help(Nick, Irc) ->
+	irc_conn:async_privmsg(Irc, Nick, ["Ебани тебя оса..."]),
+	irc_conn:async_privmsg(Irc, Nick, help(undefined)),
+	ok = irc_conn:async_privmsg(Irc, Nick, verbose_help()).
 
 save_histent(Chan, Ident, Event) ->
 	ok = mnesia:async_dirty(fun () ->
@@ -264,8 +277,3 @@ event_to_list({nick, Nick1, Nick2}) ->
 	["@@ ", Nick1, " ныне известен как ", Nick2];
 event_to_list(Ev) ->
 	["??? какая-то Неведомая Ебанная Хуйня: ", io_lib:format("~p", [Ev])].
-
--define(HIST_HELP, ["Ебани тебя оса..."]).
-
-give_help(Nick, Irc) ->
-	ok = irc_conn:async_privmsg(Irc, Nick, ?HIST_HELP).

@@ -8,13 +8,17 @@
 -module(bhv_bash).
 
 -behaviour(irc_behaviour).
--export([init/1, handle_event/3]).
+-export([init/1, help/1, handle_event/3]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
 -include("bhv_common.hrl").
 
 init(_) -> undefined.
+
+help(_) -> 
+	["!#<номер> : цитата с Bash.Org.Ru"
+	 "!bash <строка> : поиск по цитатам Bash.Org.Ru"].
 
 handle_event(cmdevent, {chancmd, Chan, ?USER(Nick), [[$# | Rest] | _]}, Irc) ->
 	case catch list_to_integer(Rest) of 
