@@ -1,8 +1,0 @@
-#!/usr/bin/env escript 
-%% -*- erlang -*-
-%%! -smp enable -name yest -pa ebin
-
-main(Args) ->
-	shell:start(),
-	irc_client:test(),
-	timer:sleep(infinity).

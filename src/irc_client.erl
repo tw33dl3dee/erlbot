@@ -114,7 +114,7 @@ run() ->
 	{ok, Pid} = start_link({local, erlbot}, 
 						   {"192.168.1.1", "nya", [{login, "nya"}, {oper_pass, ?MAGIC_WORD}, {autojoin, ["#pron", "#work", "#mstu"]}, {umode, "+F"}]}, 
 						   ?BEHAVIOURS),
-	%unlink(Pid),
+	unlink(Pid),
 	Pid.
 
 %% Reload all modules under current working dir.
