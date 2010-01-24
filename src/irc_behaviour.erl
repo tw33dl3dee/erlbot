@@ -60,21 +60,12 @@ handle_call(_Request, State) ->
 %% `specevent' is special event type which is not passed to `handle_event' of behaviours
 %% Special events currently defined:
 %% `eval' -
-%%   EvalFun(*Args, BhvData) for each behaviour is called and it's return value is
-%%   processed by ProcessFun whose return value is treated the same way as of `handle_event'
+%%   EvalFun(BhvName) for each behaviour is called (return value ignored but for 
+%%   future compatibility it must return either `ok' or `not_handled')
 %%   Orig is the event originator (for error logging) and is ignored
-%%   If EvalFun is not defined and exported by behaviour, nothing happens
 
-handle_event({specevent, {eval, _Orig, EvalFun, Args, ProcessFun}, _Irc} = E,
-			 #state{mod = M, data = D} = State) ->
-	Result = case catch apply(M, EvalFun, Args ++ [D]) of
-				 {'EXIT', {undef, _}} ->
-					 ok;
-				 {'EXIT', Reason} ->
-					 {'EXIT', Reason};
-				 Any ->
-					 ProcessFun(Any)
-			 end,
+handle_event({specevent, {eval, _Orig, EvalFun}, _Irc} = E, State) ->
+	Result = (catch EvalFun(State#state.mod)),
 	process_event(Result, E, State);
 handle_event({Type, Event, Irc} = E, #state{mod = M, data = D} = State) ->
 	Result = (catch M:handle_event(Type, Event, Irc#irc{data = D})),

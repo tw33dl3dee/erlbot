@@ -28,9 +28,12 @@ init(_) ->
 									{attributes, record_info(fields, cstat)}]),
 	undefined.
 
-help(_) ->
-	["!stat : статистика пользователей",
-	 "/msg stat : пофапать на статистику тайно"].
+help(chancmd) ->
+	[{"stat", "статистика пользователей"}];
+help(privcmd) ->
+	[{"stat", "пофапать на статистику тайно"}];
+help(about) ->
+	"Статистика пиздежа".
 
 %% We could use either `genevent' for counting (which includes public commands to bot) or
 %% `msgevent' (which excludes "<botnick>: " part from appeals.

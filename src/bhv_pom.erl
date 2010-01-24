@@ -16,9 +16,13 @@
 
 init(_) -> undefined.
 
-help(_) -> 
-	["!mooon : текущая фаза Луны", 
-	 "!moooon : даты ближайших чертвертей фазы Луны"].
+help(chancmd) -> 
+	[{"mooon",	"текущая фаза Луны"},
+	 {"moooon",	"даты ближайших чертвертей фазы Луны"}];
+help(privcmd) ->
+	none;
+help(about) ->
+	"Фазы Луны".
 
 handle_event(cmdevent, {chancmd, Chan, _, ["mooon"]}, Irc) ->
 	{success, [Moon]} = util:system("pom"),

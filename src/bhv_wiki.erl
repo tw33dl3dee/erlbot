@@ -16,9 +16,13 @@
 
 init(_) -> undefined.
 
-help(_) -> 
-	["!w|в <топик> : топик из Википедии (англ./рус.)",
-	 "!ww|вв <топик> : поиск в Википедии (англ./рус.)"].
+help(chancmd) -> 
+	[{"w|в <топик>",	"топик из Википедии (англ./рус.)"},
+	 {"ww|вв <топик>",	"поиск в Википедии (англ./рус.)"}];
+help(privcmd) ->
+	none;
+help(about) ->
+	"Цитирование Википедии".
 
 handle_event(cmdevent, {chancmd, Chan, _, ["w" | Topic]}, Irc) when length(Topic) > 0 ->
 	wiki_topic(Irc, Chan, "en", Topic);

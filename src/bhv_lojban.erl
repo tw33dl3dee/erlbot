@@ -16,11 +16,15 @@
 
 init(_) -> undefined.
 
-help(_) -> 
-	["!Jbo <sentence> : трансляция с Ложбана",
-	 "!jbo <word>: разбор слова на Ложбане",
-	 "!jvo <word1> <word2>... : комбинирование слов в lujvo на Ложбане",
-	 "!en-jbo|jbo-en <word> : перевод слова с Ложбана"].
+help(chancmd) -> 
+	[{"Jbo <sentence>",			"трансляция с Ложбана"},
+	 {"jbo <word>",				"разбор слова на Ложбане"},
+	 {"jvo <word1> <word2>...",	"комбинирование слов в lujvo на Ложбане"},
+	 {"en-jbo|jbo-en <word>",	"перевод слова с Ложбана"}];
+help(privcmd) ->
+	none;
+help(about) ->
+	"Перевод с Ложбана".
 
 handle_event(cmdevent, {chancmd, Chan, _, ["Jbo" | Sentence]}, Irc) when length(Sentence) > 0 ->
 	jbofihe(Irc, Chan, string:join(Sentence, " "));

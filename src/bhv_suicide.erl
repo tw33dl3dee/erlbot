@@ -18,8 +18,12 @@
 %% where 'disabled' means that User cannot kick bot, KickPoints is user's penalty for kicking bot.
 init(_) -> dict:new().
 
-help(_) ->
-	["!suicide <время в сек> : нихуя не оригинальный способ выразить несогласие с ботом или просто плохое настроение"].
+help(chancmd) ->
+	[{"suicide <время в сек>", "нихуя не оригинальный способ выразить несогласие с ботом или просто плохое настроение"}];
+help(privcmd) ->
+	none;
+help(about) ->
+	"Выражение несогласия с ботом".
 
 -define(MAX_SUICIDE_TIME, 60).
 -define(DEFAULT_SUICIDE_TIME, 30).

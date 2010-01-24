@@ -16,9 +16,13 @@
 
 init(_) -> undefined.
 
-help(_) -> 
-	["!lynch : случайная цитата из линча Лебедева",
-	 "!lynchtopic|lynch topic : случайная цитата из линча Лебедева в топик"].
+help(chancmd) -> 
+	[{"lynch",						"случайная цитата из линча Лебедева"},
+	 {"lynchtopic (lynch topic)",	"случайная цитата из линча Лебедева в топик"}];
+help(privcmd) ->
+	none;
+help(about) ->
+	"Линч Лебедева".
 
 handle_event(chanevent, {joined, Chan, ?TOPIC(""), _}, Irc) ->
 	lynch(Irc, Chan, topic);

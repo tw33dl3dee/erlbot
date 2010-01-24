@@ -14,10 +14,15 @@
 -include("irc.hrl").
 -include("bhv_common.hrl").
 
+%% Dict: Channel -> [{Nick, Message}] (last MAX_XLIT_LINES entries for each channel)
 init(_) -> dict:new().
 
-help(_) ->
-	["!xlit : транслитерация последних предложений, набранных в ошибочной раскладке (англ. -> рус.)"].
+help(chancmd) ->
+	[{"xlit", "транслитерация последних предложений, набранных в ошибочной раскладке (англ. -> рус.)"}];
+help(privcmd) ->
+	none;
+help(about) ->
+	"Транслитерация".
 
 -define(MAX_XLIT_LINES, 5).
 

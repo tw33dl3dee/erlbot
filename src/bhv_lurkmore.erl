@@ -16,8 +16,12 @@
 
 init(_) -> undefined.
 
-help(_) -> 
-	["!l|л <топик> : ссылка на Луркмор"].
+help(chancmd) -> 
+	[{"l|л <топик>", "ссылка на Луркмор"}];
+help(privcmd) ->
+	none;
+help(about) ->
+	"Ссылка на топик Луркмора".
 
 handle_event(cmdevent, {chancmd, Chan, _, [Cmd | Topic]}, Irc) when Cmd =:= "l" orelse Cmd =:= "л", length(Topic) > 0 ->
 	lurkmore_topic(Irc, Chan, string:join(Topic, " "));

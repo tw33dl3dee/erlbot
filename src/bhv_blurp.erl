@@ -20,14 +20,11 @@ help(_) -> none.
 
 %% Bot can react to any `genmsg', direct or induced from `maybe_appeal'.
 handle_event(_, {genmsg, Chan, _User, Msg}, Irc) ->
-	blurp(Irc, Chan, Msg),
-	ok;
+	blurp(Irc, Chan, Msg);
 handle_event(_, {Event, Chan, _, _, _}, Irc) when Event =:= mode; Event =:= mymode ->
-	blurp(Irc, Chan, none),
-	ok;
+	blurp(Irc, Chan, none);
 handle_event(_, {nick, Chan, _, _}, Irc) ->
-	blurp(Irc, Chan, none),
-	ok;
+	blurp(Irc, Chan, none);
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.
 
@@ -39,9 +36,9 @@ handle_event(_Type, _Event, _Irc) ->
 						"Поедем на таксо", "У вас вся спина белая", "Подумаешь!", "Ого!"]).
 
 %% Neither I am a good author for such comments
--define(BLURP_CTX, [["квак", 10,  % 1/10
+-define(BLURP_CTX, [["квак|q3", 10,  % 1/10
 					 "Пры-ы-ы-ыжка!", "Заперчатили... =(", "Кваку фтопку, Диабла лучше!"],
-					["диабл", 5,  % 1/5
+					["диабл|д2", 5,  % 1/5
 					 "Энтерпрайзно сосем!", "А слабо 99-й левел на классике?", "Я таких рун не видел..."]]).
 
 blurp(Irc, Chan, Message) ->
@@ -50,9 +47,9 @@ blurp(Irc, Chan, Message) ->
 		do ->
 			timer:sleep(?BLURP_DELAY),
 			irc_conn:chanmsg(Irc, Chan, choice:make(Words)),
-			did;
+			ok;
 		dont ->
-			didnt
+			not_handled
 	end.
 
 match_ctx(none) ->

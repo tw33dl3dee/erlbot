@@ -16,9 +16,13 @@
 
 init(_) -> undefined.
 
-help(_) -> 
-	["!#<номер> : цитата с Bash.Org.Ru"
-	 "!bash <строка> : поиск по цитатам Bash.Org.Ru"].
+help(chancmd) -> 
+	[{"#<номер>",		"цитата с Bash.Org.Ru"},
+	 {"bash <строка>",	"поиск по цитатам Bash.Org.Ru"}];
+help(privcmd) ->
+	none;
+help(about) -> 
+	"Цитаты bash.org.ru".
 
 handle_event(cmdevent, {chancmd, Chan, ?USER(Nick), [[$# | Rest] | _]}, Irc) ->
 	case catch list_to_integer(Rest) of 

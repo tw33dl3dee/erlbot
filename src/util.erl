@@ -1,7 +1,7 @@
 -module(util).
 -author("Ivan Korotkov <twee@tweedle-dee.org>").
 
--export([multiline/1, multiline/2, split/1, split/2, contains/2, set_flag/2, unset_flag/2]).
+-export([multiline/1, multiline/2, split/1, split/2, contains/2, join/2, set_flag/2, unset_flag/2]).
 -export([epoch/0, epoch/1]).
 -export([uri_encode/1]).
 -export([execv/3, execv/4, execvp/2, execvp/3, system/1, system/2, find_prog/2, signame/1]).
@@ -27,6 +27,9 @@ contains(String, Pattern) ->
 		match -> true;
 		nomatch -> false
 	end.
+
+join(Sep, [H|T]) ->
+	[H | [[Sep, El] || El <- T]].
 
 set_flag(Flag, Flags) ->
 	[Flag | unset_flag(Flag, Flags)].
