@@ -17,34 +17,40 @@
 init(_) -> undefined.
 
 help(chancmd) -> 
-	[{"gg <строка>",						"поиск через Google REST Services"},
-	 {"gc <выражение>",						"вычисление через Google Calculator"},
+	[{"gg|гг <строка>",						"поиск через Google REST Services"},
+	 {"gc|гк <выражение>",					"вычисление через Google Calculator"},
+	 {"vs <слово1> <слово2>",				"сравнение популярности (Google Fight)"},
 	 {"en-ru|ru-en|de-ru|ru-de <слово>",	"перевод через Google Translate"}];
 help(privcmd) ->
 	none;
 help(about) ->
 	"Поиск по Google".
 
-handle_event(cmdevent, {chancmd, Chan, _, ["gg" | Rest]}, Irc) when length(Rest) > 0 ->
-	google_search(Irc, Chan, string:join(Rest, " "));
-handle_event(cmdevent, {chancmd, Chan, _, ["gc" | Rest]}, Irc) when length(Rest) > 0 ->
-	google_calc(Irc, Chan, string:join(Rest, " "));
+handle_event(cmdevent, {chancmd, Chan, _, ["gg" | Query]}, Irc) when length(Query) > 0 ->
+	google_search(Irc, Chan, "en", Query);
+handle_event(cmdevent, {chancmd, Chan, _, ["гг" | Query]}, Irc) when length(Query) > 0 ->
+	google_search(Irc, Chan, "ru", Query);
+handle_event(cmdevent, {chancmd, Chan, _, ["gc" | Query]}, Irc) when length(Query) > 0 ->
+	google_calc(Irc, Chan, "en", Query);
+handle_event(cmdevent, {chancmd, Chan, _, ["гк" | Query]}, Irc) when length(Query) > 0 ->
+	google_calc(Irc, Chan, "ru", Query);
+handle_event(cmdevent, {chancmd, Chan, _, ["vs", Word1, Word2]}, Irc) ->
+	google_fight(Irc, Chan, "ru", Word1, Word2);
 handle_event(cmdevent, {chancmd, Chan, _, [Lang | Words]}, Irc) 
   when Lang =:= "en-ru"; Lang =:= "ru-en"; Lang =:= "de-ru"; Lang =:= "ru-de" ->
-	Dict = [case C of $- -> $|; C -> C end || C <- Lang],
-	[google_trans(Irc, Chan, Dict, Word) || Word <- Words],
+	[google_trans(Irc, Chan, Lang, Word) || Word <- Words],
 	ok;
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.
 
-google_search(Irc, Chan, Query) ->
-	{success, Lines} = util:execv("google.pl", [Query], ?SCRIPT_DIR),
-	ok = irc_conn:async_chanmsg(Irc, Chan, bhv_common:empty_check(Lines)).
+google_search(Irc, Chan, Lang, Query) ->
+	ok = bhv_common:pipe_script(Irc, Chan, "google.py", ["-l", Lang | Query]).
 
-google_calc(Irc, Chan, Query) ->
-	{success, Lines} = util:execv("gcalc.pl", [Query], ?SCRIPT_DIR),
-	ok = irc_conn:async_chanmsg(Irc, Chan, bhv_common:empty_check(Lines)).
+google_calc(Irc, Chan, Lang, Query) ->
+	ok = bhv_common:pipe_script(Irc, Chan, "google.py", ["-l", Lang, "-c" | Query]).
+
+google_fight(Irc, Chan, Lang, Word1, Word2) ->
+	ok = bhv_common:pipe_script(Irc, Chan, "google.py", ["-l", Lang, Word1, "-f", Word2]).
 
 google_trans(Irc, Chan, Dict, Word) ->
-	{success, Lines} = util:execv("gdict.pl", [Word, Dict], ?SCRIPT_DIR),
-	ok = irc_conn:async_chanmsg(Irc, Chan, bhv_common:empty_check(Lines)).
+	ok = bhv_common:pipe_script(Irc, Chan, "google.py", ["-t", Dict, Word]).

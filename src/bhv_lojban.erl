@@ -54,5 +54,4 @@ jvocuhadju(Irc, Chan, Words) ->
 	ok = irc_conn:async_chanmsg(Irc, Chan, Lines).
 
 dict(Irc, Chan, Server, Db, Word) ->
-	{success, Lines} = util:execv("dict.rb", ["-h", Server, "-d", Db, Word], ?SCRIPT_DIR),
-	ok = irc_conn:async_chanmsg(Irc, Chan, bhv_common:empty_check(Lines)).
+	ok = bhv_common:pipe_script(Irc, Chan, "dict.rb", ["-h", Server, "-d", Db, Word]).

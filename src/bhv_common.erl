@@ -8,10 +8,24 @@
 -module(bhv_common).
 
 -export([empty_check/1, error/3, fuckoff/3, identify/3]).
+-export([pipe_script/5, pipe_script/4]).
 
 -include("irc.hrl").
 -include("utf8.hrl").
 -include("bhv_common.hrl").
+
+%% Execute script from script directory, piping it's output to channel
+%% If error occurs, displays error message and output
+pipe_script(Irc, Chan, Script, Args, Input) ->
+	case util:execv(Script, Args, ?SCRIPT_DIR, Input) of
+		{success, Lines} ->
+			ok = irc_conn:async_chanmsg(Irc, Chan, empty_check(Lines));
+		{{failure, ErrCode}, Trace} ->
+			Tail = io_lib:format("Exited with ~p", [ErrCode]),
+			ok = error(Irc, Chan, Trace ++ [Tail])
+	end.
+
+pipe_script(Irc, Chan, Script, Args) -> pipe_script(Irc, Chan, Script, Args, <<>>).
 
 empty_check([]) -> [empty_msg()];
 empty_check([""]) -> [empty_msg()];

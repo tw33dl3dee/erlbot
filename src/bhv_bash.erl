@@ -39,9 +39,7 @@ handle_event(_Type, _Event, _Irc) ->
 	not_handled.
 
 bash_quote(Irc, Chan, Num) ->
-	{success, Lines} = util:execv("bash.pl", [integer_to_list(Num)], ?SCRIPT_DIR),
-	ok = irc_conn:async_chanmsg(Irc, Chan, bhv_common:empty_check(Lines)).
+	ok = bhv_common:pipe_script(Irc, Chan, "bash.pl", [integer_to_list(Num)]).
 
 bash_search(Irc, Chan, Query) ->
-	{success, Lines} = util:execv("bash-search.pl", [Query], ?SCRIPT_DIR),
-	ok = irc_conn:async_chanmsg(Irc, Chan, bhv_common:empty_check(Lines)).
+	ok = bhv_common:pipe_script(Irc, Chan, "bash-search.pl", [Query]).

@@ -36,17 +36,7 @@ handle_event(_Type, _Event, _Irc) ->
 	not_handled.
 
 wiki_topic(Irc, Chan, Lang, SearchQuery) ->
-	case util:execv("wiki.py", ["-l", Lang | SearchQuery], ?SCRIPT_DIR) of
-		{success, Lines} ->
-			ok = irc_conn:async_chanmsg(Irc, Chan, bhv_common:empty_check(Lines));
-		{{failure, 1}, Trace} ->
-			ok = bhv_common:error(Irc, Chan, Trace)
-	end.
+	ok = bhv_common:pipe_script(Irc, Chan, "wiki.py", ["-l", Lang | SearchQuery]).
 
 wiki_search(Irc, Chan, Lang, SearchQuery) ->
-	case util:execv("wiki.py", ["-l", Lang, "-s" | SearchQuery], ?SCRIPT_DIR) of
-		{success, Lines} ->
-			ok = irc_conn:async_chanmsg(Irc, Chan, bhv_common:empty_check(Lines));
-		{{failure, 1}, Trace} ->
-			ok = bhv_common:error(Irc, Chan, Trace)
-	end.
+	ok = bhv_common:pipe_script(Irc, Chan, "wiki.py", ["-l", Lang, "-s" | SearchQuery]).

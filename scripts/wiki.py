@@ -1,8 +1,7 @@
 #!/usr/bin/env python2.6
 
-import httplib, urllib
-import yaml, json
-import re
+import urllib, urllib2
+import json, re
 from optparse import OptionParser
 from sys import stderr, exit
 
@@ -58,17 +57,9 @@ class Wiki(object):
         @return: parsed reply object (str, list or dict)
         """
         params['format'] = 'json'
-        site = "%s.wikipedia.org" % self._lang
-        url = '/w/api.php?%s' % urllib.urlencode(params)
-        try:
-            conn = httplib.HTTPConnection(site)
-            conn.request('GET', url)
-            resp = conn.getresponse()
-        except httplib.HTTPException, e:
-            raise RuntimeError, "Connect to %s failed: %s" % (site, e.args[1])
-        if resp.status != httplib.OK:
-            raise RuntimeError, "GET %s: %s" % (url, resp.reason)
-        return json.loads(resp.read())
+        url = 'http://%s.wikipedia.org/w/api.php?%s' % (self._lang, urllib.urlencode(params))
+        resp = urllib2.urlopen(url)
+        return json.load(resp)
 
     def get_page(self, topic):
         """Fetches page (first section only) from Wikipedia as plain text
@@ -108,7 +99,7 @@ class Wiki(object):
         pages = dict((page['title'], page) for page in long_repl['query']['pages'].values())
         shorts = dict((s['title'], s) for s in short_repl['query']['search'])
         matches = [(page['fullurl'], title, self._dewikify(shorts[title]['snippet']))
-                   for (title, page) in pages.iteritems()]
+                   for (title, page) in pages.iteritems() if title in shorts]
         return matches
 
 
@@ -124,7 +115,8 @@ def main():
     if opts.search:
         matches = w.search(topic)
         for url, title, snippet in matches:
-            print "- %s: %s\n(%s)" % (title.encode('utf8'), snippet.encode('utf8'), url)
+            line = "- %s: %s\n(%s)" % (title, snippet, url) 
+            print line.encode('utf8')
     else:
         page = w.get_page(topic)
         if page is not None:
@@ -134,8 +126,8 @@ def main():
             print "... %s" % url
 
 if __name__ == '__main__':
-    try:
+   try:
         main()
-    except RuntimeError, e:
-        print >>stderr, e
-        exit(1)
+   except Exception, e:
+       print >>stderr, e
+       exit(1)

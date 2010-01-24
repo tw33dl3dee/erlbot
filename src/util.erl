@@ -135,38 +135,38 @@ transform_status(I) ->
 	{failure, I}.
 
 %% These are actually x86/ppc-specific.
-signame(1) -> hup;
-signame(2) -> int;
-signame(3) -> quit;
-signame(4) -> ill;
-signame(5) -> trap;
-signame(6) -> abrt;
-signame(7) -> bus;
-signame(8) -> fpe;
-signame(9) -> kill;
-signame(10) -> usr1;
-signame(11) -> segv;
-signame(12) -> usr2;
-signame(13) -> pipe;
-signame(14) -> alrm;
-signame(15) -> term;
-signame(16) -> stkflt;
-signame(17) -> chld;
-signame(18) -> cont;
-signame(19) -> stop;
-signame(20) -> tstp;
-signame(21) -> ttin;
-signame(22) -> ttou;
-signame(23) -> urg;
-signame(24) -> xcpu;
-signame(25) -> xfsz;
-signame(26) -> vtalrm;
-signame(27) -> prof;
-signame(28) -> winch;
-signame(29) -> io;
-signame(30) -> pwr;
-signame(31) -> unused;
-signame(I) when I < 64 -> {rt, I - 32};
+signame(1) -> 'SIGHUP';
+signame(2) -> 'SIGINT';
+signame(3) -> 'SIGQUIT';
+signame(4) -> 'SIGILL';
+signame(5) -> 'SIGTRAP';
+signame(6) -> 'SIGABRT';
+signame(7) -> 'SIGBUS';
+signame(8) -> 'SIGFPE';
+signame(9) -> 'SIGKILL';
+signame(10) -> 'SIGUSR1';
+signame(11) -> 'SIGSEGV';
+signame(12) -> 'SIGUSR2';
+signame(13) -> 'SIGPIPE';
+signame(14) -> 'SIGALRM';
+signame(15) -> 'SIGTERM';
+signame(16) -> 'SIGSTKFLT';
+signame(17) -> 'SIGCHLD';
+signame(18) -> 'SIGCONT';
+signame(19) -> 'SIGSTOP';
+signame(20) -> 'SIGTSTP';
+signame(21) -> 'SIGTTIN';
+signame(22) -> 'SIGTTOU';
+signame(23) -> 'SIGURG';
+signame(24) -> 'SIGXCPU';
+signame(25) -> 'SIGXFSZ';
+signame(26) -> 'SIGVTALRM';
+signame(27) -> 'SIGPROF';
+signame(28) -> 'SIGWINCH';
+signame(29) -> 'SIGIO';
+signame(30) -> 'SIGPWR';
+signame(31) -> 'SIGUNUSED';
+signame(I) when I < 64 -> {'SIGRT', I - 32};
 signame(I) -> I.
 
 uri_encode(Atom) when is_atom(Atom) ->

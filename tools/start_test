@@ -1,3 +1,3 @@
 #!/bin/sh
 
-exec screen -O -d -m -S yest -h 10000 erl -pa ebin/ -name yest -s irc_client test
+exec erl -pa ebin/ -name yest -s irc_client test
