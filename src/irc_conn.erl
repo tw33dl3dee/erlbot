@@ -13,12 +13,13 @@
 -export([each_channel/2, each_channel/3, is_user_present/3]).
 -export([async_chanmsg/3, async_action/3, async_privmsg/3]).
 
--record(conf, {nick      = [] :: list(),      %% initial nick requested
-			   login     = [] :: list(),      %% login field in USER and OPER commands (defaults to nick)
-			   long_name = [] :: list(),      %% long name in USER command (defaults to nick)
-			   oper_pass = [] :: list(),      %% password in OPER command (won't do OPER if not specified)
-			   umode     = [] :: list(),      %% umode spec to request initially (like, "+F")
-			   autojoin  = [] :: [list()],    %% channels to join automatically
+-record(conf, {nick       = [] :: list(),     %% initial nick requested
+			   login      = [] :: list(),     %% login field in USER and OPER commands (defaults to nick)
+			   long_name  = [] :: list(),     %% long name in USER command (defaults to nick)
+			   oper_pass  = [] :: list(),     %% password in OPER command (won't do OPER if not specified)
+			   umode      = [] :: list(),     %% umode spec to request initially (like, "+F")
+			   impl_umode = [] :: list(),     %% umode spec which is implied (used as workaround for absent +F)
+			   autojoin   = [] :: [list()],   %% channels to join automatically
 			   msg_interval = 200,            %% minimal interval between messages when sending long bulks
 			   conn_rate    = {2, 16000}}).   %% maximum connection rate
 
@@ -158,6 +159,8 @@ conf(Conf, [Option | Options]) ->
 			Conf#conf{autojoin = Autojoin};
 		{umode, Umode} ->
 			Conf#conf{umode = Umode};
+		{impl_umode, Umode} ->
+			Conf#conf{impl_umode = Umode};
 		{conn_rate, MaxConn, Period} ->
 			Conf#conf{conn_rate = {MaxConn, Period}};
 		{msg_interval, MsgInterval} ->
@@ -215,8 +218,8 @@ handle_event(Event, StateName, StateData) ->
 handle_sync_event(_Event, _From, StateName, StateData) ->
 	{reply, ok, StateName, StateData}.
 
-state_connecting({notice, _, _}, Conn) ->
-	{next_state, state_auth_nick, auth_login(Conn)};
+state_connecting({notice, _, _}, #conn{conf = Conf} = Conn) ->
+	{next_state, state_auth_nick, auth_login(apply_umode(Conf#conf.impl_umode, Conn))};
 state_connecting(_, Conn) ->
 	{next_state, state_connecting, Conn}.
 

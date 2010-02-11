@@ -256,17 +256,18 @@ parse_tokens([_Server, topicinfo, _Target, Channel, Author, Ts], State) ->
 	event({chantopic, Channel, Author, list_to_integer(Ts)}, State);
 parse_tokens([_Server, namreply, _Target, _, Channel, Users], State) ->
 	event({names, Channel, parse_names(Users)}, State);
-parse_tokens([_Server, endofnames, _Target, Channel, Text], State) ->
-	event({endofnames, Channel, Text}, State);
-parse_tokens([_Server, myinfo, _Target, Server, Vsn, Umodes, Chanmodes], State) ->
+parse_tokens([_Server, myinfo, _Target, Server, Vsn, Umodes, Chanmodes | _], State) ->
 	event({myinfo, undefined, Server, Vsn, Umodes, Chanmodes}, State);
-parse_tokens([_Server, nicknameinuse, _Target, Nick, Text], State) ->
-	event({nicknameinuse, Nick, Text}, State);
 parse_tokens([_Server, Reply, _Target, Channel, Text], State) 
   when Reply =:= inviteonlychan; Reply =:= bannedfromchan; Reply =:= badchannelkey; Reply =:= badchanmask; 
-	   Reply =:= nosuchchannel; Reply =:= channelisfull; Reply =:= toomanychannels; Reply =:= killdeny ->
+	   Reply =:= nosuchchannel; Reply =:= channelisfull; Reply =:= toomanychannels; Reply =:= killdeny;
+	   Reply =:= endofnames ->
 	event({Reply, Channel, Text}, State);
+parse_tokens([_Server, Reply, _Target, Nick, Text], State) when is_atom(Reply) ->
+	event({Reply, Nick, Text}, State);
 parse_tokens([_Server, Reply, _Target, Text], State) when is_atom(Reply) ->
+	event({Reply, undefined, Text}, State);
+parse_tokens([_Server, Reply, _Target | Text], State) when is_atom(Reply) ->
 	event({Reply, undefined, Text}, State);
 parse_tokens(Tokens, State) ->
 	event({unknown, undefined, Tokens}, State).
