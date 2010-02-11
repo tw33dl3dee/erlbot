@@ -43,7 +43,7 @@ class BashOrgRu(object):
         if True in page("span.error").map(lambda i, e: "!" in PyQuery(e).text()):
             return []
         # Whoa...
-        matches = [(int(e.parent()("span").text()),     # votes
+        matches = [(e.parent()("span").text(),          # votes
                     int(e.parent()("a").eq(0).text()),  # quote number
                     self._quote_to_text(e))             # quote text
                    for m in page("#quotes div.q div.vote + div")
@@ -62,7 +62,7 @@ def main():
     if opts.search:
         results = bor.search(text)
         for votes, num, quote in results:
-            line = "#%d [%d]\n%s\n" % (num, votes, quote)
+            line = "#%d [%s]\n%s\n" % (num, votes, quote)
             print line.encode('utf8')
     elif opts.num:
         cite = bor.cite(opts.num)
