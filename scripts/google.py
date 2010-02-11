@@ -56,7 +56,7 @@ class Google(object):
         """
         repl = self._make_REST_request('search', 'web',
                                        q=text,
-                                       rsz=((results > 4) and "large" or "small"),
+                                       rsz="large" if (results > 4) else "small",
                                        hl=self._lang)
         matches = [(urllib.unquote(res['url']), res['titleNoFormatting'], self._dehtmlize(res['content']))
                    for res in repl['responseData']['results'][0:results]]

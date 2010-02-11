@@ -33,13 +33,13 @@ handle_event(cmdevent, {chancmd, Chan, ?USER(Nick), [[$# | Rest] | _]}, Irc) ->
 		_ ->
 			bhv_common:fuckoff(Irc, Chan, Nick)
 	end;
-handle_event(cmdevent, {chancmd, Chan, _, ["bash" | Rest]}, Irc) when length(Rest) > 0 ->
-	bash_search(Irc, Chan, string:join(Rest, " "));
+handle_event(cmdevent, {chancmd, Chan, _, ["bash" | Query]}, Irc) when length(Query) > 0 ->
+	bash_search(Irc, Chan, Query);
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.
 
 bash_quote(Irc, Chan, Num) ->
-	ok = bhv_common:pipe_script(Irc, Chan, "bash.pl", [integer_to_list(Num)]).
+	ok = bhv_common:pipe_script(Irc, Chan, "bash.py", ["-n", integer_to_list(Num)]).
 
 bash_search(Irc, Chan, Query) ->
-	ok = bhv_common:pipe_script(Irc, Chan, "bash-search.pl", [Query]).
+	ok = bhv_common:pipe_script(Irc, Chan, "bash.py", ["-s" | Query]).
