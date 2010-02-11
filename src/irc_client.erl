@@ -112,7 +112,7 @@ ev_mgr(SupRef) ->
 
 run() ->
 	{ok, Pid} = start_link({local, erlbot}, 
-						   {"irc.tweedle-dee.org", "nya", [{login, "nya"}, {autojoin, ["#pron", "#work", "#mstu"]}, {impl_umode, "+F"}]}, 
+						   {"localhost", "nya", [{login, "nya"}, {autojoin, ["#pron", "#work", "#mstu"]}, {impl_umode, "+F"}]}, 
 						   ?BEHAVIOURS),
 	unlink(Pid),
 	Pid.
@@ -132,7 +132,7 @@ reload() ->
 
 test() ->
 	{ok, Pid} = start_link({local, erlbot}, 
-						   {"irc.tweedle-dee.org", "nya", [{login, "nya"}, {autojoin, ["#test"]}, {impl_umode, "+F"}]}, 
+						   {"localhost", "nya", [{login, "nya"}, {autojoin, ["#test"]}, {impl_umode, "+F"}]}, 
 						   ?BEHAVIOURS),
 	unlink(Pid),
 	Pid.
