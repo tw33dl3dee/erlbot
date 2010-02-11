@@ -48,7 +48,7 @@ help(about) ->
 	"История событий на канале".
 
 verbose_help() ->
-	["    <время> может задаваться как h.mm, h:mm, -h.mm, -h:mm",
+	["    время может задаваться как h.mm, h:mm, -h.mm, -h:mm",
 	 "    (отрицательное время считается от текущего)"].
 
 handle_event(genevent, {chanmsg, Chan, ?USER2(Nick, Ident), Msg}, _Irc) ->
@@ -94,7 +94,6 @@ handle_event(_Type, _Event, _Irc) ->
 
 give_help(Nick, Irc) ->
 	irc_conn:async_privmsg(Irc, Nick, ["Ебани тебя оса..."]),
-	irc_conn:async_privmsg(Irc, Nick, help(undefined)),
 	ok = irc_conn:async_privmsg(Irc, Nick, verbose_help()).
 
 save_histent(Chan, Ident, Event) ->
