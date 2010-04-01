@@ -132,7 +132,7 @@ reload() ->
 
 test() ->
 	{ok, Pid} = start_link({local, erlbot}, 
-						   {"localhost", "nya", [{login, "nya"}, {autojoin, ["#test"]}, {impl_umode, "+F"}]}, 
+						   {"irc.tweedle-dee.org", "yest", [{login, "nya"}, {autojoin, ["#test"]}, {impl_umode, "+F"}]}, 
 						   ?BEHAVIOURS),
 	unlink(Pid),
 	Pid.
