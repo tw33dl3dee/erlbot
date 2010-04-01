@@ -1,3 +1,0 @@
-#!/bin/sh
-
-tools/bcast nya@magrathea.twee.cc action "r`bzr log -r-1 --line`"
