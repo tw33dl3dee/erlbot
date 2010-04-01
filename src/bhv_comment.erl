@@ -20,12 +20,6 @@ help(_) -> none.
 
 handle_event(chanevent, {topic, Chan, ?USER(Nick), _}, Irc) ->
 	comment(topic, Chan, Nick, Irc);
-handle_event(chanevent, {join, Chan, ?USER(Nick)}, Irc) ->
-	comment(join, Chan, Nick, Irc);
-handle_event(chanevent, {part, Chan, ?USER(Nick), _}, Irc) ->
-	comment(exit, Chan, Nick, Irc);
-handle_event(chanevent, {quit, Chan, ?USER(Nick), _}, Irc) ->
-	comment(exit, Chan, Nick, Irc);
 %% Bot can comment any `genmsg', direct or induced from `maybe_appeal'.
 handle_event(_, {genmsg, Chan, ?USER(Nick), _}, Irc) ->
 	comment(message, Chan, Nick, Irc);
@@ -33,6 +27,8 @@ handle_event(_Type, _Event, _Irc) ->
 	not_handled.
 
 -define(COMMENT_REV_PROB, 50).  % 1/50th
+
+%% Some of these are unused
 
 comment(topic, Chan, Nick, Irc) ->
 	ok = irc_conn:chanmsg(Irc, Chan, choice:make([["Говенный топег, ", Nick, "."], 
