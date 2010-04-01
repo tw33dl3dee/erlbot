@@ -66,10 +66,10 @@ get_stat(Ident) ->
 
 dump_stat(Ident, StatLines) ->
 	Lines = [statline_to_list(Ident, Stat) || Stat <- StatLines],
-	[" ************* Статистега **************",
-	 " Пользователь    | Сообщения |   Символы",
-	 " ---------------------------------------" | Lines] ++ 
-		[" ***************************************"].
+	[" ************** Статистега ***************",
+	 " Идент       | Сообщения | Символы | Длина",
+	 " -----------------------------------------" | Lines] ++ 
+		[" *****************************************"].
 
 statline_to_list(Ident, {Ident, _, _} = S) ->
 	[statline_to_list(S), " <==="];
@@ -77,7 +77,7 @@ statline_to_list(_, S) ->
 	statline_to_list(S).
 
 statline_to_list({Ident, Lines, Chars}) ->
-	io_lib:format(" ~-15s | ~9B | ~9B", [format_ident(Ident), Lines, Chars]).
+	io_lib:format(" ~-11s | ~9B | ~7B | ~-4.1f", [format_ident(Ident), Lines, Chars, (Chars + 1)/(Lines + 1)]).
 
 format_ident([$~ | Ident]) -> Ident;
 format_ident(Ident)        -> Ident.
