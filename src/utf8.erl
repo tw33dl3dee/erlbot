@@ -14,6 +14,9 @@
 
 -compile([bin_opt_info]).
 
+-define(NO_UTF8_TRANSFORM, true).	% exclude from transforming itself
+-include("utf8.hrl").				% we need it for some macros
+
 %% External API
 -export([encode/1, decode/1, try_decode/1, split/2]).
 
@@ -36,6 +39,7 @@ encode(Text) ->
 	unicode:characters_to_binary(Text).
 
 %% @doc Converts UTF8 binary to Unicode string, skipping invalid bytes
+%%   Invalid byte sequences are replaced with `UTF8_INVALID_SEQ' codepoints. 
 %% @spec decode(Binary) -> Text
 %% where
 %%    Binary = unicode_binary()
@@ -60,10 +64,16 @@ binary_to_characters(Bin, OnError) ->
 
 binary_to_characters(<<Char/utf8, Rest/binary>>, OnError, List) ->
 	binary_to_characters(Rest, OnError, [Char | List]);
-binary_to_characters(<<_Invalid:8, Rest/binary>>, skip, List) ->
-	binary_to_characters(Rest, skip, List);
 binary_to_characters(<<_Invalid:8, _Rest/binary>>, abort, _) ->
 	not_utf8;
+%% If decoded string does not already contain "invalid sequence" marker at this position,
+%% add it. Thus, invalid multi-byte sequence is translated to only one marker.
+binary_to_characters(<<_Invalid:8, Rest/binary>>, skip, [?UTF8_INVALID_SEQ | _] = List) ->
+	io:format("UTF8: skipped byte ~p~n", [_Invalid]),
+	binary_to_characters(Rest, skip, List);
+binary_to_characters(<<_Invalid:8, Rest/binary>>, skip, List) ->
+	io:format("UTF8: skipped byte ~p, added mark~n", [_Invalid]),
+	binary_to_characters(Rest, skip, [?UTF8_INVALID_SEQ | List]);
 binary_to_characters(<<>>, _, List) ->
 	{utf8, lists:reverse(List)}.
 
