@@ -20,7 +20,7 @@
 -record(conf, {ping_timeout  = 90000,
 			   sock_timeout  = 60000,
 			   port          = 6667,
-			   maxsend       = 400}).
+			   maxsend       = 450}).
 
 -record(state, {owner      :: pid(),
 				sock       :: port(),
@@ -169,12 +169,15 @@ send(State, Prefix, Line) ->
 send(State, Prefix, Line, Suffix) ->
 	send_bytes(State, utf8:encode(Prefix), utf8:encode(Line), utf8:encode(Suffix)).
 
-send_bytes(State, Prefix, Bytes, Suffix) when size(Bytes) =< State#state.maxsend ->
+-define(PACKET_SIZE(Prefix, Data, Suffix), 
+		(size(Prefix) + size(Data) + size(Suffix) + size(<<?CRLF>>))).
+
+send_bytes(State, Prefix, Bytes, Suffix) when ?PACKET_SIZE(Prefix, Bytes, Suffix) =< State#state.maxsend ->
 	true = sanity_check(Bytes),
 	ok = gen_tcp:send(State#state.sock, <<Prefix/binary, Bytes/binary, Suffix/binary, ?CRLF>>),
 	State;
 send_bytes(State, Prefix, Bytes, Suffix) ->
-	{ByteLine, Rest} = utf8:split(Bytes, State#state.maxsend),
+	{ByteLine, Rest} = utf8:split(Bytes, State#state.maxsend - ?PACKET_SIZE(Prefix, <<>>, Suffix)),
 	S = send_bytes(State, Prefix, ByteLine, Suffix),
 	send_bytes(S, Prefix, Rest, Suffix).
 
