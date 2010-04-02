@@ -16,7 +16,12 @@
 
 init(_) -> undefined.
 
-help(_) -> none.
+help(chancmd) ->
+	none;
+help(privcmd) ->
+	none;
+help(about) ->
+	"Behaviour skeleton".
 
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.
