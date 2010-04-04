@@ -15,7 +15,7 @@
 read FROM TO HEAD
 echo $FROM $TO $HEAD
 git checkout -f
-gmake -C ..
+make -C ..
 ../tools/reload nya@magrathea.twee.cc
 (IFS=$'\n'
 for LINE in `git log --reverse --pretty=format:"%h %an (%ar): %s" $FROM..$TO`; do
