@@ -251,8 +251,11 @@ convert_time_abs(_, _, _) ->
 %% Requested HMS is within today
 convert_time(HH, MM, {YMD, {HH1, MM1, _}}, yesterday) when {HH, MM} < {HH1, MM1} ->
 	convert_time({YMD, {HH, MM, 0}});
-convert_time(HH, MM, {YMD, {HH1, MM1, _}}, tomorrow) when {HH, MM} >= {HH1, MM1} ->
+convert_time(HH, MM, {YMD, {HH1, MM1, _}}, tomorrow) when {HH, MM} > {HH1, MM1} ->
 	convert_time({YMD, {HH, MM, 0}});
+%% Special case, current hour/minute given; it's rounded to the current second
+convert_time(HH, MM, {YMD, {HH, MM, _}} = Now, tomorrow) ->
+	convert_time(Now);
 %% Otherwise, it's yesterday...
 convert_time(HH, MM, {YMD, _}, yesterday) ->
 	convert_time({util:add_days(YMD, -1), {HH, MM, 0}});
