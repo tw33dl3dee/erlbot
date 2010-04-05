@@ -156,35 +156,9 @@ parse_number(S) ->
 	end.
 
 parse_time([$- | HH], MM) ->
-	convert_time_rel(list_to_integer(HH), list_to_integer(MM));
+	util:convert_time_rel(list_to_integer(HH), list_to_integer(MM));
 parse_time(HH, MM) ->
-	convert_time_abs(list_to_integer(HH), list_to_integer(MM)).
-
-%% Relative time offset
-convert_time_rel(HH, MM) ->
-	Diff = HH*3600 + MM*60,
-	{time, util:add_seconds(erlang:universaltime(), -Diff)}.
-
-convert_time_abs(HH, MM) when HH >= 0, HH < 24, MM >= 0, MM < 60 ->
-	convert_time(HH, MM, erlang:localtime());
-convert_time_abs(_, _) ->
-	undefined.
-
-%% If requested HMS less than current, it's today's time;
-convert_time(HH, MM, {YMD, {HH1, MM1, _}}) when {HH, MM} < {HH1, MM1} ->
-	io:format("today: ~p < ~p~n", [{HH1, MM1}, {HH, MM}]),
-	convert_time({YMD, {HH, MM, 0}});
-%% Otherwise, it's yesterday.
-convert_time(HH, MM, {YMD, _}) ->
-	io:format("yesterday~n"),
-	convert_time({util:add_days(YMD, -1), {HH, MM, 0}}).
-
-%% Local time -> universal time | undefined
-convert_time(LT) ->
-	case calendar:local_time_to_universal_time_dst(LT) of
-		[]       ->  undefined;
-		[UT | _] -> {time, UT}
-	end.
+	util:convert_time_abs(list_to_integer(HH), list_to_integer(MM), yesterday).
 
 show_history(Nick, Chan, [], Irc) ->
 	history(Nick, Chan, {number, 1}, Irc);

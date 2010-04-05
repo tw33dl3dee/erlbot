@@ -6,7 +6,8 @@
 -export([uri_encode/1]).
 -export([execv/3, execv/4, execvp/2, execvp/3, system/1, system/2, find_prog/2, signame/1]).
 -export([read_file/1]).
--export([add_days/2, add_seconds/2, valid_datetime/1]).
+-export([add_days/2, add_seconds/2, valid_datetime/1, time_diff/2]).
+-export([convert_time_abs/3, convert_time_rel/2, convert_time_rel_diff/2]).
 
 multiline(Term) ->
 	string:tokens(lists:flatten(io_lib:print(Term)), io_lib:nl()).
@@ -225,3 +226,43 @@ valid_datetime({Date, {H, M, S}}) when H >= 0, H < 24, M >= 0, M < 60, S >= 0, S
 	calendar:valid_date(Date);
 valid_datetime(_) ->
 	false.
+
+%% Difference in seconds between 2 datetimes
+time_diff(DateTime1, DateTime2) ->
+	calendar:datetime_to_gregorian_seconds(DateTime1) - calendar:datetime_to_gregorian_seconds(DateTime2).
+
+%% Relative time offset to seconds
+convert_time_rel_diff(HH, MM) ->
+	HH*3600 + MM*60.
+
+%% Relative time offset to universal datetime
+convert_time_rel(HH, MM) ->
+	Diff = convert_time_rel_diff(HH, MM),
+	{time, util:add_seconds(erlang:universaltime(), -Diff)}.
+
+%% Absolutime time to universal datetime
+%% Shift may be `yesterday'  (when time is in future, it's shifted one day back) 
+%% or `tomorrow' (when time is in past, it's shifted one day back)
+convert_time_abs(HH, MM, Shift) when HH >= 0, HH < 24, MM >= 0, MM < 60 ->
+	convert_time(HH, MM, erlang:localtime(), Shift);
+convert_time_abs(_, _, _) ->
+	undefined.
+
+%% Requested HMS is within today
+convert_time(HH, MM, {YMD, {HH1, MM1, _}}, yesterday) when {HH, MM} < {HH1, MM1} ->
+	convert_time({YMD, {HH, MM, 0}});
+convert_time(HH, MM, {YMD, {HH1, MM1, _}}, tomorrow) when {HH, MM} >= {HH1, MM1} ->
+	convert_time({YMD, {HH, MM, 0}});
+%% Otherwise, it's yesterday...
+convert_time(HH, MM, {YMD, _}, yesterday) ->
+	convert_time({util:add_days(YMD, -1), {HH, MM, 0}});
+%% ... or tomorrow.
+convert_time(HH, MM, {YMD, _}, tomorrow) ->
+	convert_time({util:add_days(YMD, 1), {HH, MM, 0}}).
+
+%% Local time -> universal time | undefined
+convert_time(LT) ->
+	case calendar:local_time_to_universal_time_dst(LT) of
+		[]       ->  undefined;
+		[UT | _] -> {time, UT}
+	end.
