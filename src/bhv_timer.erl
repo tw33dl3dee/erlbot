@@ -24,6 +24,10 @@ help(privcmd) ->
 help(about) ->
 	"Таймеры для напоминания".
 
+%% If bot is not present on channel at the moment of reminder, 
+%% reschedule it for this timeout (msec).
+-define(RESCHEDULE_TIMEOUT, 30000).
+
 handle_event(cmdevent, {chancmd, Chan, ?USER(Nick), ["timer", Time | Rest]}, Irc) ->
 	Message = string:join(Rest, " "),
 	case parse_time(Time) of
@@ -34,16 +38,24 @@ handle_event(cmdevent, {chancmd, Chan, ?USER(Nick), ["timer", Time | Rest]}, Irc
 			{delayed_event, 1000*Timeout, customevent, {timer_expire, Chan, Nick, Message}, undefined}
 	end;
 handle_event(customevent, {timer_expire, Chan, Nick, Message}, Irc) ->
-	irc_conn:chanmsg(Irc, Chan, ["========== НАПОМИНАНИЕ от ", Nick, " =========="]),
-	ok = irc_conn:chanmsg(Irc, Chan, Message);
+	case lists:member(Chan, irc_conn:get_channels(Irc)) of
+		true ->
+			irc_conn:chanmsg(Irc, Chan, ["========== НАПОМИНАНИЕ от ", Nick, " =========="]),
+			ok = irc_conn:chanmsg(Irc, Chan, Message);
+		false ->
+			%% user not present, reschedule reminder
+			{delayed_event, ?RESCHEDULE_TIMEOUT, customevent, {timer_expire, Chan, Nick, Message}, undefined}
+	end;
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.
 
+%% relative time
 parse_time([$+ | TimeSpec]) ->
 	case parse_hhmm(TimeSpec) of 
 		{HH, MM} -> util:convert_time_rel_diff(HH, MM);
 		false    -> false
 	end;
+%% absolute time
 parse_time(TimeSpec) ->
 	case parse_hhmm(TimeSpec) of 
 		{HH, MM} -> case util:convert_time_abs(HH, MM, tomorrow) of
