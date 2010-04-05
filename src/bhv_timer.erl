@@ -24,13 +24,13 @@ help(privcmd) ->
 help(about) ->
 	"Таймеры для напоминания".
 
-handle_event(cmdevent, {chancmd, Chan, ?USER(Nick), ["timer", Time | Rest]}, _Irc) ->
+handle_event(cmdevent, {chancmd, Chan, ?USER(Nick), ["timer", Time | Rest]}, Irc) ->
 	Message = string:join(Rest, " "),
 	case parse_time(Time) of
 		false ->
 			not_handled;
 		Timeout ->
-			io:format("Timeout: ~p~n", [Timeout]),
+			announce_timer(Chan, Nick, Timeout, Irc),
 			{delayed_event, 1000*Timeout, customevent, {timer_expire, Chan, Nick, Message}, undefined}
 	end;
 handle_event(customevent, {timer_expire, Chan, Nick, Message}, Irc) ->
@@ -62,3 +62,10 @@ parse_hhmm(TimeSpec) ->
 		nomatch ->
 			false
 	end.
+
+announce_timer(Chan, _Nick, Timeout, Irc) ->
+	{{Y, M, D}, {HH, MM, _}} = util:add_seconds(erlang:localtime(), Timeout),
+	Message = io_lib:format("Таймер установлен на ~2..0B:~2..0B ~2..0B/~2..0B/~2..0B"
+							" (через ~2..0B:~2..0B), насяльника!",
+							[HH, MM, Y rem 100, M, D, Timeout div 3600, (Timeout div 60 rem 60)]),
+	ok = irc_conn:chanmsg(Irc, Chan, Message).
