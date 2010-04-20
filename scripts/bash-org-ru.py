@@ -66,7 +66,8 @@ def main():
             print line.encode('utf8')
     elif opts.num:
         cite = bor.cite(opts.num)
-        print cite.encode('utf8')
+        if cite:
+            print cite.encode('utf8')
     else:
         parser.error("no action specified")
 
