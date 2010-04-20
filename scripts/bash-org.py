@@ -18,7 +18,7 @@ class BashOrg(object):
     def _quote_to_text(self, quote_el):
         """Converts quote element to plain text
         """
-        fixed_html = quote_el.html().replace('<', '&lt;').replace('>', '&gt;')
+        fixed_html = quote_el.html().replace('<br/>', '').replace('<', '&lt;').replace('>', '&gt;')
         return PyQuery(fixed_html).text()        
 
     def cite(self, num):
