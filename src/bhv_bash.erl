@@ -31,6 +31,8 @@ handle_event(cmdevent, {chancmd, Chan, ?USER(Nick), [[$# | Rest] | _]}, Irc) ->
 	bash_quote(Irc, Chan, Nick, Rest, ru);
 handle_event(cmdevent, {chancmd, Chan, _, ["bash" | Query]}, Irc) when length(Query) > 0 ->
 	bash_search(Irc, Chan, Query, ru);
+handle_event(cmdevent, {chancmd, Chan, _, ["ebash" | Query]}, Irc) when length(Query) > 0 ->
+	bash_search(Irc, Chan, Query, org);
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.
 

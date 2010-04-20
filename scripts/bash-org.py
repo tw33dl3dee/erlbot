@@ -10,8 +10,8 @@ from sys import stderr, exit
 class BashOrg(object):
     """Citations, search over bash.org
     """
-    _encoding = 'utf-8'
-    
+    _encoding = 'iso-8859-1'
+
     def _fetch_page(self, url):
         return PyQuery(url=url, opener=lambda url: unicode(urllib2.urlopen(url).read(), self._encoding))
 
@@ -19,36 +19,35 @@ class BashOrg(object):
         """Converts quote element to plain text
         """
         fixed_html = quote_el.html().replace('<br/>', '').replace('<', '&lt;').replace('>', '&gt;')
-        return PyQuery(fixed_html).text()        
+        return PyQuery(fixed_html).text()
 
     def cite(self, num):
         """Get quote by number
         """
-        page = self._fetch_page("http://bash.org/?quote=%d" % num)
+        page = self._fetch_page("http://bash.org/?%s" % urllib.urlencode({'quote': num}))
         quote = page("p.qt")
         if not quote:
             return None
         return self._quote_to_text(quote)
 
-    # def search(self, text, results = 3):
-    #     """Search quotes for given text
+    def search(self, text, results = 5):
+        """Search quotes for given text
 
-    #     :param text: text to search (ascii or unicode)
-    #     :param result: number of results to return
-    #     :return: 
-    #     """
-    #     url = "http://bash.org.ru/?%s" % urllib.urlencode({'text': text.encode('windows-1251')})
-    #     page = self._fetch_page(url)
-    #     # If there is a span with "error" class having "!" in itself
-    #     if True in page("span.error").map(lambda i, e: "!" in PyQuery(e).text()):
-    #         return []
-    #     # Whoa...
-    #     matches = [(e.parent()("span").text(),          # votes
-    #                 int(e.parent()("a").eq(0).text()),  # quote number
-    #                 self._quote_to_text(e))             # quote text
-    #                for m in page("#quotes div.q div.vote + div")
-    #                for e in (PyQuery(m),)]
-    #     return sorted(matches, reverse=True)[0:results]
+        :param text: text to search (ascii or unicode)
+        :param result: number of results to return
+        :return:
+        """
+        url = "http://bash.org/?%s" % urllib.urlencode({'search': text.encode('utf-8'),
+                                                        'sort': 0,
+                                                        'show': results})
+        page = self._fetch_page(url)
+        # Whoa...
+        matches = [(re.search(r'\((-?[0-9]+)\)', e.prev().text()).group(1),  # votes
+                    int(e.prev()("a b").text()[1:]),                         # quote number
+                    self._quote_to_text(e))                                  # quote text
+                   for m in page("p.qt")
+                   for e in (PyQuery(m),)]
+        return matches[:results]
 
 def main():
     parser = OptionParser(usage="usage: %prog [options] [TEXT]", version="%prog 0.1")
