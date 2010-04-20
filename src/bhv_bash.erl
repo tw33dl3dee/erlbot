@@ -19,6 +19,7 @@ init(_) -> undefined.
 help(chancmd) -> 
 	[{"#<номер>",		"цитата с Bash.Org.Ru"},
 	 {"##<номер>",		"цитата с Bash.Org"},
+	 {"ebash <строка>",	"поиск по цитатам Bash.Org"},
 	 {"bash <строка>",	"поиск по цитатам Bash.Org.Ru"}];
 help(privcmd) ->
 	none;

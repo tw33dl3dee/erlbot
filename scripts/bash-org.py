@@ -30,7 +30,7 @@ class BashOrg(object):
             return None
         return self._quote_to_text(quote)
 
-    def search(self, text, results = 5):
+    def search(self, text, results = 3):
         """Search quotes for given text
 
         :param text: text to search (ascii or unicode)
