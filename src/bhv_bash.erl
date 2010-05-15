@@ -38,8 +38,8 @@ handle_event(_Type, _Event, _Irc) ->
 	not_handled.
 
 bash_quote(Irc, Chan, Nick, NumStr, Domain) ->
-	case catch list_to_integer(NumStr) of 
-		{'EXIT', _} ->
+	case decode_quote_num(NumStr) of 
+		false ->
 			not_handled;
 		Num when Num > 0 ->
 			ok = bhv_common:pipe_script(Irc, Chan, bash_script(Domain), ["-n", integer_to_list(Num)]);
@@ -52,3 +52,13 @@ bash_search(Irc, Chan, Query, Domain) ->
 
 bash_script(ru)  -> "bash-org-ru.py";
 bash_script(org) -> "bash-org.py".
+
+decode_quote_num(NumStr) ->
+	case catch list_to_integer(NumStr) of 
+		{'EXIT', _} ->
+			case re:run(NumStr, "[/\\?]([0-9]+)", [unicode, {capture, all_but_first, list}]) of
+				nomatch -> false;
+				{match, [Num]} -> list_to_integer(Num)
+			end;
+		Num -> Num
+	end.
