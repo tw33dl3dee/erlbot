@@ -99,8 +99,8 @@ statline_to_list(_, S) ->
 	statline_to_list(S).
 
 statline_to_list({Ident, Lines, Chars, FirstDay}) ->
-	io_lib:format(" ~-11s | ~9B | ~7B | ~-5.1f | ~-5.1f", [format_ident(Ident), Lines, Chars, 
-														   (Chars + 1)/(Lines + 1), Lines/days_passed(FirstDay)]).
+	io_lib:format(" ~-11s | ~9B | ~7B | ~-5.1f | ~6.1f", [format_ident(Ident), Lines, Chars, 
+														  (Chars + 1)/(Lines + 1), Lines/days_passed(FirstDay)]).
 
 days_passed(FirstDay) ->
 	{CurDate, _} = erlang:localtime(),
