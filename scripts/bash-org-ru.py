@@ -39,8 +39,9 @@ class BashOrgRu(object):
         """
         url = "http://bash.org.ru/?%s" % urllib.urlencode({'text': text.encode('windows-1251')})
         page = self._fetch_page(url)
-        # If there is a span with "error" class having "!" in itself
-        if True in page("span.error").map(lambda i, e: "!" in PyQuery(e).text()):
+        # If there is a span with "error" class having "!" in itself, nothing's found
+        # There might also be no span.error at all -- BOR's bug :(
+        if not len(page("span.error")) or True in page("span.error").map(lambda i, e: "!" in PyQuery(e).text()):
             return []
         # Whoa...
         matches = [(e.parent()("span").text(),          # votes
