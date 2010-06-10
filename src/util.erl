@@ -6,7 +6,7 @@
 -export([uri_encode/1]).
 -export([execv/3, execv/4, execvp/2, execvp/3, system/1, system/2, find_prog/2, signame/1]).
 -export([read_file/1]).
--export([add_days/2, add_seconds/2, valid_datetime/1, time_diff/2]).
+-export([add_days/2, add_seconds/2, valid_datetime/1, time_diff/2, date_diff/2]).
 -export([convert_time_abs/3, convert_time_rel/2, convert_time_rel_diff/2]).
 
 multiline(Term) ->
@@ -231,6 +231,10 @@ valid_datetime(_) ->
 time_diff(DateTime1, DateTime2) ->
 	calendar:datetime_to_gregorian_seconds(DateTime1) - calendar:datetime_to_gregorian_seconds(DateTime2).
 
+%% Difference in days between 2 dates
+date_diff(Date1, Date2) ->
+	calendar:date_to_gregorian_days(Date1) - calendar:date_to_gregorian_days(Date2).
+
 %% Relative time offset to seconds
 convert_time_rel_diff(HH, MM) ->
 	HH*3600 + MM*60.
@@ -254,7 +258,7 @@ convert_time(HH, MM, {YMD, {HH1, MM1, _}}, yesterday) when {HH, MM} < {HH1, MM1}
 convert_time(HH, MM, {YMD, {HH1, MM1, _}}, tomorrow) when {HH, MM} > {HH1, MM1} ->
 	convert_time({YMD, {HH, MM, 0}});
 %% Special case, current hour/minute given; it's rounded to the current second
-convert_time(HH, MM, {YMD, {HH, MM, _}} = Now, tomorrow) ->
+convert_time(HH, MM, {_YMD, {HH, MM, _}} = Now, tomorrow) ->
 	convert_time(Now);
 %% Otherwise, it's yesterday...
 convert_time(HH, MM, {YMD, _}, yesterday) ->

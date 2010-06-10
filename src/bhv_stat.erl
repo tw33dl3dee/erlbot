@@ -9,6 +9,7 @@
 
 -behaviour(irc_behaviour).
 -export([init/1, help/1, handle_event/3]).
+-export([fix_stat/1]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
@@ -20,12 +21,16 @@
 				lines  :: integer()}).
 -record(cstat, {ident  :: list(),
 				chars  :: integer()}).
+-record(uinfo, {ident     :: list(),
+				first_day :: {integer(), integer(), integer()}}).
 
 init(_) -> 	
 	ok = db_util:init_table(lstat, [{disc_copies, [node()]},
 									{attributes, record_info(fields, lstat)}]),
 	ok = db_util:init_table(cstat, [{disc_copies, [node()]},
 									{attributes, record_info(fields, cstat)}]),
+	ok = db_util:init_table(uinfo, [{disc_copies, [node()]},
+									{attributes, record_info(fields, uinfo)}]),
 	undefined.
 
 help(chancmd) ->
@@ -51,33 +56,58 @@ handle_event(_Type, _Event, _Irc) ->
 update_stat(Ident, Lines, Chars) ->
 	mnesia:dirty_update_counter(lstat, Ident, Lines),
 	mnesia:dirty_update_counter(cstat, Ident, Chars),
+	mnesia:async_dirty(fun update_first_day/1, [Ident]),
 	ok.
+
+fix_stat(IrcName) ->
+	irc_client:remove_behaviour(IrcName, ?MODULE),
+	irc_client:add_behaviour(IrcName, ?MODULE),
+	AllUsr = qlc:q([L#lstat.ident || L <- mnesia:table(lstat)]),
+	mnesia:async_dirty(fun () -> [begin io:format("Fix ~s~n", [I]), 
+										update_stat(I, 0, 0) 
+								  end || I <- qlc:eval(AllUsr)] end).
+
+update_first_day(Ident) ->
+	case mnesia:read(uinfo, Ident) of
+		[] -> {Date, _} = erlang:localtime(),
+			  mnesia:write(#uinfo{ident = Ident, first_day = Date});
+		_  -> not_handled
+	end.
 
 -define(MIN_VISIBLE_STAT_LINES, 100).  % Minimum number of lines user must have to be shown in stat.
 
 get_stat(Ident) ->
-	Q = qlc:q([{L#lstat.ident, L#lstat.lines, C#cstat.chars} || 
+	Q = qlc:q([{L#lstat.ident, L#lstat.lines, C#cstat.chars, U#uinfo.first_day} || 
 				  L <- mnesia:table(lstat),
 				  C <- mnesia:table(cstat),
-				  L#lstat.ident =:= C#cstat.ident,
+				  U <- mnesia:table(uinfo),
+				  L#lstat.ident =:= C#cstat.ident, L#lstat.ident =:= U#uinfo.ident,
 				  L#lstat.lines > ?MIN_VISIBLE_STAT_LINES]),
 	Qs = qlc:keysort(2, Q, [{order, descending}]),
 	mnesia:async_dirty(fun () -> dump_stat(Ident, qlc:eval(Qs)) end).
 
 dump_stat(Ident, StatLines) ->
 	Lines = [statline_to_list(Ident, Stat) || Stat <- StatLines],
-	[" ************** Статистега ***************",
-	 " Идент       | Сообщения | Символы | Длина",
-	 " -----------------------------------------" | Lines] ++ 
-		[" *****************************************"].
+	[" ************** Статистега ************************",
+	 " Идент       | Сообщения | Символы | Длина | В день",
+	 " --------------------------------------------------" | Lines] ++ 
+		[" **************************************************"].
 
-statline_to_list(Ident, {Ident, _, _} = S) ->
+statline_to_list(Ident, {Ident, _, _, _} = S) ->
 	[statline_to_list(S), " <==="];
 statline_to_list(_, S) ->
 	statline_to_list(S).
 
-statline_to_list({Ident, Lines, Chars}) ->
-	io_lib:format(" ~-11s | ~9B | ~7B | ~-4.1f", [format_ident(Ident), Lines, Chars, (Chars + 1)/(Lines + 1)]).
+statline_to_list({Ident, Lines, Chars, FirstDay}) ->
+	io_lib:format(" ~-11s | ~9B | ~7B | ~-5.1f | ~-5.1f", [format_ident(Ident), Lines, Chars, 
+														   (Chars + 1)/(Lines + 1), Lines/days_passed(FirstDay)]).
+
+days_passed(FirstDay) ->
+	{CurDate, _} = erlang:localtime(),
+	case util:date_diff(CurDate, FirstDay) of
+		0 -> 1;
+		D -> D
+	end.
 
 format_ident([$~ | Ident]) -> Ident;
 format_ident(Ident)        -> Ident.
