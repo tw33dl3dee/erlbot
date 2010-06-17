@@ -48,7 +48,8 @@ comment(message, Chan, Nick, Irc) ->
 			case choice:make([[neg, "Хуйню спорол, ", Nick, "."], 
 							  [pos, Nick, ": лови пиченьку."],
 							  [neg, Nick, " -- дятел. ^_^"],
-							  [pos, Nick, ", ты гений!"]]) of
+							  [pos, Nick, ", ты гений!"],
+							  [pos, Nick, ": чмоки, противный"]]) of
 				[Emotion | Msg] ->
 					comment(Emotion, Chan, Nick, Msg, Irc)
 			end;

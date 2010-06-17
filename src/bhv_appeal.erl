@@ -37,7 +37,10 @@ appeal(Type, From, ?USER(Nick) = User, Msg, Irc) ->
 	FuckOff = util:contains(Msg, "(у?ебись|сосн?и)"),
 	Caress = util:contains(Msg, "(няшка|кавай)"),
 	Criticism = util:contains(Msg, "(тупа+я +пи+зда|пи+зда +тупа+я)"),
-	if Humiliation ->
+	Kiss = util:contains(Msg, "чмоки"),
+	if Kiss -> 
+			react(Irc, From, action, ["*KISSED* *YAHOO*"]);
+	   Humiliation ->
 			%% @attention Bot will not start smart-appeal because using privmsg here and later.
 			react(Irc, From, privmsg, [Nick, ": хамишь, сцуко."]);
 	   Greeting ->
