@@ -4,6 +4,7 @@ import urllib, urllib2
 import json, re
 import htmlentitydefs
 from optparse import OptionParser
+from pyquery import PyQuery
 from sys import stderr, exit
 from collections import defaultdict
 
@@ -31,6 +32,21 @@ class Google(object):
         req = urllib2.Request(url, headers={'Referer': self._referer})
         resp = urllib2.urlopen(req)
         return json.load(resp)
+
+    def _make_HTML_request(self, path, params):
+        """Performs ordinary request and fetches HTML
+
+        @param url: URL part with no parameters and no leading /
+        @param params: request parameters (dict)
+        """
+        tld = defaultdict(lambda: self._lang, en="com")[self._lang]
+        url = 'http://www.google.%s/%s?%s' % (tld, path, urllib.urlencode(params))
+        # You get back simpler and smaller html if you pretend to be Lynx
+        ua = 'Lynx/2.8.6rel.4 libwww-FM/2.14'
+        req = urllib2.Request(url, headers={'Referer': self._referer, 'User-Agent': ua})
+        resp = unicode(urllib2.urlopen(req).read(), 'utf-8')
+        return resp
+
 
     # List of filters to apply to google results HTML
     _postproc = [# <sup> raises into power
@@ -97,13 +113,7 @@ class Google(object):
         @type  expr: str
         @return: value (str) or None
         """
-        tld = defaultdict(lambda: self._lang, en="com")[self._lang]
-        params = urllib.urlencode({'num': 1, 'ie': 'utf-8', 'oe': 'utf-8', 'q': expr})
-        url = 'http://www.google.%s/search?%s' % (tld, params)
-        # You get back simpler and smaller html if you pretend to be Lynx
-        ua = 'Lynx/2.8.6rel.4 libwww-FM/2.14'
-        req = urllib2.Request(url, headers={'Referer': self._referer, 'User-Agent': ua})
-        resp = unicode(urllib2.urlopen(req).read(), 'utf-8')
+        resp = self._make_HTML_request('search', {'num': 1, 'ie': 'utf-8', 'oe': 'utf-8', 'q': expr})
         draft = re.match(self._calc_draft_match, resp)
         if draft:
             fine = re.match(self._calc_fine_match, draft.group('match'))
@@ -111,6 +121,18 @@ class Google(object):
                 ans = self._dehtmlize(fine.group('match'))
                 return ans
         return None
+
+    def define(self, term, results = 5):
+        """Google Define service
+
+        @param term: term to search for
+        @param results: number of results to return
+        """
+        resp = self._make_HTML_request('search', {'ie': 'utf-8', 'oe': 'utf-8', 'q': 'define:%s' % term})
+        body = PyQuery(resp)
+        items = body("ul.std li").map(lambda i, e: (PyQuery(PyQuery(e).html().split("<br/>")[0]).text(),
+                                                    "=".join(PyQuery(e)("a").attr('href').split('=')[1:])))
+        return items[:results]
 
 
 def main():
@@ -125,6 +147,8 @@ def main():
                       help="evaluate query using Google Calculator")
     parser.add_option("-t", "--translate", dest="langpair", metavar="LANGPAIR",
                       help="translate query from one language to another (e.g. en-ru)")
+    parser.add_option("-d", "--define", dest="define", action="store_true", default=False,
+                      help="use Google Define on the query")
     (opts, args) = parser.parse_args()
     if len(args) == 0:
         parser.error("no search query supplied")
@@ -140,6 +164,11 @@ def main():
         ans = g.calc(query)
         if ans:
             print ans.encode('utf8')
+    elif opts.define:
+        res = g.define(query)
+        for definition, url in res:
+            line = "- %s\n(%s)" % (definition, url)
+            print line.encode('utf8')
     else:
         (count, matches) = g.search(query, opts.results)
         print "Google search for '%s': %d result(s)" % (query, count)
@@ -148,8 +177,8 @@ def main():
             print line.encode('utf8')
 
 if __name__ == '__main__':
-   try:
+   #try:
         main()
-   except Exception, e:
-       print >>stderr, e
-       exit(1)
+   #except Exception, e:
+   #    print >>stderr, e
+   #    exit(1)
