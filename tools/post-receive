@@ -12,12 +12,15 @@
 # see contrib/hooks/ for a sample, or uncomment the next line and
 # rename the file to "post-receive".
 
+unset GIT_DIR
+cd ..
+
 read FROM TO HEAD
 echo $FROM $TO $HEAD
 git checkout -f
-make -C ..
-../tools/reload nya@magrathea.twee.cc
+make
+tools/reload nya@magrathea.twee.cc
 (IFS=$'\n'
 for LINE in `git log --reverse --pretty=format:"%h %an (%ar): %s" $FROM..$TO`; do
-	../tools/bcast nya@magrathea.twee.cc action "$LINE"
+	tools/bcast nya@magrathea.twee.cc action "$LINE"
 done)
