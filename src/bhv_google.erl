@@ -19,6 +19,7 @@ init(_) -> undefined.
 help(chancmd) -> 
 	[{"gg|гг <строка>",						"поиск через Google REST Services"},
 	 {"gc|гк <выражение>",					"вычисление через Google Calculator"},
+	 {"gd|гд <выражение>",					"толковый словарь (Google Define)"},
 	 {"vs <слово1> <слово2>",				"сравнение популярности (Google Fight)"},
 	 {"en-ru|ru-en|de-ru|ru-de <слово>",	"перевод через Google Translate"}];
 help(privcmd) ->
@@ -34,6 +35,10 @@ handle_event(cmdevent, {chancmd, Chan, _, ["gc" | Query]}, Irc) when length(Quer
 	google_calc(Irc, Chan, "en", Query);
 handle_event(cmdevent, {chancmd, Chan, _, ["гк" | Query]}, Irc) when length(Query) > 0 ->
 	google_calc(Irc, Chan, "ru", Query);
+handle_event(cmdevent, {chancmd, Chan, _, ["gd" | Query]}, Irc) when length(Query) > 0 ->
+	google_define(Irc, Chan, "en", Query);
+handle_event(cmdevent, {chancmd, Chan, _, ["гд" | Query]}, Irc) when length(Query) > 0 ->
+	google_define(Irc, Chan, "ru", Query);
 handle_event(cmdevent, {chancmd, Chan, _, ["vs", Word1, Word2]}, Irc) ->
 	google_fight(Irc, Chan, "ru", Word1, Word2);
 handle_event(cmdevent, {chancmd, Chan, _, [Lang | Words]}, Irc) 
@@ -48,6 +53,9 @@ google_search(Irc, Chan, Lang, Query) ->
 
 google_calc(Irc, Chan, Lang, Query) ->
 	ok = bhv_common:pipe_script(Irc, Chan, "google.py", ["-l", Lang, "-c" | Query]).
+
+google_define(Irc, Chan, Lang, Query) ->
+	ok = bhv_common:pipe_script(Irc, Chan, "google.py", ["-l", Lang, "-d" | Query]).
 
 google_fight(Irc, Chan, Lang, Word1, Word2) ->
 	ok = bhv_common:pipe_script(Irc, Chan, "google.py", ["-l", Lang, Word1, "-f", Word2]).

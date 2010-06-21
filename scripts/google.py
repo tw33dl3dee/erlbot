@@ -128,10 +128,10 @@ class Google(object):
         @param term: term to search for
         @param results: number of results to return
         """
-        resp = self._make_HTML_request('search', {'ie': 'utf-8', 'oe': 'utf-8', 'q': 'define:%s' % term})
+        resp = self._make_HTML_request('search', {'ie': 'utf-8', 'oe': 'utf-8', 'q': 'define:%s' % term, 'defl': self._lang})
         body = PyQuery(resp)
         items = body("ul.std li").map(lambda i, e: (PyQuery(PyQuery(e).html().split("<br/>")[0]).text(),
-                                                    "=".join(PyQuery(e)("a").attr('href').split('=')[1:])))
+                                                    "=".join((PyQuery(e)("a").attr('href') or "").split('=')[1:]) or None))
         return items[:results]
 
 
@@ -167,7 +167,7 @@ def main():
     elif opts.define:
         res = g.define(query)
         for definition, url in res:
-            line = "- %s\n(%s)" % (definition, url)
+            line = url and ("- %s\n(%s)" % (definition, url)) or ("- %s" % definition)
             print line.encode('utf8')
     else:
         (count, matches) = g.search(query, opts.results)
