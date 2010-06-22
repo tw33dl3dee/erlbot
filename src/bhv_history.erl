@@ -41,7 +41,8 @@ init(_) ->
 	undefined.
 
 help(chancmd) ->
-	[{"hist <время>",				"история событий на канале (в приват)"}];
+	[{"hist <время>",				"история событий на канале (в приват)"},
+	 {"lastseen <ник>",             "вывод последней активности данного пользователя"}];
 help(privcmd) ->
 	[{"hist <канал> <время>",		"то же самое, но чтоб никто не узнал"}];
 help(about) ->
@@ -89,6 +90,8 @@ handle_event(cmdevent, {privcmd, ?USER(Nick), ["hist" | _]}, Irc) ->
 	give_help(Nick, Irc);
 handle_event(cmdevent, {chancmd, Chan, ?USER(Nick), ["hist" | Rest]}, Irc) ->
 	show_history(Nick, Chan, Rest, Irc);
+handle_event(cmdevent, {chancmd, Chan, _, ["lastseen", TargetNick]}, Irc) ->
+	show_lastseen(Chan, TargetNick, Irc);
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.
 
@@ -188,7 +191,7 @@ trace_history(_Method, Nick, Chan, LoginCount, Irc) ->
 %% Trace by specified begin/end time.
 trace_history(Method, Nick, Chan, From, To, Irc) ->
 	ok = irc_conn:async_privmsg(Irc, Nick, util:multiline("History for ~s from ~p to ~p~n", [Chan, From, To])),
-	Q = qlc:q([{neg_timestamp(H#histent.timestamp), H#histent.event} ||
+	Q = qlc:q([H#histent{timestamp = neg_timestamp(H#histent.timestamp)} ||
 				  H  <- mnesia:table(histent),
 				  Ch <- mnesia:table(chan),
 				  Ch#chan.cid  =:= H#histent.cid,
@@ -201,12 +204,62 @@ trace_history(Method, Nick, Chan, From, To, Irc) ->
 
 fetch_history(list, Q, Nick, Irc) ->
 	R = lists:reverse(qlc:eval(Q)),
-	Lines = [histent_to_list(H) || H <- R],
+	Lines = [histent_to_list(short, H) || H <- R],
 	ok = irc_conn:async_privmsg(Irc, Nick, Lines);
 fetch_history(cursor, Q, Nick, Irc) ->
 	Qs = qlc:keysort(1, Q),
 	C = qlc:cursor(Qs),
 	ok = dump_history(C, Nick, Irc).
+
+fetch_first(Q) ->
+	{atomic, Histent} = mnesia:transaction(fun () -> C = qlc:cursor(Q),
+													 A = qlc:next_answers(C, 1),
+													 io:format("==FETCH ~p==~n", [A]),
+													 qlc:delete_cursor(C),
+													 A
+										   end),
+	Histent.
+
+show_lastseen(Chan, TargetNick, Irc) ->
+	case trace_lastseen(Chan, {nick, TargetNick}) of
+		[] -> dump_lastseen({}, Chan, Irc);
+		[#histent{uid = Uid} = LastByNick] ->	
+			case trace_lastseen(Chan, {uid, Uid}) of
+				[LastByNick] -> dump_lastseen({LastByNick}, Chan, Irc);
+				[LastById]   -> dump_lastseen({LastById, LastByNick}, Chan, Irc)
+			end
+	end.
+
+-define(HIST_EVENT_BYNICK(Event, Nick),
+		element(2, Event) =:= Nick orelse
+		(element(3, Event) =:= Nick andalso 
+		 (element(1, Event) =:= kick orelse element(1, Event) =:= nick))).
+
+trace_lastseen(Chan, {uid, Uid}) ->
+	Q = qlc:q([H#histent{timestamp = neg_timestamp(H#histent.timestamp)} ||
+				  H  <- mnesia:table(histent),
+				  Ch <- mnesia:table(chan),
+				  Ch#chan.cid  =:= H#histent.cid,
+				  Ch#chan.name =:= Chan,
+				  H#histent.uid =:= Uid], [{join, lookup}]),
+	fetch_first(Q);
+trace_lastseen(Chan, {nick, Nick}) ->
+	Q  = qlc:q([H#histent{timestamp = neg_timestamp(H#histent.timestamp)} ||
+				  H  <- mnesia:table(histent),
+				  Ch <- mnesia:table(chan),
+				  Ch#chan.cid  =:= H#histent.cid,
+				  Ch#chan.name =:= Chan,
+				  ?HIST_EVENT_BYNICK(H#histent.event, Nick)], [{join, lookup}]),
+	fetch_first(Q).
+
+dump_lastseen({}, Chan, Irc) ->
+	ok = irc_conn:chanmsg(Irc, Chan, bhv_common:empty_check([]));
+dump_lastseen({SingleEntry}, Chan, Irc) ->
+	ok = dump_histents(long, [SingleEntry], Chan, Irc);
+dump_lastseen({Entry1, Entry2}, Chan, Irc) when Entry1 < Entry2 ->
+	ok = dump_histents(long, [Entry1, Entry2], Chan, Irc);
+dump_lastseen({Entry1, Entry2}, Chan, Irc) ->
+	ok = dump_histents(long, [Entry2, Entry1], Chan, Irc).
 
 -define(HIST_CHUNKLEN, 100).
 
@@ -216,14 +269,20 @@ dump_history(Cursor, Nick, Irc)	->
 dump_history(Cursor, [], _, _) ->
 	ok = qlc:delete_cursor(Cursor);
 dump_history(Cursor, Results, Nick, Irc) ->
-	Lines = [histent_to_list(H) || H <- Results],
-	irc_conn:async_privmsg(Irc, Nick, Lines),
+	dump_histents(short, Results, Nick, Irc),
 	dump_history(Cursor, qlc:next_answers(Cursor, ?HIST_CHUNKLEN), Nick, Irc).
 
-histent_to_list({TS, Event}) ->
-	[timestamp_to_list(TS), " ", event_to_list(Event)].
+dump_histents(TimeFormat, Histents, Target, Irc) ->
+	Lines = [histent_to_list(TimeFormat, H) || H <- Histents],
+	irc_conn:async_privmsg(Irc, Target, Lines).
 
-timestamp_to_list({YMD, HMS, _}) ->
+histent_to_list(TimeFormat, #histent{timestamp = TS, event = Event}) ->
+	[timestamp_to_list(TimeFormat, TS), " ", event_to_list(Event)].
+
+timestamp_to_list(long, {YMD, HMS, _}) ->
+	{{Y, M, D}, {HH, MM, SS}} = calendar:universal_time_to_local_time({YMD, HMS}),
+	io_lib:format("[~2..0b/~2..0b/~2..0b ~2..0b:~2..0b:~2..0b]", [Y rem 1000, M, D, HH, MM, SS]);
+timestamp_to_list(short, {YMD, HMS, _}) ->
 	{_, {HH, MM, SS}} = calendar:universal_time_to_local_time({YMD, HMS}),
 	io_lib:format("[~2..0b:~2..0b:~2..0b]", [HH, MM, SS]).
 
