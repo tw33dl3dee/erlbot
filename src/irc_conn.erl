@@ -23,15 +23,16 @@
 			   msg_interval = 200,            %% minimal interval between messages when sending long bulks
 			   conn_rate    = {2, 16000}}).   %% maximum connection rate
 
--record(conn, {nick                   :: list(),    %% actual nick (may differ from initially requested one)
-			   nick_suffix = 1        :: integer(), %% suffix appended to nick on nick collision
-			   login                  :: list(),    %% actual login used
-			   is_oper   = false      :: boolean(),
-			   umode     = []         :: [atom()],  %% actual umodes set
-			   conf                   :: #conf{},
-			   irc_ref                :: pid(),
-			   handler                :: function(),
-			   chan_fsms = dict:new() :: dict()}).  %% channame -> pid()
+-record(conn, {nick                      :: list(),    %% actual nick (may differ from initially requested one)
+			   nick_suffix = 1           :: integer(), %% suffix appended to nick on nick collision
+			   login                     :: list(),    %% actual login used
+			   is_oper   = false         :: boolean(),
+			   umode     = []            :: [atom()],  %% actual umodes set
+			   conf                      :: #conf{},
+			   irc_ref                   :: pid(),
+			   handler                   :: function(),
+			   priv_senders = dict:new() :: dict(),    %% bulk privmsg sender processes, nick -> pid()
+			   chan_fsms = dict:new()    :: dict()}).  %% channame -> pid()
 
 -include("irc.hrl").
 
@@ -157,7 +158,8 @@ conn_throttle(Host, #conf{conn_rate = {MaxConn, Period}}) ->
 
 handle_info({'DOWN', _, process, Pid, _}, StateName, StateData) ->
 	Channels = dict:filter(fun (_, V) when V =:= Pid -> false; (_, _) -> true end, StateData#conn.chan_fsms),
-	{next_state, StateName, StateData#conn{chan_fsms = Channels}};
+	Senders  = dict:filter(fun (_, V) when V =:= Pid -> false; (_, _) -> true end, StateData#conn.priv_senders),
+	{next_state, StateName, StateData#conn{chan_fsms = Channels, priv_senders = Senders}};
 handle_info({'EXIT', _, Reason}, _StateName, StateData) when Reason =/= normal ->
 	{stop, Reason, StateData};
 handle_info({irc, IrcRef, Event}, StateName, #conn{irc_ref = IrcRef} = StateData) ->
@@ -228,13 +230,12 @@ state_auth_end(_, Conn) ->
 	{next_state, state_auth_end, Conn}.
 
 state_connected({bulk_irc_command, privmsg, Nick, Lines}, Conn) ->
-	spawn_link(fun () ->
-					   Fun = fun (Line) -> do_irc_command({privmsg, Nick, Line}, Conn),
-										   msg_throttle(Conn)
-							 end,
-					   [Fun(Line) || Line <- Lines]
-			   end),
-	{next_state, state_connected, Conn};	
+	{SenderPid, NewConn} = bulk_priv_sender(Nick, Conn),
+	Fun = fun (Line) -> do_irc_command({privmsg, Nick, Line}, NewConn),
+						msg_throttle(NewConn)
+		  end,
+	SenderPid ! {bulk_irc_command, Fun, Lines},
+	{next_state, state_connected, NewConn};	
 state_connected({bulk_irc_command, Cmd, Channel, Lines}, Conn) ->
 	case dict:find(Channel, Conn#conn.chan_fsms) of
 		{ok, FsmRef} ->
@@ -263,6 +264,25 @@ state_connected({get_channel_info, Chan}, _From, Conn) ->
 			{reply, irc_chan:get_chan_info(FsmRef), state_connected, Conn};
 		Error ->
 			{reply, Error, state_connected, Conn}
+	end.
+
+%% Returns (spawning if needed) PID of bulk privmsg sender for given Nick
+%% Sender ceases after some idle timeout
+bulk_priv_sender(Nick, Conn) ->
+	case dict:find(Nick, Conn#conn.priv_senders) of
+		{ok, Pid} -> {Pid, Conn};
+		_ ->
+			Pid = spawn_link(fun bulk_sender_loop/0),
+			erlang:monitor(process, Pid),
+			{Pid, Conn#conn{priv_senders = dict:store(Nick, Pid, Conn#conn.priv_senders)}}
+	end.
+
+%% Bulk sender loop
+bulk_sender_loop() ->
+	receive
+		{bulk_irc_command, Fun, Lines} -> [Fun(Line) || Line <- Lines],
+										  bulk_sender_loop()
+	after 1000 -> stop
 	end.
 
 %% Processes raw event (as it is received from IRC)
