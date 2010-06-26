@@ -101,6 +101,32 @@ class Google(object):
                                        q=text, langpair=langpair)
         return repl['responseData']['translatedText']
 
+    def dict(self, word, lang_from, lang_to, results = 5):
+        """Lookup word in dictionary
+
+        @param word: word to lookup
+        @param lang_from: source language
+        @param lang_to: target language
+        @param results: number of results to fetch
+        @return: [{'pos': part-of-speech, 'tr': list of translations}]
+
+        WARNING this is unofficial Google API
+        """
+        params = {'callback': 'eval', 'q': word, 'sl': lang_from, 'tl': lang_to}
+        url = 'http://www.google.com/dictionary/json?%s' % (urllib.urlencode(params))
+        req = urllib2.Request(url, headers={'Referer': self._referer})
+        resp = urllib2.urlopen(req).read()
+        data = json.loads(re.search(r'eval\(({.*}),.*\)', resp).group(1))
+        res = []
+        for e in data['primaries'][0]['entries']:
+            trans = {'pos': '?', 'tr': []}
+            for l in e['labels']:
+                if l['title'] == "Part-of-speech": trans['pos'] = l['text']
+            for ee in e['entries'][:results]:
+                if ee['type'] == 'meaning': trans['tr'].append(ee['terms'][0]['text'])
+            res.append(trans)
+        return res
+
     # Find what seems to be Calculator result
     _calc_draft_match = r'(?s).*calc_img\.gif(?P<match>.*)</h2>'
     # Accurately rip out the answer
@@ -147,6 +173,8 @@ def main():
                       help="evaluate query using Google Calculator")
     parser.add_option("-t", "--translate", dest="langpair", metavar="LANGPAIR",
                       help="translate query from one language to another (e.g. en-ru)")
+    parser.add_option("-D", "--dict", dest="dict", metavar="LANGPAIR",
+                      help="lookup word in dictionary w.r.t. langpair (e.g. en-ru)")
     parser.add_option("-d", "--define", dest="define", action="store_true", default=False,
                       help="use Google Define on the query")
     (opts, args) = parser.parse_args()
@@ -157,6 +185,12 @@ def main():
     if opts.langpair:
         res = g.translate(query, opts.langpair.replace('-', '|'))
         print res.encode('utf8')
+    elif opts.dict:
+        [lang_from, lang_to] = opts.dict.split('-')
+        res = g.dict(query, lang_from, lang_to)
+        for trans in res:
+            line = "(%s) %s" % (trans['pos'], ', '.join(trans['tr']))
+            print line.encode('utf8')
     elif opts.fight:
         res = "%s wins! (%d vs %d)" % g.fight(query, opts.fight) 
         print res

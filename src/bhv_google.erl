@@ -61,4 +61,4 @@ google_fight(Irc, Chan, Lang, Word1, Word2) ->
 	ok = bhv_common:pipe_script(Irc, Chan, "google.py", ["-l", Lang, Word1, "-f", Word2]).
 
 google_trans(Irc, Chan, Dict, Word) ->
-	ok = bhv_common:pipe_script(Irc, Chan, "google.py", ["-t", Dict, Word]).
+	ok = bhv_common:pipe_script(Irc, Chan, "google.py", ["-D", Dict, Word]).
