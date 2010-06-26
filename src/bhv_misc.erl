@@ -41,12 +41,12 @@ handle_event(cmdevent, {chancmd, Chan, ?USER(Nick), ["uuid"]}, Irc) ->
 	gen_uuid(Irc, Chan, Nick);
 handle_event(cmdevent, {chancmd, Chan, _, ["time"]}, Irc) ->
 	{success, [Time]} = util:system("date '+%a %b %d %R:%S %Z %Y'"),
-	ok = irc_conn:chanmsg(Irc, Chan, ["Точное время: ", Time, "."]);
+	ok = irc_conn:chanmsg(Irc, Chan, nohist, ["Точное время: ", Time, "."]);
 handle_event(cmdevent, {chancmd, Chan, ?USER(Nick), ["ping"]}, Irc) ->
-	ok = irc_conn:command(Irc, choice:make([{chanmsg, Chan, ["Да-да, ", Nick, "?.."]},
-											{action, Chan, "понг"},
-											{chanmsg, Chan, "Ну, понг."},
-											{chanmsg, Chan, [Nick, ": сам пинг, че надо?"]}]));
+	ok = irc_conn:command(Irc, choice:make([{chanmsg, Chan, nohist, ["Да-да, ", Nick, "?.."]},
+											{action, Chan, nohist, "понг"},
+											{chanmsg, Chan, nohist, "Ну, понг."},
+											{chanmsg, Chan, nohist, [Nick, ": сам пинг, че надо?"]}]));
 handle_event(cmdevent, {chancmd, Chan, _, ["dice", Max | _]}, Irc) ->
 	case catch list_to_integer(Max) of
 		X when X > 0->
@@ -67,27 +67,27 @@ show_uptime(Irc, Chan) ->
 	{Rest1, Sec} = {UptimeSec div 60, UptimeSec rem 60},
 	{Rest2, Min} = {Rest1 div 60, Rest1 rem 60},
 	{Day, Hour} = {Rest2 div 24, Rest2 rem 24},
-	ok = irc_conn:chanmsg(Irc, Chan, io_lib:format("Uptime: ~b day(s), ~2..0b:~2..0b:~2..0b", [Day, Hour, Min, Sec])).
+	ok = irc_conn:chanmsg(Irc, Chan, hist, io_lib:format("Uptime: ~b day(s), ~2..0b:~2..0b:~2..0b", [Day, Hour, Min, Sec])).
 
 -define(DICE_TIMEOUT, 1000).
 
 dice(Irc, Chan, Max) ->
 	Res = choice:uniform(Max),
-	irc_conn:chanmsg(irc, Chan, "Кручу, верчу, наебать хочу..."),
+	irc_conn:chanmsg(irc, Chan, hist, "Кручу, верчу, наебать хочу..."),
 	timer:sleep(?DICE_TIMEOUT),
-	ok = irc_conn:chanmsg(Irc, Chan, integer_to_list(Res)).
+	ok = irc_conn:chanmsg(Irc, Chan, hist, integer_to_list(Res)).
 
 -define(JABBERWOCK_FILE, "data/jabberwock.txt").
 -define(JABBERWOCK_DELAY, 3000).
 
 jabberwock(Irc, Chan) ->
-	irc_conn:chanmsg(Irc, Chan, "Кхм кхм."),
+	irc_conn:chanmsg(Irc, Chan, hist, "Кхм кхм."),
 	timer:sleep(?JABBERWOCK_DELAY),
-	ok = irc_conn:chanmsg(Irc, Chan, "А вот ХУЙ вам, мне лениво.").
+	ok = irc_conn:chanmsg(Irc, Chan, hist, "А вот ХУЙ вам, мне лениво.").
 
 gen_uuid(Irc, Chan, Nick) ->
 	{success, [Uuid]} = util:system("uuidgen"),
-	ok = irc_conn:chanmsg(Irc, Chan, [Nick, ": ", Uuid]).
+	ok = irc_conn:chanmsg(Irc, Chan, hist, [Nick, ": ", Uuid]).
 
 %%	{ok, Data} = file:read_file(?JABBERWOCK_FILE),
 %%	{ok, Lines} = regexp:split(binary_to_list(Data), "\n"),

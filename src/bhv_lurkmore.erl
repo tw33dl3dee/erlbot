@@ -30,4 +30,4 @@ handle_event(_Type, _Event, _Irc) ->
 
 lurkmore_topic(Irc, Chan, Topic) ->
 	Url = "http://lurkmore.ru/" ++ util:uri_encode(Topic),
-	ok = irc_conn:action(Irc, Chan, ["доставил: ", Url]).
+	ok = irc_conn:action(Irc, Chan, hist, ["доставил: ", Url]).

@@ -41,4 +41,4 @@ lynch(Irc, Chan, Action) ->
 	{ok, Data} = file:read_file(?LYNCH_FILE),
 	Lines = string:tokens(utf8:decode(Data), "\r\n"),
 	LineNo = choice:uniform(length(Lines)),
-	ok = irc_conn:command(Irc, {Action, Chan, lists:nth(LineNo, Lines)}).
+	ok = irc_conn:command(Irc, {Action, Chan, hist, lists:nth(LineNo, Lines)}).

@@ -49,7 +49,7 @@ blurp(Irc, Chan, Message) ->
 	case choice:make([{1, do}, {RevProb - 1, dont}]) of
 		do ->
 			timer:sleep(?BLURP_DELAY),
-			irc_conn:chanmsg(Irc, Chan, choice:make(Words)),
+			irc_conn:chanmsg(Irc, Chan, hist, choice:make(Words)),
 			ok;
 		dont ->
 			not_handled

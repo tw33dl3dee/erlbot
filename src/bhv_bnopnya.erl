@@ -39,6 +39,6 @@ check_bnopnya(_, _, [], _, _) ->
 	not_handled.
 
 handle_bnopnya(Chan, Nick, FixedMsg, Irc) ->
-	irc_conn:chanmsg(Irc, Chan, [Nick, ": бНОПНЯ!!!"]),
+	irc_conn:chanmsg(Irc, Chan, hist, [Nick, ": бНОПНЯ!!!"]),
 	timer:sleep(500),
-	ok = irc_conn:chanmsg(Irc, Chan, ["#iconv: ", FixedMsg]).
+	ok = irc_conn:chanmsg(Irc, Chan, hist, ["#iconv: ", FixedMsg]).

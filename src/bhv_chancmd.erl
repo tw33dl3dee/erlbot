@@ -37,7 +37,7 @@ handle_event(genevent, {chanmsg, Chan, User, Msg}, Irc) ->
 handle_event(genevent, {action, Chan, User, Action}, Irc) ->
 	check_genmsg(Chan, User, Action, Irc);
 % Own channel message (including ACTION) starts smart appeal. 
-handle_event(selfevent, {Cmd, Chan, _}, #irc{data = Data}) when Cmd =:= chanmsg; Cmd =:= action ->
+handle_event(selfevent, {Cmd, Chan, _, _}, #irc{data = Data}) when Cmd =:= chanmsg; Cmd =:= action ->
 	{ok, dict:store(Chan, {?MAX_LINES, erlang:now()}, Data)};
 % Currently unused.
 handle_event(customevent, {cancel_appeal, Chan}, #irc{data = Data}) ->

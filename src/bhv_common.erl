@@ -19,7 +19,7 @@
 pipe_script(Irc, Chan, Script, Args, Input) ->
 	case util:execv(Script, Args, ?SCRIPT_DIR, Input) of
 		{success, Lines} ->
-			ok = irc_conn:bulk_chanmsg(Irc, Chan, empty_check(Lines));
+			ok = irc_conn:bulk_chanmsg(Irc, Chan, hist, empty_check(Lines));
 		{{failure, ErrCode}, Trace} ->
 			Tail = io_lib:format("Exited with ~p", [ErrCode]),
 			ok = error(Irc, Chan, Trace ++ [Tail])
@@ -39,13 +39,13 @@ empty_msg() ->
 				 "Почувствуйте себя неудачником!"]).
 
 error(Irc, Chan, Trace) -> 
-	ok = irc_conn:bulk_chanmsg(Irc, Chan, [error_msg() | Trace]).
+	ok = irc_conn:bulk_chanmsg(Irc, Chan, hist, [error_msg() | Trace]).
 
 error_msg() -> 
 	choice:make(["Усе поломалось, насяльника :("]).
 
 fuckoff(Irc, Chan, Nick) ->
-	ok = irc_conn:chanmsg(Irc, Chan, Nick ++ fuckoff_msg()).
+	ok = irc_conn:chanmsg(Irc, Chan, hist, Nick ++ fuckoff_msg()).
 
 fuckoff_msg() ->
 	choice:make([", не еби мне моск.", 
@@ -91,16 +91,16 @@ fuckoff_msg() ->
 -define(MAX_GREETS, 6).
 
 identify(Irc, Chan, short) ->
-	irc_conn:action(Irc, Chan, "нядваноль"),
+	irc_conn:action(Irc, Chan, nohist, "нядваноль"),
 	timer:sleep(500),
-	ok = irc_conn:action(Irc, Chan, choice:make(["векторен и гипертекстов",
-												 "металлическ и блестящ"]));
+	ok = irc_conn:action(Irc, Chan, nohist, choice:make(["векторен и гипертекстов",
+														 "металлическ и блестящ"]));
 identify(Irc, Chan, long) ->
 	identify(Irc, Chan, short),
-	irc_conn:action(Irc, Chan, ["обитает по адресу: ", "http://tweedle-dee.org/bzr/erlbot/"]),
-	ok = irc_conn:chanmsg(Irc, Chan, ["Советы и предложения постить сюды: ", 
-									  "http://redmine.tweedle-dee.org/projects/erlbot/issues/new"]);
+	irc_conn:action(Irc, Chan, nohist, ["обитает по адресу: ", "http://tweedle-dee.org/bzr/erlbot/"]),
+	ok = irc_conn:chanmsg(Irc, Chan, nohist, ["Советы и предложения постить сюды: ", 
+											  "http://redmine.tweedle-dee.org/projects/erlbot/issues/new"]);
 identify(Irc, Chan, greet) ->
 	NumGreets = choice:uniform(?MIN_GREETS, ?MAX_GREETS),
 	Greets = [choice:make(?GREETINGS) || _I <- lists:seq(1, NumGreets)],
-	ok = irc_conn:bulk_action(Irc, Chan, Greets).
+	ok = irc_conn:bulk_action(Irc, Chan, nohist, Greets).

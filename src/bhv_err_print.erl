@@ -19,9 +19,9 @@ init(_) -> undefined.
 help(_) -> none.
 
 handle_event(exitevent, {Bhv, Chan, Reason}, Irc) when ?IS_CHAN(Chan) ->
-	ok = irc_conn:bulk_action(Irc, Chan, log(Bhv, Reason));
+	ok = irc_conn:bulk_action(Irc, Chan, hist, log(Bhv, Reason));
 handle_event(exitevent, {Bhv, Nick, Reason}, Irc) when Nick =/= undefined ->
-	ok = irc_conn:bulk_privmsg(Irc, Nick, log(Bhv, Reason));
+	ok = irc_conn:bulk_privmsg(Irc, Nick, nohist, log(Bhv, Reason));
 handle_event(_, _, _) ->
 	not_handled.
 

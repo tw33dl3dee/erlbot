@@ -40,8 +40,8 @@ handle_event(cmdevent, {chancmd, Chan, ?USER(Nick), ["timer", Time | Rest]}, Irc
 handle_event(customevent, {timer_expire, Chan, Nick, Message}, Irc) ->
 	case lists:member(Chan, irc_conn:get_channels(Irc)) of
 		true ->
-			irc_conn:chanmsg(Irc, Chan, ["========== НАПОМИНАНИЕ от ", Nick, " =========="]),
-			ok = irc_conn:chanmsg(Irc, Chan, Message);
+			irc_conn:chanmsg(Irc, Chan, hist, ["========== НАПОМИНАНИЕ от ", Nick, " =========="]),
+			ok = irc_conn:chanmsg(Irc, Chan, hist, Message);
 		false ->
 			%% user not present, reschedule reminder
 			{delayed_event, ?RESCHEDULE_TIMEOUT, customevent, {timer_expire, Chan, Nick, Message}, undefined}
@@ -80,4 +80,4 @@ announce_timer(Chan, _Nick, Timeout, Irc) ->
 	Message = io_lib:format("Таймер установлен на ~2..0B:~2..0B ~2..0B/~2..0B/~2..0B"
 							" (через ~2..0B:~2..0B), насяльника!",
 							[HH, MM, Y rem 100, M, D, Timeout div 3600, (Timeout div 60 rem 60)]),
-	ok = irc_conn:chanmsg(Irc, Chan, Message).
+	ok = irc_conn:chanmsg(Irc, Chan, hist, Message).

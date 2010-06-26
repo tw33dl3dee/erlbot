@@ -39,20 +39,19 @@ appeal(Type, From, ?USER(Nick) = User, Msg, Irc) ->
 	Criticism = util:contains(Msg, "(тупа+я +пи+зда|пи+зда +тупа+я)"),
 	Kiss = util:contains(Msg, "чмоки"),
 	if Kiss -> 
-			react(Irc, From, action, ["*KISSED* *YAHOO*"]);
+			react(Irc, From, action, hist, ["*KISSED* *YAHOO*"]);
 	   Humiliation ->
-			%% @attention Bot will not start smart-appeal because using privmsg here and later.
-			react(Irc, From, privmsg, [Nick, ": хамишь, сцуко."]);
+			react(Irc, From, chanmsg, hist, [Nick, ": хамишь, сцуко."]);
 	   Greeting ->
-			react(Irc, From, privmsg,["\\O/ Превед, ", Nick, "!!!"]);
+			react(Irc, From, chanmsg, hist, ["\\O/ Превед, ", Nick, "!!!"]);
 	   FuckOff, ?IS_CHAN(From) ->
 			{delayed_event, ?APPEAL_DELAY, customevent, {suicide, From, Nick}, undefined};
 	   Caress ->
-			react(Irc, From, privmsg, "^_^");
+			react(Irc, From, chanmsg, hist, "^_^");
 	   Criticism ->
-			react(Irc, From, action, "тупая пизда v_v");
+			react(Irc, From, action, hist, "тупая пизда v_v");
 	   Type =:= direct ->
-			react(Irc, From, privmsg, "Ня!");
+			react(Irc, From, chanmsg, hist, "Ня!");
 	   Type =:= {indirect, chan} ->
 			%% Induced `genmsg' is `customevent' which means that `msgevent' 
 			%% (as `genmsg', `appeal' or `maybe_appeal') occurs once per user message
@@ -61,6 +60,6 @@ appeal(Type, From, ?USER(Nick) = User, Msg, Irc) ->
 			not_handled
 	end.
 
-react(Irc, From, How, Msg) ->
+react(Irc, From, How, Save, Msg) ->
 	timer:sleep(?APPEAL_DELAY),
-	ok = irc_conn:How(Irc, From, Msg).
+	ok = irc_conn:How(Irc, From, Save, Msg).

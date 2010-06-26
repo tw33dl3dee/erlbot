@@ -43,15 +43,15 @@ handle_event(_Type, _Event, _Irc) ->
 
 jbofihe(Irc, Chan, Sentence) ->
 	{_, Lines} = util:system("head -n1 | jbofihe -x", [Sentence, $\n]),
-	ok = irc_conn:bulk_chanmsg(Irc, Chan, Lines).
+	ok = irc_conn:bulk_chanmsg(Irc, Chan, hist, Lines).
 
 cmafihe(Irc, Chan, Sentence) ->
 	{_, Lines} = util:system("head -n1 | cmafihe", [Sentence, $\n]),
-	ok = irc_conn:bulk_chanmsg(Irc, Chan, Lines).
+	ok = irc_conn:bulk_chanmsg(Irc, Chan, hist, Lines).
 
 jvocuhadju(Irc, Chan, Words) ->
 	{_, Lines} = util:execvp("jvocuhadju", Words),
-	ok = irc_conn:bulk_chanmsg(Irc, Chan, Lines).
+	ok = irc_conn:bulk_chanmsg(Irc, Chan, hist, Lines).
 
 dict(Irc, Chan, Server, Db, Word) ->
 	ok = bhv_common:pipe_script(Irc, Chan, "dict.rb", ["-h", Server, "-d", Db, Word]).

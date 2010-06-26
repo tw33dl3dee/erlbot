@@ -8,10 +8,10 @@
 
 %% public interface
 -export([start/3, start_link/3,start/2, start_link/2]).
--export([chanmsg/3, privmsg/3, join/2, part/2, quit/2, action/3, mode/4, umode/2, kick/4, topic/3, nick/2, command/2]).
+-export([chanmsg/4, privmsg/4, join/2, part/2, quit/2, action/4, mode/4, umode/2, kick/4, topic/3, nick/2, command/2]).
 -export([get_channels_info/1, get_channels/1, get_channel_info/2]).
 -export([each_channel/2, each_channel/3, is_user_present/3]).
--export([bulk_chanmsg/3, bulk_action/3, bulk_privmsg/3]).
+-export([bulk_chanmsg/4, bulk_action/4, bulk_privmsg/4]).
 
 -record(conf, {nick       = [] :: list(),     %% initial nick requested
 			   login      = [] :: list(),     %% login field in USER and OPER commands (defaults to nick)
@@ -67,23 +67,31 @@ async_send_command(FsmRef, Cmd) when is_pid(FsmRef); is_atom(FsmRef) ->
 %% IRC itself doesn't distinguish them so irc_proto collides them back
 %% This discrimination is needed for correct selfevent handling
 
-command(Irc, Command)            -> async_send_command(Irc, {irc_command, Command}).
-chanmsg(Irc, Channel, Msg)       -> async_send_command(Irc, {irc_command, {msgtype(chanmsg, Channel), Channel, Msg}}).
-privmsg(Irc, Nick, Msg)          -> async_send_command(Irc, {irc_command, {msgtype(privmsg, Nick), Nick, Msg}}).
-action(Irc, Channel, Action)     -> async_send_command(Irc, {irc_command, {msgtype(action, Channel), Channel, Action}}).
-join(Irc, Channel)               -> async_send_command(Irc, {irc_command, {join, Channel}}).
-part(Irc, Channel)               -> async_send_command(Irc, {irc_command, {part, Channel}}).
-quit(Irc, QuitMsg)               -> async_send_command(Irc, {irc_command, {quit, QuitMsg}}).
-mode(Irc, Channel, User, Mode)   -> async_send_command(Irc, {irc_command, {mode, Channel, User, Mode}}).
-umode(Irc, Mode)                 -> async_send_command(Irc, {irc_command, {umode, Mode}}).
-nick(Irc, Nick)                  -> async_send_command(Irc, {irc_command, {nick, Nick}}).
-kick(Irc, Channel, Nick, Reason) -> async_send_command(Irc, {irc_command, {kick, Channel, Nick, Reason}}).
-topic(Irc, Channel, Topic)       -> async_send_command(Irc, {irc_command, {topic, Channel, Topic}}).
+%% All message commands (privmsg/chanmsg/action) have Save modifier:
+%% - `hist' -- save to history
+%% - `nohist' -- do not save
+%% This modifier is stripped before passing to `irc_proto' but present in selfevents
+
+command(Irc, Command)              -> async_send_command(Irc, {irc_command, Command}).
+privmsg(Irc, Nick, Save, Msg)      -> async_send_command(Irc, {irc_command, {msgtype(privmsg, Nick), Nick, Save, Msg}}).
+chanmsg(Irc, Channel, Save, Msg)   -> async_send_command(Irc, {irc_command, {msgtype(chanmsg, Channel), Channel, Save, Msg}}).
+action(Irc, Channel, Save, Action) -> async_send_command(Irc, {irc_command, {msgtype(action, Channel), Channel, Save, Action}}).
+join(Irc, Channel)                 -> async_send_command(Irc, {irc_command, {join, Channel}}).
+part(Irc, Channel)                 -> async_send_command(Irc, {irc_command, {part, Channel}}).
+quit(Irc, QuitMsg)                 -> async_send_command(Irc, {irc_command, {quit, QuitMsg}}).
+mode(Irc, Channel, User, Mode)     -> async_send_command(Irc, {irc_command, {mode, Channel, User, Mode}}).
+umode(Irc, Mode)                   -> async_send_command(Irc, {irc_command, {umode, Mode}}).
+nick(Irc, Nick)                    -> async_send_command(Irc, {irc_command, {nick, Nick}}).
+kick(Irc, Channel, Nick, Reason)   -> async_send_command(Irc, {irc_command, {kick, Channel, Nick, Reason}}).
+topic(Irc, Channel, Topic)         -> async_send_command(Irc, {irc_command, {topic, Channel, Topic}}).
 
 %% Send big bulk of private/channel messages asynchronously
-bulk_chanmsg(Irc, Channel, Lines) -> async_send_command(Irc, {bulk_irc_command, msgtype(chanmsg, Channel), Channel, Lines}).
-bulk_action(Irc, Channel, Lines)  -> async_send_command(Irc, {bulk_irc_command, msgtype(action, Channel), Channel, Lines}).
-bulk_privmsg(Irc, Nick, Lines)    -> async_send_command(Irc, {bulk_irc_command, msgtype(privmsg, Nick), Nick, Lines}).
+bulk_chanmsg(Irc, Channel, Save, Lines) -> 
+	async_send_command(Irc, {bulk_irc_command, msgtype(chanmsg, Channel), Channel, Save, Lines}).
+bulk_action(Irc, Channel, Save, Lines)  -> 
+	async_send_command(Irc, {bulk_irc_command, msgtype(action, Channel), Channel, Save, Lines}).
+bulk_privmsg(Irc, Nick, Save, Lines)    -> 
+	async_send_command(Irc, {bulk_irc_command, msgtype(privmsg, Nick), Nick, Save, Lines}).
 
 %% Determine real message type (action/chan/priv) based on target (nick/channel)
 msgtype(action, Chan)  when ?IS_CHAN(Chan) -> action;
@@ -229,17 +237,17 @@ state_auth_end({endofmotd, _, _}, Conn) ->
 state_auth_end(_, Conn) ->
 	{next_state, state_auth_end, Conn}.
 
-state_connected({bulk_irc_command, privmsg, Nick, Lines}, Conn) ->
+state_connected({bulk_irc_command, privmsg, Nick, Save, Lines}, Conn) ->
 	{SenderPid, NewConn} = bulk_priv_sender(Nick, Conn),
-	Fun = fun (Line) -> do_irc_command({privmsg, Nick, Line}, NewConn),
+	Fun = fun (Line) -> do_irc_command({privmsg, Nick, Save, Line}, NewConn),
 						msg_throttle(NewConn)
 		  end,
 	SenderPid ! {bulk_irc_command, Fun, Lines},
 	{next_state, state_connected, NewConn};	
-state_connected({bulk_irc_command, Cmd, Channel, Lines}, Conn) ->
+state_connected({bulk_irc_command, Cmd, Channel, Save, Lines}, Conn) ->
 	case dict:find(Channel, Conn#conn.chan_fsms) of
 		{ok, FsmRef} ->
-			Fun = fun (Line) -> do_irc_command({Cmd, Channel, Line}, Conn),
+			Fun = fun (Line) -> do_irc_command({Cmd, Channel, Save, Line}, Conn),
 								msg_throttle(Conn)
 				  end,
 			irc_chan:chan_event(FsmRef, {bulk_irc_command, Fun, Lines});
@@ -392,8 +400,15 @@ notify(Event, Type, #conn{handler = H,     nick = Nick, login = Login, is_oper =
 	H(Type, Event, #irc{conn_ref = self(), nick = Nick, login = Login, is_oper = IsOper}),
 	Conn.
 
+%% Perform IRC command (low-level)
+%% `umode' needs additional nick (own)
 do_irc_command({umode, Mode}, #conn{nick = Nick} = Conn) ->
 	do_irc_command({umode, Nick, Mode}, Conn);
+%% Strip `hist', `nohist' modifier from message commands
+do_irc_command({MsgType, Target, _, Msg} =  Cmd, #conn{irc_ref = IrcRef} = Conn) 
+  when MsgType =:= chanmsg; MsgType =:= privmsg; MsgType =:= action ->
+	irc_proto:send_irc_command(IrcRef, {MsgType, Target, Msg}),
+	notify_selfevent(Cmd, Conn);
 do_irc_command(Cmd, #conn{irc_ref = IrcRef} = Conn) ->
 	irc_proto:send_irc_command(IrcRef, Cmd),
 	notify_selfevent(Cmd, Conn).

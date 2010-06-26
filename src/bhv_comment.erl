@@ -31,17 +31,17 @@ handle_event(_Type, _Event, _Irc) ->
 %% Some of these are unused
 
 comment(topic, Chan, Nick, Irc) ->
-	ok = irc_conn:chanmsg(Irc, Chan, choice:make([["Говенный топег, ", Nick, "."], 
-												  "Гг :)", 
-												  {8, ["Мощно задвинул, ", Nick, "."]}]));
+	ok = irc_conn:chanmsg(Irc, Chan, nohist, choice:make([["Говенный топег, ", Nick, "."], 
+														  "Гг :)", 
+														  {8, ["Мощно задвинул, ", Nick, "."]}]));
 comment(join, Chan, Nick, Irc) ->
-	ok = irc_conn:command(Irc, choice:make([{2, {chanmsg, Chan, ["Превед, ", Nick, "."]}}, 
-											{chanmsg, Chan, [">> ВНИМАНИЕ: К нам приходит пользователь СИСЬКИ^W", Nick, 
-															 ". Поприветствуем!"]},	
-											{action, Chan, ["приветствует ", Nick, "."]}]));
+	ok = irc_conn:command(Irc, choice:make([{2, {chanmsg, Chan, nohist, ["Превед, ", Nick, "."]}}, 
+											{chanmsg, Chan, nohist, [">> ВНИМАНИЕ: К нам приходит пользователь СИСЬКИ^W", Nick, 
+																	 ". Поприветствуем!"]},	
+											{action, Chan, nohist, ["приветствует ", Nick, "."]}]));
 comment(exit, Chan, Nick, Irc) ->
-	ok = irc_conn:chanmsg(Irc, Chan, choice:make([["Нам будет нехватать тебя, ", Nick, "."], 
-												  "Гг, наконец-то он ушел."]));
+	ok = irc_conn:chanmsg(Irc, Chan, nohist, choice:make([["Нам будет нехватать тебя, ", Nick, "."], 
+														  "Гг, наконец-то он ушел."]));
 comment(message, Chan, Nick, Irc) ->
     case choice:make([{1, do}, {?COMMENT_REV_PROB - 1, dont}]) of
         do ->
@@ -60,8 +60,8 @@ comment(message, Chan, Nick, Irc) ->
 -define(SUICIDE_DISABLE_TIMEOUT, 120000).
 
 comment(pos, Chan, Nick, Msg, Irc) ->
-	irc_conn:chanmsg(Irc, Chan, Msg),
+	irc_conn:chanmsg(Irc, Chan, hist, Msg),
 	{new_event, customevent, {suicide_enable, Nick}, undefined};
 comment(neg, Chan, Nick, Msg, Irc) ->
-	irc_conn:chanmsg(Irc, Chan, Msg),
+	irc_conn:chanmsg(Irc, Chan, hist, Msg),
 	{new_event, customevent, {suicide_disable, Nick, ?SUICIDE_DISABLE_TIMEOUT}, undefined}.

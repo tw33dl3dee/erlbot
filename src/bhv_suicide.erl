@@ -87,7 +87,7 @@ suicide(#irc{data = Data} = Irc, Chan, Kicker, Secs) ->
 			bhv_common:fuckoff(Irc, Chan, Kicker),
 			ok;
 		{ok, KickPoints} when KickPoints > ?MAX_KICK_POINTS ->
-			irc_conn:chanmsg(Irc, Chan, disabled_reason(Kicker)),
+			irc_conn:chanmsg(Irc, Chan, hist, disabled_reason(Kicker)),
 			disable(?SUICIDE_DISABLE_TIMEOUT, Kicker, Data);
 		{ok, KickPoints} ->
 			commit(Irc, Chan, Kicker, Secs, dict:store(Kicker, KickPoints + ?POINTS_PER_KICK, Data));
@@ -124,6 +124,6 @@ suicide_reason(Kicker) ->
 				 {1, "И ты, Брут :("}]).
 
 taunt(Irc, Chan, _Kicker) ->
-	irc_conn:command(Irc, choice:make([{2, {action, Chan, "воскрес, аки феникс из пепла"}},
-									   {2, {action, Chan, "суицидален"}},
-									   {1, {chanmsg, Chan, "Не ждали??? А я тут, суки!!!"}}])).
+	irc_conn:command(Irc, choice:make([{2, {action, Chan, nohist, "воскрес, аки феникс из пепла"}},
+									   {2, {action, Chan, nohist, "суицидален"}},
+									   {1, {chanmsg, Chan, nohist, "Не ждали??? А я тут, суки!!!"}}])).
