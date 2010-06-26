@@ -1,12 +1,12 @@
 -module(irc_proto).
 -author("Ivan Korotkov <twee@tweedle-dee.org>").
 
-%% gen_server
+%%% gen_server
 -behaviour(gen_server).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
-%% public interface
--export([start_link/3, start/3, start_link/2, start/2, irc_command/2]).
+%%% public interface
+-export([start_link/3, start/3, start_link/2, start/2, send_irc_command/2]).
 
 %% @type irc_event() = {Type, Originator} | {Type, Originator, Arg1} | {Type, Originator, Arg1, Arg2} | etc
 %%              Type = atom()
@@ -34,7 +34,7 @@
 
 -compile([bin_opt_info]).
 
-%% public interface
+%%% public interface
 
 start_link(Host, Options) ->
 	gen_server:start_link(?MODULE, {self(), Host, Options}, []).
@@ -46,10 +46,11 @@ start(Host, Options) ->
 start(ServerName, Host, Options) ->
 	gen_server:start(ServerName, ?MODULE, {self(), Host, Options}, []).
 
-irc_command(IrcRef, Cmd) ->
+%% Send IRC command (low-level)
+send_irc_command(IrcRef, Cmd) ->
 	gen_server:cast(IrcRef, Cmd).
 
-%% gen_server callbacks
+%%% gen_server callbacks
 
 %% real connect is deferred to handle_info
 init({Owner, Host, Options}) ->
@@ -129,49 +130,43 @@ terminate(Reason, #state{sock = Sock}) ->
 code_change(_Vsn, State, _Extra) ->
 	{ok, State}.
 
-%% IRC protocol commands
+%%% IRC protocol commands
 
-do_command({chanmsg, Channel, Msg}, State) ->
-	do_command({privmsg, Channel, Msg}, State);
-do_command({privmsg, To, Msg}, State) ->
-	send(State, "PRIVMSG " ++ To ++ " :", Msg);
-do_command({join, Channel}, State) ->
-	send(State, "JOIN :" ++ Channel);
-do_command({part, Channel}, State) ->
-	send(State, "PART " ++ Channel);
-do_command({quit, QuitMsg}, State) ->
-	send(State, "QUIT :" ++ QuitMsg);
-do_command({action, Channel, Action}, State) ->
-	send(State, "PRIVMSG " ++ Channel ++ " :" ++ [1] ++ "ACTION ", Action, [1]);
-do_command({mode, Channel, User, Mode}, State) ->
-	send(State, "MODE " ++ Channel ++ " " ++ Mode ++ " " ++ User);
-do_command({umode, User, Mode}, State) ->
-	send(State, "MODE " ++ User ++ " " ++ Mode);
-do_command({user, Login, LongName}, State) ->
-	send(State, "USER " ++ Login ++ " 8 * :" ++ LongName);
-do_command({nick, Nick}, State) ->
-	send(State, "NICK " ++ Nick);
-do_command({oper, Login, Passwd}, State) ->
-	send(State, "OPER " ++ Login ++ " " ++ Passwd);
-do_command({kick, Channel, Nick, Reason}, State) ->
-	send(State, "KICK " ++ Channel ++ " " ++ Nick ++ " :" ++ Reason);
-do_command({topic, Channel, Topic}, State) ->
-	send(State, "TOPIC " ++ Channel ++ " :" ++ Topic);
-do_command({pong, Server}, State) ->
-	send(State, "PONG :" ++ Server).
+%% Here, chanmsg and privmsg collide back again
+do_command({chanmsg, Channel, Msg}, State)       -> do_command({privmsg, Channel, Msg}, State);
+do_command({privmsg, To, Msg}, State)            -> send(State, "PRIVMSG " ++ To ++ " :", Msg);
+do_command({join, Channel}, State)               -> send(State, "JOIN :" ++ Channel);
+do_command({part, Channel}, State)               -> send(State, "PART " ++ Channel);
+do_command({quit, QuitMsg}, State)               -> send(State, "QUIT :" ++ QuitMsg);
+do_command({action, Channel, Action}, State)     -> send(State, "PRIVMSG " ++ Channel ++ " :" ++ [1] ++ "ACTION ", Action, [1]);
+do_command({mode, Channel, User, Mode}, State)   -> send(State, "MODE " ++ Channel ++ " " ++ Mode ++ " " ++ User);
+do_command({umode, User, Mode}, State)           -> send(State, "MODE " ++ User ++ " " ++ Mode);
+do_command({user, Login, LongName}, State)       -> send(State, "USER " ++ Login ++ " 8 * :" ++ LongName);
+do_command({nick, Nick}, State)                  -> send(State, "NICK " ++ Nick);
+do_command({oper, Login, Passwd}, State)         -> send(State, "OPER " ++ Login ++ " " ++ Passwd);
+do_command({kick, Channel, Nick, Reason}, State) -> send(State, "KICK " ++ Channel ++ " " ++ Nick ++ " :" ++ Reason);
+do_command({topic, Channel, Topic}, State)       -> send(State, "TOPIC " ++ Channel ++ " :" ++ Topic);
+do_command({pong, Server}, State)                -> send(State, "PONG :" ++ Server).
 
-send(State, Prefix) ->
-	send(State, Prefix, [], []).
+%% Send raw command
+%% Raw command consists of:
+%% - prefix
+%% - text line (may be broken into several lines)
+%% - suffix
+%% In case total line is too long, it gets broken into several lines with same prefix/suffix
+send(State, Prefix) -> send(State, Prefix, [], []).
 
-send(State, Prefix, Line) ->
-	send(State, Prefix, Line, []).
+send(State, Prefix, Line) -> send(State, Prefix, Line, []).
 
-send(State, Prefix, Line, Suffix) ->
+send(State, Prefix, Line, Suffix) -> 
 	send_bytes(State, utf8:encode(Prefix), utf8:encode(Line), utf8:encode(Suffix)).
 
 -define(PACKET_SIZE(Prefix, Data, Suffix), 
 		(size(Prefix) + size(Data) + size(Suffix) + size(<<?CRLF>>))).
 
+%% Splits raw lines in chunks of no more than `maxsend' bytes
+%% BUG: maxsend is actually greater (512) but then own identname (nick!ident@host) must be taken into account
+%% We don't handle this for now (bug #46)
 send_bytes(State, Prefix, Bytes, Suffix) when ?PACKET_SIZE(Prefix, Bytes, Suffix) =< State#state.maxsend ->
 	true = sanity_check(Bytes),
 	ok = gen_tcp:send(State#state.sock, <<Prefix/binary, Bytes/binary, Suffix/binary, ?CRLF>>),
@@ -193,13 +188,14 @@ sanity_check(<<C/utf8, Rest/binary>>) ->
 sanity_check(<<>>) ->
 	true.
 
-%% IRC protocol parser
+%%% IRC protocol parser
 
 chop(Line) ->
 	string:left(Line, string:len(Line) - 2).
 
+%% Parses raw IRC line, returns {Event, NewState}
 parse_line(Line, State) ->
-	%% @warn Doesn't parse ISUPPORT correctly
+	%% BUG Doesn't parse ISUPPORT correctly
 	case re:run(Line, "^:?([^:]+):(.*)" ++ ?CRLF, [unicode, {capture, all_but_first, list}]) of
 		nomatch ->
 			Header = string:strip(chop(Line), left, $:),
@@ -210,13 +206,12 @@ parse_line(Line, State) ->
 			parse_special(Headers ++ [Text], State)
 	end.
 
-parse_special(["ERROR", Error], State) ->
-	event({error, undefined, Error}, State);
-parse_special(["PING", Server], State) ->
-	event({ping, undefined, Server}, State);
-parse_special(Tokens, State) ->
-	parse_user(Tokens, State).
+%% Detect special cases (ping, error)
+parse_special(["ERROR", Error], State) -> {{error, undefined, Error}, State};
+parse_special(["PING", Server], State) -> {{ping, undefined, Server}, State};
+parse_special(Tokens, State)           -> parse_user(Tokens, State).
 
+%% Parse identline (nick!ident@host)
 parse_user([MaybeLogin | Rest], State) ->
 	case re:run(MaybeLogin, "(.*)!(.*)@(.*)", [unicode, {capture, all_but_first, list}]) of
 		{match, [Nick, Ident, Host]} ->
@@ -226,62 +221,67 @@ parse_user([MaybeLogin | Rest], State) ->
 			parse_code([MaybeLogin | Rest], State)
 	end.
 
+%% Parse error code, if present
 parse_code([Target, [D1, D2, D3] | Rest], State) when ?IS_DIGIT(D1), ?IS_DIGIT(D2), ?IS_DIGIT(D3) ->
 	parse_tokens([Target, irc_codes:code_to_atom([D1, D2, D3]) | Rest], State);
 parse_code(Tokens, State) ->
 	parse_tokens(Tokens, State).
 
+%% Final parsing
 parse_tokens([User, "PRIVMSG", Target, Msg], State) ->
 	parse_privmsg(Target, User, Msg, State);
 parse_tokens([User, "TOPIC", Channel, Topic], State) ->
-	event({topic, Channel, User, Topic}, State);
+	{{topic, Channel, User, Topic}, State};
 parse_tokens([User, "NICK", NewNick], State) ->
-	event({nick, NewNick, User}, State);
+	{{nick, NewNick, User}, State};
 parse_tokens([User, "JOIN", Channel], State) ->
-	event({join, Channel, User}, State);
+	{{join, Channel, User}, State};
 parse_tokens([User, "PART", Channel, Reason], State) ->
-	event({part, Channel, User, Reason}, State);
+	{{part, Channel, User, Reason}, State};
 parse_tokens([User, "PART", Channel], State) ->
-	event({part, Channel, User, []}, State);
+	{{part, Channel, User, []}, State};
 parse_tokens([User, "QUIT", Reason], State) ->
-	event({quit, User, Reason}, State);
+	{{quit, User, Reason}, State};
 parse_tokens([User, "KICK", Channel, Nick, Reason], State) ->
-	event({kick, Channel, User, Nick, Reason}, State);
+	{{kick, Channel, User, Nick, Reason}, State};
 parse_tokens([Nick, "MODE", Nick, Mode], State) ->
-	event({umode, Nick, Mode}, State);
+	{{umode, Nick, Mode}, State};
 parse_tokens([User, "MODE", Channel, Mode, Nick], State) ->
-	event({mode, Channel, User, Mode, Nick}, State);
+	{{mode, Channel, User, Mode, Nick}, State};
 parse_tokens([_Server, "NOTICE", _Target, Notice], State) ->
-	event({notice, undefined, Notice}, State);
+	{{notice, undefined, Notice}, State};
 parse_tokens([_Server, topic, _Target, Channel, Topic], State) ->
-	event({chantopic, Channel, Topic}, State);
+	{{chantopic, Channel, Topic}, State};
 parse_tokens([_Server, topicinfo, _Target, Channel, Author, Ts], State) ->
-	event({chantopic, Channel, Author, list_to_integer(Ts)}, State);
+	{{chantopic, Channel, Author, list_to_integer(Ts)}, State};
 parse_tokens([_Server, namreply, _Target, _, Channel, Users], State) ->
-	event({names, Channel, parse_names(Users)}, State);
+	{{names, Channel, parse_names(Users)}, State};
 parse_tokens([_Server, myinfo, _Target, Server, Vsn, Umodes, Chanmodes | _], State) ->
-	event({myinfo, undefined, Server, Vsn, Umodes, Chanmodes}, State);
-parse_tokens([_Server, Reply, _Target, Channel, Text], State) 
+	{{myinfo, undefined, Server, Vsn, Umodes, Chanmodes}, State};
+parse_tokens([_Server, Reply, _Target, Channel, Text], State)
   when Reply =:= inviteonlychan; Reply =:= bannedfromchan; Reply =:= badchannelkey; Reply =:= badchanmask; 
 	   Reply =:= nosuchchannel; Reply =:= channelisfull; Reply =:= toomanychannels; Reply =:= killdeny;
 	   Reply =:= endofnames ->
-	event({Reply, Channel, Text}, State);
+	{{Reply, Channel, Text}, State};
 parse_tokens([_Server, Reply, _Target, Nick, Text], State) when is_atom(Reply) ->
-	event({Reply, Nick, Text}, State);
+	{{Reply, Nick, Text}, State};
 parse_tokens([_Server, Reply, _Target, Text], State) when is_atom(Reply) ->
-	event({Reply, undefined, Text}, State);
+	{{Reply, undefined, Text}, State};
 parse_tokens([_Server, Reply, _Target | Text], State) when is_atom(Reply) ->
-	event({Reply, undefined, Text}, State);
+	{{Reply, undefined, Text}, State};
 parse_tokens(Tokens, State) ->
-	event({unknown, undefined, Tokens}, State).
+	{{unknown, undefined, Tokens}, State}.
 
+%% Privmsg actually may be one of:
+%% - `action' (detected here)
+%% - `chanmsg'
+%% - `privmsg' (this is distinguished from `chanmsg' on higher level, where own nick is known)
 parse_privmsg(Channel, User, [1] ++ "ACTION " ++ Action, State) ->
-	event({action, Channel, User, string:strip(Action, right, 1)}, State);
+	{{action, Channel, User, string:strip(Action, right, 1)}, State};
 parse_privmsg(Target, User, Msg, State) ->
-	%% @notice Target may also be own nick (which means privmsg) or channel (chanmsg) but that's detected 
-	%%         on higher level since we don't know our nick here
-	event({privmsg, Target, User, Msg}, State).
+	{{privmsg, Target, User, Msg}, State}.
 
+%% Parse `namesreply' (user list on channel)
 parse_names(Names) ->
 	[parse_name(Token) || Token <- string:tokens(Names, " ")].
 
@@ -293,20 +293,3 @@ parse_name([$+ | Name]) ->
 	{user, Name, [voice]};
 parse_name(Name) ->
 	{user, Name, []}.
-
-event(Event, State) ->
-	{Event, State}.
-
-%% keyfind(Key, List, Default) ->
-%% 	case lists:keysearch(Key, 1, List) of
-%% 		false ->
-%% 			Default;
-%% 		{value, {Key, Value}} ->
-%% 			Value
-%% 	end.
-
-%% set_data(Key, Data, State) ->
-%% 	State#state{data = lists:keystore(Key, 1, State#state.data, {Key, Data})}.
-
-%% get_data(Key, State, Default) ->
-%% 	keyfind(Key, State#state.data, Default).

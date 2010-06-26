@@ -54,7 +54,7 @@ show_xlitted(Irc, Chan, Xlitted, Nicks) when length(Xlitted) =/= length(Nicks) -
 	ok = bhv_common:error(Irc, Chan, [io_lib:format("~p =/= ~p", [length(Xlitted), length(Nicks)])]);
 show_xlitted(Irc, Chan, Xlitted, Nicks) ->
 	Out = [["#XLIT: <", Nick, "> ", L] || {L, Nick} <- lists:zip(Xlitted, Nicks), length(L) > 0],
-	irc_conn:async_chanmsg(Irc, Chan, Out).
+	irc_conn:bulk_chanmsg(Irc, Chan, Out).
 
 -define(MIN_LATINS_RATIO, 0.5).  % Minimum ratio of latin letters that line must contain.
 

@@ -32,6 +32,6 @@ handle_event(cmdevent, {chancmd, Chan, _, ["moooon"]}, Irc) ->
 	Cmd = "emacs --batch -Q --eval '(progn (lunar-phases) (with-current-buffer  \"*Phases of Moon*\" (message (buffer-string))))' "
 		"2>&1 | grep -v ^Computing | tail -n +5 | head -n 8",
 	{success, Lines} = util:system(Cmd),
-	ok = irc_conn:async_chanmsg(Irc, Chan, Lines);
+	ok = irc_conn:bulk_chanmsg(Irc, Chan, Lines);
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.

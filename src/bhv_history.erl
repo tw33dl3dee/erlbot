@@ -96,8 +96,8 @@ handle_event(_Type, _Event, _Irc) ->
 	not_handled.
 
 give_help(Nick, Irc) ->
-	irc_conn:async_privmsg(Irc, Nick, ["Ебани тебя оса..."]),
-	ok = irc_conn:async_privmsg(Irc, Nick, verbose_help()).
+	irc_conn:bulk_privmsg(Irc, Nick, ["Ебани тебя оса..."]),
+	ok = irc_conn:bulk_privmsg(Irc, Nick, verbose_help()).
 
 save_histent(Chan, Ident, Event) ->
 	ok = mnesia:async_dirty(fun () ->
@@ -186,11 +186,11 @@ history(Nick, _, _, _, Irc) ->
 
 %% Trace by specified login count.
 trace_history(_Method, Nick, Chan, LoginCount, Irc) ->
-	ok = irc_conn:async_privmsg(Irc, Nick, util:multiline("History for ~s by ~p login(s)", [Chan, LoginCount])).
+	ok = irc_conn:bulk_privmsg(Irc, Nick, util:multiline("History for ~s by ~p login(s)", [Chan, LoginCount])).
 
 %% Trace by specified begin/end time.
 trace_history(Method, Nick, Chan, From, To, Irc) ->
-	ok = irc_conn:async_privmsg(Irc, Nick, util:multiline("History for ~s from ~p to ~p~n", [Chan, From, To])),
+	ok = irc_conn:bulk_privmsg(Irc, Nick, util:multiline("History for ~s from ~p to ~p~n", [Chan, From, To])),
 	Q = qlc:q([H#histent{timestamp = neg_timestamp(H#histent.timestamp)} ||
 				  H  <- mnesia:table(histent),
 				  Ch <- mnesia:table(chan),
@@ -205,7 +205,7 @@ trace_history(Method, Nick, Chan, From, To, Irc) ->
 fetch_history(list, Q, Nick, Irc) ->
 	R = lists:reverse(qlc:eval(Q)),
 	Lines = [histent_to_list(short, H) || H <- R],
-	ok = irc_conn:async_privmsg(Irc, Nick, Lines);
+	ok = irc_conn:bulk_privmsg(Irc, Nick, Lines);
 fetch_history(cursor, Q, Nick, Irc) ->
 	Qs = qlc:keysort(1, Q),
 	C = qlc:cursor(Qs),
@@ -274,7 +274,7 @@ dump_history(Cursor, Results, Nick, Irc) ->
 
 dump_histents(TimeFormat, Histents, Target, Irc) ->
 	Lines = [histent_to_list(TimeFormat, H) || H <- Histents],
-	irc_conn:async_privmsg(Irc, Target, Lines).
+	irc_conn:bulk_privmsg(Irc, Target, Lines).
 
 histent_to_list(TimeFormat, #histent{timestamp = TS, event = Event}) ->
 	[timestamp_to_list(TimeFormat, TS), " ", event_to_list(Event)].

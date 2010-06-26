@@ -11,7 +11,7 @@
 -export([chanmsg/3, privmsg/3, join/2, part/2, quit/2, action/3, mode/4, umode/2, kick/4, topic/3, nick/2, command/2]).
 -export([get_channels_info/1, get_channels/1, get_channel_info/2]).
 -export([each_channel/2, each_channel/3, is_user_present/3]).
--export([async_chanmsg/3, async_action/3, async_privmsg/3]).
+-export([bulk_chanmsg/3, bulk_action/3, bulk_privmsg/3]).
 
 -record(conf, {nick       = [] :: list(),     %% initial nick requested
 			   login      = [] :: list(),     %% login field in USER and OPER commands (defaults to nick)
@@ -35,7 +35,7 @@
 
 -include("irc.hrl").
 
-%% public interface
+%%% Starting
 
 start(Handler, {Host, Nick, Options}) ->
 	gen_fsm:start(?MODULE, {Host, Nick, Handler, Options}, []).
@@ -47,94 +47,70 @@ start_link(Handler, {Host, Nick, Options}) ->
 start_link(FsmName, Handler, {Host, Nick, Options}) ->
 	gen_fsm:start_link(FsmName, ?MODULE, {Host, Nick, Handler, Options}, []).
 
-%%% IRC commands
+%%% Internal
 %%% Irc may be #irc{} or FSM pid/name
 
-sync_command(#irc{conn_ref = FsmRef}, Cmd) ->
+sync_send_command(#irc{conn_ref = FsmRef}, Cmd) ->
 	gen_fsm:sync_send_event(FsmRef, Cmd, infinity);
-sync_command(FsmRef, Cmd) when is_pid(FsmRef); is_atom(FsmRef) ->
+sync_send_command(FsmRef, Cmd) when is_pid(FsmRef); is_atom(FsmRef) ->
 	gen_fsm:sync_send_event(FsmRef, Cmd, infinity).
 
-async_command(#irc{conn_ref = FsmRef}, Cmd) ->
+async_send_command(#irc{conn_ref = FsmRef}, Cmd) ->
 	gen_fsm:send_event(FsmRef, Cmd);
-async_command(FsmRef, Cmd) when is_pid(FsmRef); is_atom(FsmRef) ->
+async_send_command(FsmRef, Cmd) when is_pid(FsmRef); is_atom(FsmRef) ->
 	gen_fsm:send_event(FsmRef, Cmd).
 
-command(Irc, Cmd) ->
-	async_command(Irc, {irc_command, Cmd}).
+%%% IRC commands
 
-chanmsg(Irc, Channel, Msg) ->
-	command(Irc, {chanmsg, Channel, Msg}).
+%% chanmsg and privmsg are actually aliases -- real message type is determined by target (nick/channel)
+%% IRC itself doesn't distinguish them so irc_proto collides them back
+%% This discrimination is needed for correct selfevent handling
 
-privmsg(Irc, To, Msg) ->
-	command(Irc, {privmsg, To, Msg}).
+command(Irc, Command)            -> async_send_command(Irc, {irc_command, Command}).
+chanmsg(Irc, Channel, Msg)       -> async_send_command(Irc, {irc_command, {msgtype(chanmsg, Channel), Channel, Msg}}).
+privmsg(Irc, Nick, Msg)          -> async_send_command(Irc, {irc_command, {msgtype(privmsg, Nick), Nick, Msg}}).
+action(Irc, Channel, Action)     -> async_send_command(Irc, {irc_command, {msgtype(action, Channel), Channel, Action}}).
+join(Irc, Channel)               -> async_send_command(Irc, {irc_command, {join, Channel}}).
+part(Irc, Channel)               -> async_send_command(Irc, {irc_command, {part, Channel}}).
+quit(Irc, QuitMsg)               -> async_send_command(Irc, {irc_command, {quit, QuitMsg}}).
+mode(Irc, Channel, User, Mode)   -> async_send_command(Irc, {irc_command, {mode, Channel, User, Mode}}).
+umode(Irc, Mode)                 -> async_send_command(Irc, {irc_command, {umode, Mode}}).
+nick(Irc, Nick)                  -> async_send_command(Irc, {irc_command, {nick, Nick}}).
+kick(Irc, Channel, Nick, Reason) -> async_send_command(Irc, {irc_command, {kick, Channel, Nick, Reason}}).
+topic(Irc, Channel, Topic)       -> async_send_command(Irc, {irc_command, {topic, Channel, Topic}}).
 
-action(Irc, Channel, Action) ->
-	command(Irc, {action, Channel, Action}).
+%% Send big bulk of private/channel messages asynchronously
+bulk_chanmsg(Irc, Channel, Lines) -> async_send_command(Irc, {bulk_irc_command, msgtype(chanmsg, Channel), Channel, Lines}).
+bulk_action(Irc, Channel, Lines)  -> async_send_command(Irc, {bulk_irc_command, msgtype(action, Channel), Channel, Lines}).
+bulk_privmsg(Irc, Nick, Lines)    -> async_send_command(Irc, {bulk_irc_command, msgtype(privmsg, Nick), Nick, Lines}).
 
-join(Irc, Channel) ->
-	command(Irc, {join, Channel}).
+%% Determine real message type (action/chan/priv) based on target (nick/channel)
+msgtype(action, Chan)  when ?IS_CHAN(Chan) -> action;
+msgtype(_, Chan)       when ?IS_CHAN(Chan) -> chanmsg;
+msgtype(_, _)                              -> privmsg.
 
-part(Irc, Channel) ->
-	command(Irc, {part, Channel}).
+%%% IRC queries
 
-quit(Irc, QuitMsg) ->
-	command(Irc, {quit, QuitMsg}).
-
-mode(Irc, Channel, User, Mode) ->
-	command(Irc, {mode, Channel, User, Mode}).
-
-umode(Irc, Mode) ->
-	command(Irc, {umode, Mode}).
-
-nick(Irc, Nick) ->
-	command(Irc, {nick, Nick}).
-
-kick(Irc, Channel, Nick, Reason) ->
-	command(Irc, {kick, Channel, Nick, Reason}).
-
-topic(Irc, Channel, Topic) ->
-	command(Irc, {topic, Channel, Topic}).
-
-get_channels(Irc) ->
-	sync_command(Irc, get_channels).
-
-get_channels_info(Irc) ->
-	sync_command(Irc, get_channels_info).
-
-get_channel_info(Irc, Chan) ->
-	sync_command(Irc, {get_channel_info, Chan}).	
-
-%% Call Fun for each channel we're online
-each_channel(Irc, Fun) ->
-	[Fun(Chan) || Chan <- get_channels(Irc)].
-
-%% Call Fun for each channel where specified nick is online
-each_channel(Irc, Fun, Nick) ->
-	[Fun(Chan) || {Chan, _, Users} <- get_channels_info(Irc), is_user_present(Nick, Users)].
+get_channels(Irc)           -> sync_send_command(Irc, get_channels).
+get_channels_info(Irc)      -> sync_send_command(Irc, get_channels_info).
+get_channel_info(Irc, Chan) -> sync_send_command(Irc, {get_channel_info, Chan}).	
 
 is_user_present(Irc, Nick, Chan) ->
 	{_, _, Users} = get_channel_info(Irc, Chan),
 	is_user_present(Nick, Users).
 
-is_user_present(Nick, [{_, Nick, _} | _]) ->
-	true;
-is_user_present(Nick, [_ | Rest]) ->
-	is_user_present(Nick, Rest);
-is_user_present(_, []) ->
-	false.
+is_user_present(Nick, [{_, Nick, _} | _]) -> true;
+is_user_present(Nick, [_ | Rest])         -> is_user_present(Nick, Rest);
+is_user_present(_, [])                    -> false.
 
-%% Send big bulk of private/channel messages asynchronously
-async_chanmsg(Irc, Channel, Lines) ->
-	async_command(Irc, {async_irc_command, chanmsg, Channel, Lines}).
+%% Call Fun for each channel we're online
+each_channel(Irc, Fun) -> [Fun(Chan) || Chan <- get_channels(Irc)].
 
-async_action(Irc, Channel, Lines) ->
-	async_command(Irc, {async_irc_command, action, Channel, Lines}).
+%% Call Fun for each channel where specified nick is online
+each_channel(Irc, Fun, Nick) ->
+	[Fun(Chan) || {Chan, _, Users} <- get_channels_info(Irc), is_user_present(Nick, Users)].
 
-async_privmsg(Irc, To, Lines) ->
-	async_command(Irc, {async_irc_command, privmsg, To, Lines}).
-
-%% gen_fsm callbacks
+%%% gen_fsm callbacks
 
 init({Host, Nick, Handler, Options}) ->
 	process_flag(trap_exit, true),
@@ -208,15 +184,17 @@ send_event(Event) when ?IS_ALLSTATE_EVENT(Event) ->
 send_event(Event) ->
 	gen_fsm:send_event(self(), Event).
 
-%% Conns
+%%% Generic event handlers
 
 handle_event({ping, _, Server}, StateName, StateData) ->
 	{next_state, StateName, pong(Server, StateData)};
 handle_event(Event, StateName, StateData) ->
-	{next_state, StateName, notify_raw_event(Event, StateData)}.
+	{next_state, StateName, process_event_raw(Event, StateData)}.
 
 handle_sync_event(_Event, _From, StateName, StateData) ->
 	{reply, ok, StateName, StateData}.
+
+%%% Per-state event handlers
 
 state_connecting({notice, _, _}, #conn{conf = Conf} = Conn) ->
 	{next_state, state_auth_nick, auth_login(apply_umode(Conf#conf.impl_umode, Conn))};
@@ -249,30 +227,29 @@ state_auth_end({endofmotd, _, _}, Conn) ->
 state_auth_end(_, Conn) ->
 	{next_state, state_auth_end, Conn}.
 
-state_connected({async_irc_command, privmsg, To, Lines}, Conn) ->
+state_connected({bulk_irc_command, privmsg, Nick, Lines}, Conn) ->
 	spawn_link(fun () ->
-					   [begin irc_command({privmsg, To, Line}, Conn), 
-							  msg_throttle(Conn)
-						end || Line <- Lines],
-					   ok
+					   Fun = fun (Line) -> do_irc_command({privmsg, Nick, Line}, Conn),
+										   msg_throttle(Conn)
+							 end,
+					   [Fun(Line) || Line <- Lines]
 			   end),
 	{next_state, state_connected, Conn};	
-state_connected({async_irc_command, Cmd, Channel, Lines}, Conn) ->
+state_connected({bulk_irc_command, Cmd, Channel, Lines}, Conn) ->
 	case dict:find(Channel, Conn#conn.chan_fsms) of
 		{ok, FsmRef} ->
-			Fun = fun (Line) -> irc_command({Cmd, Channel, Line}, Conn),
+			Fun = fun (Line) -> do_irc_command({Cmd, Channel, Line}, Conn),
 								msg_throttle(Conn)
 				  end,
-			irc_chan:chan_event(FsmRef, {irc_command, Fun, Lines});
+			irc_chan:chan_event(FsmRef, {bulk_irc_command, Fun, Lines});
 		_ ->	
 			false
 	end,
 	{next_state, state_connected, Conn};
 state_connected({irc_command, Cmd}, Conn) ->
-	irc_command(Cmd, Conn),
-	{next_state, state_connected, notify_selfevent(Cmd, Conn)};
+	{next_state, state_connected, do_irc_command(Cmd, Conn)};
 state_connected(Event, Conn) ->
-	{next_state, state_connected, notify_raw_event(Event, Conn)}.
+	{next_state, state_connected, process_event_raw(Event, Conn)}.
 
 state_connected(get_channels, _From, Conn) ->
 	{reply, dict:fetch_keys(Conn#conn.chan_fsms), state_connected, Conn};
@@ -288,6 +265,11 @@ state_connected({get_channel_info, Chan}, _From, Conn) ->
 			{reply, Error, state_connected, Conn}
 	end.
 
+%% Processes raw event (as it is received from IRC)
+process_event_raw(Event, Conn) ->
+	process_event(myevent(Event, Conn#conn.nick), Conn).
+
+%% Transforms events targeted to self (own nick change, etc) to "myevents"
 myevent({privmsg, Target, User, Msg}, Nick) when Target /= Nick ->
 	{chanmsg, Target, User, Msg};
 myevent({privmsg, Nick, User, Msg}, Nick) ->
@@ -310,9 +292,6 @@ myevent({topic, Channel, ?USER(Nick), Topic}, Nick) ->
 myevent(Event, _) ->
 	Event.
 
-notify_raw_event(Event, Conn) ->
-	notify_event(myevent(Event, Conn#conn.nick), Conn).
-
 %% events that are propagated to channel FSM (channel name must be 2nd element in event tuple)
 -define(IS_CHAN_EVENT(Event), 
 		element(1, Event) =:= joining; 
@@ -334,32 +313,27 @@ notify_raw_event(Event, Conn) ->
 		element(1, Event) =:= quit;
 		element(1, Event) =:= nick).
 
-%% TODO: handle mymode here?..
-notify_event({mynick, Nick}, Conn) ->
+%% Processes IRC event after "myevent" transform (may change state and/or propagate event)
+%% Events are divided into 3 type: 
+%% - channel events (sent to channel FSM, reply is propagated as event)
+%% - generic events (propagated directly)
+%% - all-channel events (sent to all channel FSMs, all replies are propagated)
+%% - selfevents (propagated by commands executed)
+process_event({mynick, Nick}, Conn) ->
 	Conn#conn{nick = Nick};
-notify_event({umode, _, Mode}, Conn) ->
+process_event({umode, _, Mode}, Conn) ->
 	apply_umode(Mode, Conn);
-notify_event(Event, Conn) when ?IS_CHAN_EVENT(Event) ->
+process_event(Event, Conn) when ?IS_CHAN_EVENT(Event) ->
 	notify_chanevent(Event, Conn);
-notify_event(Event, Conn) when ?IS_ALLCHAN_EVENT(Event) ->
+process_event(Event, Conn) when ?IS_ALLCHAN_EVENT(Event) ->
 	notify_allchanevent(Event, Conn);
-notify_event(Event, Conn) ->
+process_event(Event, Conn) ->
 	notify_genevent(Event, Conn).
 
 %% Sends event to all channel FSMs, gathers replies and resends them to handler
 notify_allchanevent(Event, Conn) ->
 	EvList = [irc_chan:chan_event(Pid, Event) || {_, Pid} <- dict:to_list(Conn#conn.chan_fsms)],
-	notify_anyevents(EvList, Conn).
-
-%% Events received from channel FSMs may be either `chanevent' or `genevent'
-%% `chanevent' must have channel name as it's 2nd element.
-%% It will NOT be propagated to channel FSM again (as it was received directly from it)
-notify_anyevents([Event | Rest], Conn) when ?IS_CHAN(element(2, Event)) ->
-	notify_anyevents(Rest, notify(Event, chanevent, Conn));
-notify_anyevents([Event | Rest], Conn) ->
-	notify_anyevents(Rest, notify_genevent(Event, Conn));
-notify_anyevents([], Conn) ->
-	Conn.
+	notify_chanreplies(EvList, Conn).
 
 %% `joining' is a special event that starts new channel FSM
 notify_chanevent({joining, Channel}, Conn) ->
@@ -370,8 +344,20 @@ notify_chanevent({joining, Channel}, Conn) ->
 notify_chanevent(Event, Conn) ->
 	Channel = element(2, Event),
 	Pid = dict:fetch(Channel, Conn#conn.chan_fsms),
-	notify(irc_chan:chan_event(Pid, Event), chanevent, Conn).
+	notify_chanreplies([irc_chan:chan_event(Pid, Event)], Conn).
+	%notify(irc_chan:chan_event(Pid, Event), chanevent, Conn).
 
+%% Events received from channel FSMs may be either `chanevent' or `genevent'
+%% `chanevent' must have channel name as it's 2nd element.
+%% It will NOT be propagated to channel FSM again (as it was received directly from it)
+notify_chanreplies([Event | Rest], Conn) when ?IS_CHAN(element(2, Event)) ->
+	notify_chanreplies(Rest, notify(Event, chanevent, Conn));
+notify_chanreplies([Event | Rest], Conn) ->
+	notify_chanreplies(Rest, notify_genevent(Event, Conn));
+notify_chanreplies([], Conn) ->
+	Conn.
+
+%% Generic events are sent directly to notifier function
 notify_genevent(Event, Conn) ->
 	notify(Event, genevent, Conn).
 
@@ -379,37 +365,35 @@ notify_genevent(Event, Conn) ->
 notify_selfevent(Event, Conn) ->
 	notify(Event, selfevent, Conn).
 
+%% Propagate event to notifier
 notify(noevent, _, Conn) ->
 	Conn;
 notify(Event, Type, #conn{handler = H,     nick = Nick, login = Login, is_oper = IsOper} = Conn) ->
 	H(Type, Event, #irc{conn_ref = self(), nick = Nick, login = Login, is_oper = IsOper}),
 	Conn.
 
-irc_command({umode, Mode}, #conn{irc_ref = IrcRef, nick = Nick}) ->
-	irc_proto:irc_command(IrcRef, {umode, Nick, Mode});
-irc_command(Cmd, #conn{irc_ref = IrcRef}) ->
-	irc_proto:irc_command(IrcRef, Cmd).
+do_irc_command({umode, Mode}, #conn{nick = Nick} = Conn) ->
+	do_irc_command({umode, Nick, Mode}, Conn);
+do_irc_command(Cmd, #conn{irc_ref = IrcRef} = Conn) ->
+	irc_proto:send_irc_command(IrcRef, Cmd),
+	notify_selfevent(Cmd, Conn).
 
 auth_login(#conn{nick = Nick, login = Login, conf = Conf} = Conn) ->
-	irc_command({nick, Nick}, Conn),
-	irc_command({user, Login, Conf#conf.long_name}, Conn),
-	Conn.
+	do_irc_command({nick, Nick}, Conn),
+	do_irc_command({user, Login, Conf#conf.long_name}, Conn).
 
 retry_nick(#conn{conf = Conf} = Conn) ->
-	irc_command({nick, Conf#conf.nick}, Conn),
-	Conn.
+	do_irc_command({nick, Conf#conf.nick}, Conn).
 
 auth_oper(Conn, OperPass) ->
-	irc_command({oper, Conn#conn.login, OperPass}, Conn),
-	Conn.
+	do_irc_command({oper, Conn#conn.login, OperPass}, Conn).
 
 set_umode(#conn{is_oper = false} = Conn) ->
 	Conn;  % must be oper
 set_umode(#conn{conf = #conf{umode = []}} = Conn) ->
 	Conn;
 set_umode(#conn{conf = Conf} = Conn) ->
-	irc_command({umode, Conf#conf.umode}, Conn),
-	Conn.
+	do_irc_command({umode, Conf#conf.umode}, Conn).
 
 next_nick(#conn{conf = Conf, nick_suffix = Suffix} = Conn) ->
 	Conn#conn{nick = Conf#conf.nick ++ "_" ++ integer_to_list(Suffix), nick_suffix = Suffix + 1}.
@@ -418,7 +402,7 @@ autojoin(#conn{conf = Conf} = Conn) ->
 	autojoin(Conn, Conf#conf.autojoin).
 
 autojoin(Conn, [Channel | Rest]) ->
-	irc_command({join, Channel}, Conn),
+	do_irc_command({join, Channel}, Conn),
 	autojoin(Conn, Rest);
 autojoin(Conn, []) ->
 	Conn.
@@ -432,8 +416,7 @@ msg_throttle(#conn{conf = #conf{msg_interval = T}, umode = M}) ->
 	end.
 
 pong(Server, Conn) ->
-	irc_command({pong, Server}, Conn),
-	Conn.
+	do_irc_command({pong, Server}, Conn).
 
 apply_umode([$- | Modes], Conn) ->
 	remove_umodes(Modes, Conn#conn.umode, Conn);

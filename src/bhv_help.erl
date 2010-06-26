@@ -30,15 +30,15 @@ help(about) ->
 
 handle_event(cmdevent, {chancmd, Chan, _, ["help" | Query]}, Irc) ->
 	show_help(Chan, Query, Irc);
-handle_event(cmdevent, {privcmd, ?USER(Nick), _, ["help" | Query]}, Irc) ->
+handle_event(cmdevent, {privcmd, ?USER(Nick), ["help" | Query]}, Irc) ->
 	show_help(Nick, Query, Irc);
 handle_event(customevent, {end_help, Target}, Irc) ->
-	ok = irc_conn:async_action(Irc, Target, ["няшка =^_^="]);
+	ok = irc_conn:bulk_action(Irc, Target, ["няшка =^_^="]);
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.
 
 show_help(Target, ["list"], Irc) ->	
-	irc_conn:async_action(Irc, Target, ["-- ахуенно полезный и функциональный бот.", "умеет:"]),
+	irc_conn:bulk_action(Irc, Target, ["-- ахуенно полезный и функциональный бот.", "умеет:"]),
 	ShowCmds = fun (?MODULE) -> not_handled;
 				   (BhvName) -> show_bhv_help(Irc, Target, BhvName) 
 			   end,
@@ -70,19 +70,19 @@ show_bhv_help(Irc, Target, BhvName) ->
 	case ChanCmds ++ PrivCmds of
 		[]      -> not_handled;
 		CmdList ->
-			ok = irc_conn:async_action(Irc, Target, [bhv_header(BhvName) | tabify(CmdList)])
+			ok = irc_conn:bulk_action(Irc, Target, [bhv_header(BhvName) | tabify(CmdList)])
 	end.
 
 %% Show brief behaviour info (`bhv_info')
 show_bhv_info(Irc, Target, BhvName) ->
-	ok = irc_conn:async_action(Irc, Target, bhv_info(BhvName)).
+	ok = irc_conn:bulk_action(Irc, Target, bhv_info(BhvName)).
 
 %% Find help for specific command
 show_cmd_info(Irc, Target, BhvName, CmdName, CmdType) ->
 	case BhvName:help(CmdType) of
 		none    -> not_handled;
 		CmdList ->
-			L = [irc_conn:async_action(Irc, Target, [[cmd_prefix(CmdType), Name, " : ", Help, 
+			L = [irc_conn:bulk_action(Irc, Target, [[cmd_prefix(CmdType), Name, " : ", Help, 
 													  " (", atom_to_list(BhvName), ")"]])
 				 || {Name, Help} <- CmdList, contains_cmd(Name, CmdName)],
 			case length(L) of 0 -> not_handled; _ -> ok end

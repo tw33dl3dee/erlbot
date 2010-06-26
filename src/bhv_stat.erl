@@ -47,9 +47,9 @@ handle_event(genevent, {What, _, ?USER2(_, Ident), Msg}, _Irc) when What =:= cha
 %handle_event(msgevent, {_, _, ?USER2(_, Ident), Msg}, _Irc) ->
 %	update_stat(Ident, 1, length(Msg));
 handle_event(cmdevent, {chancmd, Chan, ?USER2(_, Ident), ["stat" | _]}, Irc) ->
-	ok = irc_conn:async_chanmsg(Irc, Chan, get_stat(Ident));
+	ok = irc_conn:bulk_chanmsg(Irc, Chan, get_stat(Ident));
 handle_event(cmdevent, {privcmd, ?USER2(Nick, Ident), ["stat" | _]}, Irc) ->
-	ok = irc_conn:async_privmsg(Irc, Nick, get_stat(Ident));
+	ok = irc_conn:bulk_privmsg(Irc, Nick, get_stat(Ident));
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.
 

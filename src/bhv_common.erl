@@ -19,7 +19,7 @@
 pipe_script(Irc, Chan, Script, Args, Input) ->
 	case util:execv(Script, Args, ?SCRIPT_DIR, Input) of
 		{success, Lines} ->
-			ok = irc_conn:async_chanmsg(Irc, Chan, empty_check(Lines));
+			ok = irc_conn:bulk_chanmsg(Irc, Chan, empty_check(Lines));
 		{{failure, ErrCode}, Trace} ->
 			Tail = io_lib:format("Exited with ~p", [ErrCode]),
 			ok = error(Irc, Chan, Trace ++ [Tail])
@@ -39,7 +39,7 @@ empty_msg() ->
 				 "Почувствуйте себя неудачником!"]).
 
 error(Irc, Chan, Trace) -> 
-	ok = irc_conn:async_chanmsg(Irc, Chan, [error_msg() | Trace]).
+	ok = irc_conn:bulk_chanmsg(Irc, Chan, [error_msg() | Trace]).
 
 error_msg() -> 
 	choice:make(["Усе поломалось, насяльника :("]).
@@ -103,4 +103,4 @@ identify(Irc, Chan, long) ->
 identify(Irc, Chan, greet) ->
 	NumGreets = choice:uniform(?MIN_GREETS, ?MAX_GREETS),
 	Greets = [choice:make(?GREETINGS) || _I <- lists:seq(1, NumGreets)],
-	ok = irc_conn:async_action(Irc, Chan, Greets).
+	ok = irc_conn:bulk_action(Irc, Chan, Greets).
