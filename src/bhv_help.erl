@@ -28,8 +28,8 @@ help(privcmd) ->
 help(about) ->
 	"Справка по командам бота".
 
-handle_event(cmdevent, {chancmd, Chan, _, ["help" | Query]}, Irc) ->
-	show_help(Chan, Query, Irc);
+handle_event(cmdevent, {chancmd, Chan, ?USER(Nick), ["help" | Query]}, Irc) ->
+	show_help(Nick, Query, Irc);
 handle_event(cmdevent, {privcmd, ?USER(Nick), ["help" | Query]}, Irc) ->
 	show_help(Nick, Query, Irc);
 handle_event(customevent, {end_help, Target}, Irc) ->
