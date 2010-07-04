@@ -123,7 +123,6 @@ save_histent(Chan, Ident, Event) ->
 
 update_wstat(Chan, Ident, Msg) ->
 	Words = util:words(Msg, ?WSTAT_MIN_LEN),
-	io:format("WORDS ~p~n", [Words]),
 	mnesia:async_dirty(fun () ->
 							   Cid = chanid(Chan),
 							   Uid = userid(Ident),
