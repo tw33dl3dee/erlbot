@@ -8,6 +8,9 @@
 -export([read_file/1]).
 -export([add_days/2, add_seconds/2, valid_datetime/1, time_diff/2, date_diff/2]).
 -export([convert_time_abs/3, convert_time_rel/2, convert_time_rel_diff/2]).
+-export([lowercase/1, uppercase/1, words/2]).
+
+-include("utf8.hrl").
 
 multiline(Term) ->
 	string:tokens(lists:flatten(io_lib:print(Term)), io_lib:nl()).
@@ -17,11 +20,15 @@ multiline(Format, Data) when is_list(Data) ->
 multiline(Format, Data) ->
 	multiline(Format, [Data]).
 
-split(String) ->
-	re:split(String, "\s+", [unicode, {return, list}, trim]).
+split(String) -> re:split(String, "\s+", [unicode, {return, list}, trim]).
 
-split(String, Delim) ->
-	re:split(String, Delim, [unicode, {return, list}, trim]).
+split(String, Delim) -> re:split(String, Delim, [unicode, {return, list}, trim]).
+
+-define(WORD_SEP, "[^a-zA-Zа-яА-Я]+").  % regexp describing non-word characters
+
+%% Split String of words of minimum length MinLen
+words(String, MinLen) -> 
+	[W || W <- re:split(String, ?WORD_SEP, [unicode, {return, list}, trim]), length(W) >= MinLen].
 
 contains(String, Pattern) ->
 	case re:run(String, Pattern, [unicode, caseless, {capture, none}]) of
@@ -273,3 +280,14 @@ convert_time(LT) ->
 		[]       ->  undefined;
 		[UT | _] -> {time, UT}
 	end.
+
+lowercase(S) -> [lc(C) || C <- S].
+uppercase(S) -> [uc(C) || C <- S].
+
+lc(C) when C >= $A, C =< $Z; C >= 1040, C =< 1071 -> C + 32;  % Latin and Cyrillic
+lc(1025) -> 1105;											  % ё
+lc(C) -> C.
+
+uc(C) when C >= $a, C =< $z; C >= 1072, C =< 1103 -> C - 32;  % Latin and Cyrillic
+uc(1105) -> 1025;											  % ё
+uc(C) -> C.

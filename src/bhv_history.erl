@@ -9,6 +9,7 @@
 
 -behaviour(irc_behaviour).
 -export([init/1, help/1, handle_event/3]).
+-export([fix_wstat/1]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
@@ -26,6 +27,8 @@
 				  uid        :: integer(),
 				  cid        :: integer(),
 				  event      :: tuple()}).
+-record(wstat, {key      :: {integer(), integer(), list()},  % {uid, cid, word}
+				count    :: integer()}).
 
 init(_) -> 
 	db_util:create_sequence(),
@@ -38,10 +41,13 @@ init(_) ->
 	ok = db_util:init_table(histent, [{disc_copies, [node()]},
 									  {type, ordered_set},
 									  {attributes, record_info(fields, histent)}]),
+	ok = db_util:init_table(wstat, [{disc_copies, [node()]},
+									{attributes, record_info(fields, wstat)}]),
 	undefined.
 
 help(chancmd) ->
 	[{"hist <время>",				"история событий на канале (в приват)"},
+	 {"wstat [<ник>]",              "статистика употребления слов"},
 	 {"lastseen <ник>",             "вывод последней активности данного пользователя"}];
 help(privcmd) ->
 	[{"hist <канал> <время>",		"то же самое, но чтоб никто не узнал"}];
@@ -53,8 +59,10 @@ verbose_help() ->
 	 "    (отрицательное время считается от текущего)"].
 
 handle_event(genevent, {chanmsg, Chan, ?USER2(Nick, Ident), Msg}, _Irc) ->
+	update_wstat(Chan, Ident, Msg),
 	save_histent(Chan, Ident, {chanmsg, Nick, Msg});
 handle_event(genevent, {action, Chan, ?USER2(Nick, Ident), Msg}, _Irc) ->
+	update_wstat(Chan, Ident, Msg),
 	save_histent(Chan, Ident, {action, Nick, Msg});
 handle_event(selfevent, {chanmsg, Chan, hist, Msg}, Irc) ->
 	save_histent(Chan, me, {chanmsg, me(Irc), Msg});
@@ -91,7 +99,11 @@ handle_event(cmdevent, {privcmd, ?USER(Nick), ["hist" | _]}, Irc) ->
 handle_event(cmdevent, {chancmd, Chan, ?USER(Nick), ["hist" | Rest]}, Irc) ->
 	show_history(Nick, Chan, Rest, Irc);
 handle_event(cmdevent, {chancmd, Chan, _, ["lastseen", TargetNick]}, Irc) ->
-	show_lastseen(Chan, TargetNick, Irc);
+	show_lastseen(Chan, {nick, TargetNick}, Irc);
+handle_event(cmdevent, {chancmd, Chan, _, ["wstat"]}, Irc) ->
+	show_wstat(Chan, all, Irc);
+handle_event(cmdevent, {chancmd, Chan, _, ["wstat", TargetNick]}, Irc) ->
+	show_wstat(Chan, {nick, TargetNick}, Irc);
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.
 
@@ -106,6 +118,30 @@ save_histent(Chan, Ident, Event) ->
 														  cid       = chanid(Chan),
 														  event     = Event})
 							end).
+
+-define(WSTAT_MIN_LEN, 1).  %% minimum word length for statistic inclusion
+
+update_wstat(Chan, Ident, Msg) ->
+	Words = util:words(Msg, ?WSTAT_MIN_LEN),
+	io:format("WORDS ~p~n", [Words]),
+	mnesia:async_dirty(fun () ->
+							   Cid = chanid(Chan),
+							   Uid = userid(Ident),
+							   [mnesia:dirty_update_counter(wstat, {Uid, Cid, W}, 1) || W <- Words],
+							   ok
+					   end).
+
+fix_wstat(IrcName) ->
+	irc_client:remove_behaviour(IrcName, ?MODULE),
+	irc_client:add_behaviour(IrcName, ?MODULE),
+	Q = qlc:q([{Ch#chan.name, U#user.ident, Msg} ||
+				  #histent{event = {Event, _, Msg}} = H  <- mnesia:table(histent),
+				  Ch <- mnesia:table(chan),
+				  U <- mnesia:table(user),
+				  Ch#chan.cid =:= H#histent.cid,
+				  U#user.uid =:= H#histent.uid,
+				  Event =:= chanmsg orelse Event =:= action]),
+	mnesia:transaction(fun () -> [update_wstat(Ch, Id, M) || {Ch, Id, M} <- qlc:eval(Q)] end).
 
 me(#irc{nick = Nick}) -> Nick.
 
@@ -219,6 +255,46 @@ fetch_first(Q) ->
 													 A
 										   end),
 	Histent.
+
+show_wstat(Chan, {nick, TargetNick}, Irc) ->
+	case trace_lastseen(Chan, {nick, TargetNick}) of
+		[] -> ok = irc_conn:chanmsg(Irc, Chan, bhv_common:empty_check([]));
+		[#histent{uid = Uid}] -> show_wstat(Chan, {id, Uid}, Irc)
+	end;
+show_wstat(Chan, {id, Uid}, Irc) ->
+	[#user{ident = Ident}] = mnesia:dirty_read(user, Uid),
+	Q = qlc:q([{Ident, Count, Word} || 
+				  #wstat{key = {_, Cid, Word}, count = Count}  <- mnesia:table(wstat),
+				  Ch <- mnesia:table(chan),
+				  U <- mnesia:table(user),
+				  Ch#chan.name =:= Chan,
+				  Ch#chan.cid =:= Cid,
+				  U#user.uid =:= Uid]),
+	Qs = qlc:keysort(2, Q),
+	dump_wstat(mnesia:async_dirty(fun () -> lists:reverse(qlc:eval(Qs)) end), Chan, Irc);
+show_wstat(Chan, all, Irc) ->
+	Q = qlc:q([{U#user.ident, Count, Word} || 
+				  #wstat{key = {Uid, Cid, Word}, count = Count}  <- mnesia:table(wstat),
+				  Ch <- mnesia:table(chan),
+				  U <- mnesia:table(user),
+				  Ch#chan.name =:= Chan,
+				  Ch#chan.cid =:= Cid,
+				  U#user.uid =:= Uid]),
+	Qs = qlc:keysort(2, Q),
+	dump_wstat(mnesia:async_dirty(fun () -> lists:reverse(qlc:eval(Qs)) end), Chan, Irc).
+
+-define(WSTAT_MAX, 5).  % number of words to output in word statistic
+
+dump_wstat(StatByUser, Chan, Irc) ->
+	Stat = lists:foldl(fun ({Id, C, W}, D) -> dict:append(Id, {C, W}, D) end, 
+					   dict:new(), StatByUser),
+	TopStat = dict:map(fun (_, V) -> lists:sublist(V, ?WSTAT_MAX) end, Stat),
+	[dump_wstat_user(Id, Words, Chan, Irc) || {Id, Words} <- lists:keysort(1, dict:to_list(TopStat))],
+	ok.
+
+dump_wstat_user(Ident, Words, Chan, Irc) ->
+	ok = irc_conn:chanmsg(Irc, Chan, hist,
+						  [Ident, ": ", [[Word, " (", integer_to_list(Count), ") "] || {Count, Word} <- Words]]).
 
 show_lastseen(Chan, TargetNick, Irc) ->
 	case trace_lastseen(Chan, {nick, TargetNick}) of
