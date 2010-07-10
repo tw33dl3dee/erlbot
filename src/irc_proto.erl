@@ -98,8 +98,6 @@ handle_info({connect, Host, Conf, Owner}, undefined) ->
 	{ok, State} = connect(Host, Conf),
 	{noreply, State#state{owner = Owner}, State#state.ping}.
 
-notify(noevent, State) ->
-	State;
 notify(Event, #state{owner = Pid} = State) ->
 	Pid ! {irc, self(), Event},
 	State.

@@ -208,23 +208,23 @@ show_history(Nick, Chan, _, Irc) ->
 	history(Nick, Chan, undefined, Irc).
 
 history(Nick, Chan, {number, X}, Irc) ->
-	trace_history(list, Nick, Chan, X, Irc);
+	trace_history(Nick, Chan, X, Irc);
 history(Nick, Chan, {time, From}, Irc) ->
-	trace_history(list, Nick, Chan, From, erlang:universaltime(), Irc);
+	trace_history(Nick, Chan, From, erlang:universaltime(), Irc);
 history(Nick, _, undefined, Irc) ->
 	give_help(Nick, Irc).
 
 history(Nick, Chan, {time, From}, {time, To}, Irc) ->
-	trace_history(list, Nick, Chan, From, To, Irc);
+	trace_history(Nick, Chan, From, To, Irc);
 history(Nick, _, _, _, Irc) ->
 	give_help(Nick, Irc).
 
 %% Trace by specified login count.
-trace_history(_Method, Nick, Chan, LoginCount, Irc) ->
+trace_history(Nick, Chan, LoginCount, Irc) ->
 	ok = irc_conn:bulk_privmsg(Irc, Nick, nohist, util:multiline("History for ~s by ~p login(s)", [Chan, LoginCount])).
 
 %% Trace by specified begin/end time.
-trace_history(Method, Nick, Chan, From, To, Irc) ->
+trace_history(Nick, Chan, From, To, Irc) ->
 	ok = irc_conn:bulk_privmsg(Irc, Nick, nohist, util:multiline("History for ~s from ~p to ~p~n", [Chan, From, To])),
 	Q = qlc:q([H#histent{timestamp = neg_timestamp(H#histent.timestamp)} ||
 				  H  <- mnesia:table(histent),
@@ -234,17 +234,15 @@ trace_history(Method, Nick, Chan, From, To, Irc) ->
 				  H#histent.timestamp < timestamp(From),
 				  H#histent.timestamp > timestamp(To)], [{join, lookup}]),
 	io:format("QUERY ~s~n", [qlc:info(Q)]),
-	{T, {atomic, ok}} = timer:tc(mnesia, transaction, [fun () -> fetch_history(Method, Q, Nick, Irc) end]),
+	{T, {atomic, ok}} = timer:tc(mnesia, transaction, [fun () -> fetch_history(Q, Nick, Irc) end]),
 	ok = io:format("QUERY TOOK ~p usec~n", [T]).
 
-fetch_history(list, Q, Nick, Irc) ->
+fetch_history(Q, Nick, Irc) ->
 	R = lists:reverse(qlc:eval(Q)),
 	Lines = [histent_to_list(short, H) || H <- R],
-	ok = irc_conn:bulk_privmsg(Irc, Nick, nohist, Lines);
-fetch_history(cursor, Q, Nick, Irc) ->
-	Qs = qlc:keysort(1, Q),
-	C = qlc:cursor(Qs),
-	ok = dump_history(C, Nick, Irc).
+	ok = irc_conn:bulk_privmsg(Irc, Nick, nohist, Lines).
+
+-define(HIST_CHUNKLEN, 100).
 
 fetch_first(Q) ->
 	{atomic, Histent} = mnesia:transaction(fun () -> C = qlc:cursor(Q),
@@ -257,7 +255,7 @@ fetch_first(Q) ->
 
 show_wstat(Chan, {nick, TargetNick}, Irc) ->
 	case trace_lastseen(Chan, {nick, TargetNick}) of
-		[] -> ok = irc_conn:chanmsg(Irc, Chan, bhv_common:empty_check([]));
+		[] -> ok = bhv_common:empty_check(Irc, Chan, []);
 		[#histent{uid = Uid}] -> show_wstat(Chan, {id, Uid}, Irc)
 	end;
 show_wstat(Chan, {id, Uid}, Irc) ->
@@ -335,17 +333,6 @@ dump_lastseen({Entry1, Entry2}, Chan, Irc) when Entry1 < Entry2 ->
 	ok = dump_histents(long, [Entry1, Entry2], Chan, Irc);
 dump_lastseen({Entry1, Entry2}, Chan, Irc) ->
 	ok = dump_histents(long, [Entry2, Entry1], Chan, Irc).
-
--define(HIST_CHUNKLEN, 100).
-
-dump_history(Cursor, Nick, Irc)	->
-	dump_history(Cursor, qlc:next_answers(Cursor, ?HIST_CHUNKLEN), Nick, Irc).
-
-dump_history(Cursor, [], _, _) ->
-	ok = qlc:delete_cursor(Cursor);
-dump_history(Cursor, Results, Nick, Irc) ->
-	dump_histents(short, Results, Nick, Irc),
-	dump_history(Cursor, qlc:next_answers(Cursor, ?HIST_CHUNKLEN), Nick, Irc).
 
 dump_histents(TimeFormat, Histents, Target, Irc) ->
 	Lines = [histent_to_list(TimeFormat, H) || H <- Histents],
