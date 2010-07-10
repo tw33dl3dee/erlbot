@@ -7,7 +7,7 @@
 %%%-------------------------------------------------------------------
 -module(bhv_common).
 
--export([empty_check/1, error/3, fuckoff/3, identify/3]).
+-export([empty_check/1, empty_check/3, error/3, fuckoff/3, identify/3]).
 -export([pipe_script/5, pipe_script/4]).
 
 -include("irc.hrl").
@@ -26,6 +26,10 @@ pipe_script(Irc, Chan, Script, Args, Input) ->
 	end.
 
 pipe_script(Irc, Chan, Script, Args) -> pipe_script(Irc, Chan, Script, Args, <<>>).
+
+empty_check(Irc, Chan, [])   -> irc_conn:chanmsg(Irc, Chan, hist, empty_msg());
+empty_check(Irc, Chan, [""]) -> irc_conn:chanmsg(Irc, Chan, hist, empty_msg());
+empty_check(_, _, _)         -> ok.
 
 empty_check([]) -> [empty_msg()];
 empty_check([""]) -> [empty_msg()];
