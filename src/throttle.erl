@@ -121,7 +121,7 @@ remove_trace(Id, State) ->
 
 set_timer(#trace{timer = OldTimer} = Trace, Timer) ->
 	case erlang:cancel_timer(OldTimer) of
-		cancel ->
+		false ->
 			clean_msg(OldTimer);
 		T ->
 			T
