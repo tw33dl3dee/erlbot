@@ -14,52 +14,59 @@
 -include("utf8.hrl").
 -include("bhv_common.hrl").
 
--define(APPEAL_DELAY, 500).
+-define(APPEAL_DELAY, 500).  % delay in ms between bot answer to appeal
 
 init(_) -> undefined.
 
 help(_) -> none.
 
 handle_event(msgevent, {appeal, Chan, User, Msg}, Irc) ->
-	appeal(direct, Chan, User, Msg, Irc);
+	handle_appeal(direct, Chan, User, Msg, Irc);
 handle_event(msgevent, {maybe_appeal, Chan, User, Msg}, Irc) ->
-	appeal({indirect, chan}, Chan, User, Msg, Irc);
+	handle_appeal({indirect, chan}, Chan, User, Msg, Irc);
 handle_event(cmdevent, {privcmd, ?USER(Nick) = User, Words}, Irc) ->
-	appeal({indirect, priv}, Nick, User, string:join(Words, " "), Irc);
+	handle_appeal({indirect, priv}, Nick, User, string:join(Words, " "), Irc);
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.
 
-%% From may be user nickname or channel name
-%% Type = `direct' | {`indirect', `chan'} | {`indirect', `priv'}
-appeal(Type, From, ?USER(Nick) = User, Msg, Irc) ->
-	Humiliation = util:contains(Msg, "(суч?ка|хуй|заткни)"),
-	Greeting = util:contains(Msg, "превед"),
-	FuckOff = util:contains(Msg, "(у?ебись|сосн?и)"),
-	Caress = util:contains(Msg, "(няшка|кавай)"),
-	Criticism = util:contains(Msg, "(тупа+я +пи+зда|пи+зда +тупа+я)"),
-	Kiss = util:contains(Msg, "чмоки"),
-	if Kiss -> 
-			react(Irc, From, action, hist, ["*KISSED* *YAHOO*"]);
-	   Humiliation ->
-			react(Irc, From, chanmsg, hist, [Nick, ": хамишь, сцуко."]);
-	   Greeting ->
-			react(Irc, From, chanmsg, hist, ["\\O/ Превед, ", Nick, "!!!"]);
-	   FuckOff, ?IS_CHAN(From) ->
-			{delayed_event, ?APPEAL_DELAY, customevent, {suicide, From, Nick}, undefined};
-	   Caress ->
-			react(Irc, From, chanmsg, hist, "^_^");
-	   Criticism ->
-			react(Irc, From, action, hist, "тупая пизда v_v");
-	   Type =:= direct ->
-			react(Irc, From, chanmsg, hist, "Ня!");
-	   Type =:= {indirect, chan} ->
-			%% Induced `genmsg' is `customevent' which means that `msgevent' 
-			%% (as `genmsg', `appeal' or `maybe_appeal') occurs once per user message
-			{new_event, customevent, {genmsg, From, User, Msg}, undefined};
-	   true ->
-			not_handled
+%% Source may be user nickname or channel name
+%% Cause = `direct' | {`indirect', `chan'} | {`indirect', `priv'}
+handle_appeal(Cause, Source, ?USER(Nick) = User, Msg, Irc) ->
+	AppealType = appeal_type(Msg),
+	case appeal_react(AppealType, Source, Nick, Cause) of
+		{message_react, Method, ReplyMsg} -> message_react(Irc, Source, Method, ReplyMsg);
+		%% Induced `genmsg' is `customevent' which means that `msgevent' 
+		%% (as `genmsg', `appeal' or `maybe_appeal') occurs once per user message
+		not_handled                  -> {new_event, customevent, {genmsg, Source, User, Msg}, undefined};
+		NewEvent                     -> NewEvent
 	end.
 
-react(Irc, From, How, Save, Msg) ->
+-define(APPEAL_REGEX, [{humiliation, "(суч?ка|хуй|заткни)"},
+					   {greeting,    "превед"},
+					   {fuckoff,     "(у?ебись|сосн?и)"},
+					   {caress,      "(няшка|кавай)"},
+					   {criticism,   "(тупа+я +пи+зда+|пи+зда+ +тупа+я+)"},
+					   {kiss,        "чмоки"}]).
+
+appeal_type(Msg) -> appeal_type(?APPEAL_REGEX, Msg).
+
+appeal_type([{Type, Regexp} | Rest], Msg) ->
+	case util:contains(Msg, Regexp) of
+		true  -> Type;
+		false -> appeal_type(Rest, Msg)
+	end;
+appeal_type([], _) -> undefined.
+
+appeal_react(kiss, _, _, _)             -> {message_react, action,  ["*KISSED* *YAHOO*"]};
+appeal_react(humiliation, _, Nick, _)   -> {message_react, chanmsg, [Nick, ": хамишь, сцуко."]};
+appeal_react(greeting, _, Nick, _)      -> {message_react, chanmsg, ["\\O/ Превед, ", Nick, "!!!"]};
+appeal_react(caress, _, _, _)           -> {message_react, chanmsg, "^_^"};
+appeal_react(criticism, _, _, _)        -> {message_react, action,  "тупая пизда v_v"};
+appeal_react(fuckoff, Chan, Nick, _)
+  when ?IS_CHAN(Chan)                   -> {delayed_event, ?APPEAL_DELAY, customevent, {suicide, Chan, Nick}, undefined};
+appeal_react(_, _, _, direct)           -> {message_react, chanmsg, "Ня!"};
+appeal_react(_, _Source, _Nick, _Cause) -> not_handled.
+
+message_react(Irc, Source, Method, Msg) ->
 	timer:sleep(?APPEAL_DELAY),
-	ok = irc_conn:How(Irc, From, Save, Msg).
+	ok = irc_conn:Method(Irc, Source, hist, Msg).
