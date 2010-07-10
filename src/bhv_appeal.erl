@@ -37,8 +37,9 @@ handle_appeal(Cause, Source, ?USER(Nick) = User, Msg, Irc) ->
 		{message_react, Method, ReplyMsg} -> message_react(Irc, Source, Method, ReplyMsg);
 		%% Induced `genmsg' is `customevent' which means that `msgevent' 
 		%% (as `genmsg', `appeal' or `maybe_appeal') occurs once per user message
-		not_handled                  -> {new_event, customevent, {genmsg, Source, User, Msg}, undefined};
-		NewEvent                     -> NewEvent
+		not_handled when Cause =:= {indirect, chan} -> 
+			{new_event, customevent, {genmsg, Source, User, Msg}, undefined};
+		NewEvent -> NewEvent
 	end.
 
 -define(APPEAL_REGEX, [{humiliation, "(суч?ка|хуй|заткни)"},
