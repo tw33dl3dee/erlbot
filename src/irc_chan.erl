@@ -72,11 +72,11 @@ handle_sync_event(_Event, _From, StateName, StateData) ->
 %%% States
 
 state_joining({chantopic, _, Topic}, Chan) ->
-	{next_state, state_topic, Chan#chan{topic = Topic}};
+	{next_state, state_topic, Chan#chan{topic = {Topic, [], 0}}};
 state_joining({names, _, Names}, #chan{users = Users} = Chan) ->
 	{next_state, state_names, Chan#chan{users = Users ++ Names}}.
 
-state_topic({chantopic, _, Author, Ts}, #chan{topic = Topic} = Chan) ->
+state_topic({chantopic, _, Author, Ts}, #chan{topic = {Topic, _, _}} = Chan) ->
 	{next_state, state_names, Chan#chan{topic = {Topic, Author, Ts}}}.
 
 state_names({names, _, Names}, #chan{users = Users} = Chan) ->
