@@ -18,6 +18,7 @@ init(_) -> undefined.
 
 help(_) -> none.
 
+%% TODO: rejoin when kick by someone
 handle_event(customevent, {rejoin, Chan}, Irc) ->
 	ok = irc_conn:join(Irc, Chan);
 handle_event(_Type, _Event, _Irc) ->

@@ -31,14 +31,20 @@ handle_event(cmdevent, {chancmd, Chan, _, ["lynch", "topic" | _]}, Irc) ->
 handle_event(cmdevent, {chancmd, Chan, _, ["lynchtopic" | _]}, Irc) ->
 	lynch(Irc, Chan, topic);
 handle_event(cmdevent, {chancmd, Chan, _, ["lynch" | _]}, Irc) ->
-	lynch(Irc, Chan, chanmsg);
+	lynch(Irc, Chan, message);
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.
 
 -define(LYNCH_FILE, "data/lynch.txt").
 
-lynch(Irc, Chan, Action) ->
+lynch(Irc, Chan, Target) ->
+	print_lynch(Irc, Chan, Target, lynch_message()).
+
+lynch_message() ->
 	{ok, Data} = file:read_file(?LYNCH_FILE),
 	Lines = string:tokens(utf8:decode(Data), "\r\n"),
 	LineNo = choice:uniform(length(Lines)),
-	ok = irc_conn:command(Irc, {Action, Chan, hist, lists:nth(LineNo, Lines)}).
+	lists:nth(LineNo, Lines).
+
+print_lynch(Irc, Chan, topic, Lynch) ->   ok = irc_conn:topic(Irc, Chan, Lynch);
+print_lynch(Irc, Chan, message, Lynch) -> ok = irc_conn:chanmsg(Irc, Chan, nohist, Lynch).

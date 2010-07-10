@@ -9,7 +9,7 @@
 
 -behaviour(irc_behaviour).
 -export([init/1, help/1, handle_event/3]).
--export([fix_stat/1]).
+-export([fix_stat/1, get_stat/0]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
@@ -25,12 +25,9 @@
 				first_day :: {integer(), integer(), integer()}}).
 
 init(_) -> 	
-	ok = db_util:init_table(lstat, [{disc_copies, [node()]},
-									{attributes, record_info(fields, lstat)}]),
-	ok = db_util:init_table(cstat, [{disc_copies, [node()]},
-									{attributes, record_info(fields, cstat)}]),
-	ok = db_util:init_table(uinfo, [{disc_copies, [node()]},
-									{attributes, record_info(fields, uinfo)}]),
+	ok = db_util:init_table(lstat, [{disc_copies, [node()]}, {attributes, record_info(fields, lstat)}]),
+	ok = db_util:init_table(cstat, [{disc_copies, [node()]}, {attributes, record_info(fields, cstat)}]),
+	ok = db_util:init_table(uinfo, [{disc_copies, [node()]}, {attributes, record_info(fields, uinfo)}]),
 	undefined.
 
 help(chancmd) ->
@@ -47,9 +44,9 @@ handle_event(genevent, {What, _, ?USER2(_, Ident), Msg}, _Irc) when What =:= cha
 %handle_event(msgevent, {_, _, ?USER2(_, Ident), Msg}, _Irc) ->
 %	update_stat(Ident, 1, length(Msg));
 handle_event(cmdevent, {chancmd, Chan, ?USER2(_, Ident), ["stat" | _]}, Irc) ->
-	ok = irc_conn:bulk_chanmsg(Irc, Chan, nohist, get_stat(Ident));
+	ok = irc_conn:bulk_chanmsg(Irc, Chan, nohist, show_stat(Ident));
 handle_event(cmdevent, {privcmd, ?USER2(Nick, Ident), ["stat" | _]}, Irc) ->
-	ok = irc_conn:bulk_privmsg(Irc, Nick, nohist, get_stat(Ident));
+	ok = irc_conn:bulk_privmsg(Irc, Nick, nohist, show_stat(Ident));
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.
 
@@ -76,7 +73,9 @@ update_first_day(Ident) ->
 
 -define(MIN_VISIBLE_STAT_LINES, 100).  % Minimum number of lines user must have to be shown in stat.
 
-get_stat(Ident) ->
+show_stat(Ident) -> dump_stat(Ident, get_stat()).
+
+get_stat() ->
 	Q = qlc:q([{L#lstat.ident, L#lstat.lines, C#cstat.chars, U#uinfo.first_day} || 
 				  L <- mnesia:table(lstat),
 				  C <- mnesia:table(cstat),
@@ -84,7 +83,7 @@ get_stat(Ident) ->
 				  L#lstat.ident =:= C#cstat.ident, L#lstat.ident =:= U#uinfo.ident,
 				  L#lstat.lines > ?MIN_VISIBLE_STAT_LINES]),
 	Qs = qlc:keysort(2, Q, [{order, descending}]),
-	mnesia:async_dirty(fun () -> dump_stat(Ident, qlc:eval(Qs)) end).
+	mnesia:async_dirty(fun () -> qlc:eval(Qs) end).
 
 dump_stat(Ident, StatLines) ->
 	Lines = [statline_to_list(Ident, Stat) || Stat <- StatLines],
@@ -93,10 +92,8 @@ dump_stat(Ident, StatLines) ->
 	 " --------------------------------------------------" | Lines] ++ 
 		[" **************************************************"].
 
-statline_to_list(Ident, {Ident, _, _, _} = S) ->
-	[statline_to_list(S), " <==="];
-statline_to_list(_, S) ->
-	statline_to_list(S).
+statline_to_list(Ident, {Ident, _, _, _} = S) -> [statline_to_list(S), " <==="];
+statline_to_list(_, S)                        -> statline_to_list(S).
 
 statline_to_list({Ident, Lines, Chars, FirstDay}) ->
 	io_lib:format(" ~-11s | ~9B | ~7B | ~-5.1f | ~6.1f", [format_ident(Ident), Lines, Chars, 

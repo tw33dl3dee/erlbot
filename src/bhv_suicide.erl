@@ -30,7 +30,7 @@ help(about) ->
 
 -define(MAX_KICKS, 2).             % how many subsequent kicks allowed (KickPoints can't exceed `MAX_KICKS'*`POINTS_PER_KICK')
 -define(POINTS_PER_KICK, 10).      % kick cost (each `genmsg' decreases KickPoints by 1, each kick increases by this value)
--define(SUICIDE_DISABLE_TIMEOUT, 120000).  % how long user is incapable of kicking bot after exceeding his KickPoints
+-define(SUICIDE_DISABLE_TIMEOUT, 120000).  % how much time user is incapable of kicking bot after exceeding his KickPoints
 
 -define(MAX_KICK_POINTS, ((?MAX_KICKS - 1)*?POINTS_PER_KICK)).
 
@@ -123,7 +123,11 @@ suicide_reason(Kicker) ->
 				 {2, ["Сука ты, ", Kicker, "!"]},
 				 {1, "И ты, Брут :("}]).
 
+-define(TAUNT_REPLIES, [{2, {action,  "воскрес, аки феникс из пепла"}},
+						{2, {action,  "суицидален"}},
+						{1, {chanmsg, "Не ждали??? А я тут, суки!!!"}}]).
+
 taunt(Irc, Chan, _Kicker) ->
-	irc_conn:command(Irc, choice:make([{2, {action, Chan, nohist, "воскрес, аки феникс из пепла"}},
-									   {2, {action, Chan, nohist, "суицидален"}},
-									   {1, {chanmsg, Chan, nohist, "Не ждали??? А я тут, суки!!!"}}])).
+	case choice:make(?TAUNT_REPLIES) of
+		{Action, Msg} -> ok = irc_conn:Action(Irc, Chan, nohist, Msg)
+	end.

@@ -35,6 +35,12 @@ empty_check([]) -> [empty_msg()];
 empty_check([""]) -> [empty_msg()];
 empty_check(S) -> S.
 
+error(Irc, Chan, Trace) -> 
+	ok = irc_conn:bulk_chanmsg(Irc, Chan, hist, [error_msg() | Trace]).
+
+fuckoff(Irc, Chan, Nick) ->
+	ok = irc_conn:chanmsg(Irc, Chan, hist, Nick ++ fuckoff_msg()).
+
 empty_msg() ->
 	choice:make(["А вот хуй...",
 				 "<тут могла бы быть ваша реклама>",
@@ -42,19 +48,13 @@ empty_msg() ->
 				 "Нихуйа не найдено",
 				 "Почувствуйте себя неудачником!"]).
 
-error(Irc, Chan, Trace) -> 
-	ok = irc_conn:bulk_chanmsg(Irc, Chan, hist, [error_msg() | Trace]).
-
-error_msg() -> 
-	choice:make(["Усе поломалось, насяльника :("]).
-
-fuckoff(Irc, Chan, Nick) ->
-	ok = irc_conn:chanmsg(Irc, Chan, hist, Nick ++ fuckoff_msg()).
-
 fuckoff_msg() ->
 	choice:make([", не еби мне моск.", 
 				 ", иди нахуй.", 
 				 ": да хуй тебе!"]).
+
+error_msg() -> 
+	choice:make(["Усе поломалось, насяльника :("]).
 
 -define(GREETINGS, ["shaking...",
 					"liquefying bytes... ",

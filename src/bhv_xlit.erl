@@ -50,6 +50,7 @@ xlit(Irc, Chan, Hist) ->
 	{success, Xlitted} = util:execv("xlit2.pl", [Arg1], ?SCRIPT_DIR, Misspelled),
 	ok = show_xlitted(Irc, Chan, Xlitted, Nicks).
 
+%% BUG: this should never happen
 show_xlitted(Irc, Chan, Xlitted, Nicks) when length(Xlitted) =/= length(Nicks) ->
 	ok = bhv_common:error(Irc, Chan, [io_lib:format("~p =/= ~p", [length(Xlitted), length(Nicks)])]);
 show_xlitted(Irc, Chan, Xlitted, Nicks) ->
@@ -66,13 +67,8 @@ is_misspelled(S) ->
 	end.
 
 letter_count(S) ->
-	lists:foldl(fun(C, {Latins, Letters}) ->
-						case C of
-							C when C >= $a, C =< $z; C >= $A, C =< $Z ->
-								{Latins + 1, Letters + 1};
-							C when C > 127 ->
-								{Latins, Letters + 1};
-							C ->
-								{Latins, Letters}
-						end
+	lists:foldl(fun (C, {Latins, Letters}) when C >= $a, C =< $z -> {Latins + 1, Letters + 1};
+					(C, {Latins, Letters}) when C >= $A, C =< $Z -> {Latins + 1, Letters + 1};
+					(C, {Latins, Letters}) when C > 127          -> {Latins, Letters + 1};
+					(_NonPrint, Count)                           -> Count
 				end, {0, 0}, S).

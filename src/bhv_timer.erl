@@ -59,10 +59,8 @@ parse_time([$+ | TimeSpec]) ->
 parse_time(TimeSpec) ->
 	case parse_hhmm(TimeSpec) of 
 		{HH, MM} -> case util:convert_time_abs(HH, MM, tomorrow) of
-						{time, DateTime} ->
-							util:time_diff(DateTime, erlang:universaltime());
-						undefined ->
-							false
+						{time, DateTime} -> util:time_diff(DateTime, erlang:universaltime());
+						undefined ->        false
 					end;
 		false    -> false
 	end.

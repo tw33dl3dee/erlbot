@@ -89,7 +89,7 @@ choose2([{W, C} | _], Quantile, X) when X < W + Quantile ->
 	C;
 choose2([{_, C}], _, _) ->
 	C;
-choose2([{W, _} | Rest], Quantile, X)->
+choose2([{W, _} | Rest], Quantile, X) ->
 	choose(Rest, W + Quantile, X).
 
 weight_sum(Choices) ->

@@ -30,9 +30,16 @@ help(privcmd) ->
 help(about) ->
 	"Всякая разнотень".
 
+-define(KICK_REASONS(Nick), [["Всегда пожалуйста, ", Nick], 
+							 "Кто к нам с хуем придет, тот нахуй и пойдет."]).
+
+-define(PING_REPLIES(Nick), [{chanmsg, ["Да-да, ", Nick, "?.."]},
+							 {action,  "понг"},
+							 {chanmsg, "Ну, понг."},
+							 {chanmsg, [Nick, ": сам пинг, че надо?"]}]).
+
 handle_event(cmdevent, {chancmd, Chan, ?USER(Nick), ["kickme" | _]}, Irc) ->
-	ok = irc_conn:kick(Irc, Chan, Nick, choice:make([["Всегда пожалуйста, ", Nick], 
-													 "Кто к нам с хуем придет, тот нахуй и пойдет."]));
+	ok = irc_conn:kick(Irc, Chan, Nick, choice:make(?KICK_REASONS(Nick)));
 handle_event(cmdevent, {chancmd, Chan, _, ["jabberwock"]}, Irc) ->
 	jabberwock(Irc, Chan);
 handle_event(cmdevent, {chancmd, Chan, _, ["uptime"]}, Irc) ->
@@ -43,16 +50,13 @@ handle_event(cmdevent, {chancmd, Chan, _, ["time"]}, Irc) ->
 	{success, [Time]} = util:system("date '+%a %b %d %R:%S %Z %Y'"),
 	ok = irc_conn:chanmsg(Irc, Chan, nohist, ["Точное время: ", Time, "."]);
 handle_event(cmdevent, {chancmd, Chan, ?USER(Nick), ["ping"]}, Irc) ->
-	ok = irc_conn:command(Irc, choice:make([{chanmsg, Chan, nohist, ["Да-да, ", Nick, "?.."]},
-											{action, Chan, nohist, "понг"},
-											{chanmsg, Chan, nohist, "Ну, понг."},
-											{chanmsg, Chan, nohist, [Nick, ": сам пинг, че надо?"]}]));
+	ok = case choice:make(?PING_REPLIES(Nick)) of 
+			 {Action, Msg} -> irc_conn:Action(Irc, Chan, nohist, Msg) 
+		 end;
 handle_event(cmdevent, {chancmd, Chan, _, ["dice", Max | _]}, Irc) ->
 	case catch list_to_integer(Max) of
-		X when X > 0->
-			dice(Irc, Chan, X);
-		_ ->
-			not_handled
+		X when X > 0 -> roll_dice(Irc, Chan, X);
+		_ ->            not_handled
 	end;
 handle_event(cmdevent, {chancmd, Chan, _, ["identify" | _]}, Irc) ->
 	bhv_common:identify(Irc, Chan, long);
@@ -67,11 +71,12 @@ show_uptime(Irc, Chan) ->
 	{Rest1, Sec} = {UptimeSec div 60, UptimeSec rem 60},
 	{Rest2, Min} = {Rest1 div 60, Rest1 rem 60},
 	{Day, Hour} = {Rest2 div 24, Rest2 rem 24},
-	ok = irc_conn:chanmsg(Irc, Chan, hist, io_lib:format("Uptime: ~b day(s), ~2..0b:~2..0b:~2..0b", [Day, Hour, Min, Sec])).
+	ok = irc_conn:chanmsg(Irc, Chan, hist, io_lib:format("Uptime: ~b day(s), ~2..0b:~2..0b:~2..0b", 
+														 [Day, Hour, Min, Sec])).
 
 -define(DICE_TIMEOUT, 1000).
 
-dice(Irc, Chan, Max) ->
+roll_dice(Irc, Chan, Max) ->
 	Res = choice:uniform(Max),
 	irc_conn:chanmsg(irc, Chan, hist, "Кручу, верчу, наебать хочу..."),
 	timer:sleep(?DICE_TIMEOUT),
@@ -88,8 +93,3 @@ jabberwock(Irc, Chan) ->
 gen_uuid(Irc, Chan, Nick) ->
 	{success, [Uuid]} = util:system("uuidgen"),
 	ok = irc_conn:chanmsg(Irc, Chan, hist, [Nick, ": ", Uuid]).
-
-%%	{ok, Data} = file:read_file(?JABBERWOCK_FILE),
-%%	{ok, Lines} = regexp:split(binary_to_list(Data), "\n"),
-%%	lists:foreach(fun (L) -> cmd({chanmsg, [L]), timer:sleep(500) end, Lines}, State),
-%%	ok.

@@ -50,15 +50,8 @@ generator() ->
 %% Getting the next uniform random number
 uniform() ->
 	?NAME ! {uniform, self()},
-	receive
-		{?NAME, Random} ->
-			Random
-	end.
+	receive {?NAME, Random} -> Random end.
 
 uniform(N) ->
 	?NAME ! {uniform, self(), N},
-	receive
-		{?NAME, N, Random} ->
-			Random
-	end.
-
+	receive {?NAME, N, Random} -> Random end.
