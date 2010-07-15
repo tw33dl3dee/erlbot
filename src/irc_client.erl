@@ -110,7 +110,7 @@ ev_mgr(SupRef) ->
 					 bhv_getop, bhv_pom, bhv_privcmd, bhv_comment, bhv_bash, bhv_google,
 					 bhv_help, bhv_lebedev, bhv_lojban, bhv_lurkmore, bhv_misc, bhv_wiki,
 					 bhv_blurp, bhv_giveop, bhv_greet, bhv_rejoin, bhv_suicide,
-					 bhv_history, bhv_stat, bhv_timer, bhv_xlit]).
+					 bhv_history, bhv_stat, bhv_timer, bhv_xlit, bhv_markov]).
 
 run() ->
 	{ok, Pid} = start_link({local, erlbot}, 
