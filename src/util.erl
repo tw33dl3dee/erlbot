@@ -10,8 +10,6 @@
 -export([convert_time_abs/3, convert_time_rel/2, convert_time_rel_diff/2]).
 -export([lowercase/1, uppercase/1, words/2]).
 
--include("utf8.hrl").
-
 multiline(Term) ->
 	string:tokens(lists:flatten(io_lib:print(Term)), io_lib:nl()).
 
@@ -24,7 +22,7 @@ split(String) -> re:split(String, "\s+", [unicode, {return, list}, trim]).
 
 split(String, Delim) -> re:split(String, Delim, [unicode, {return, list}, trim]).
 
--define(WORD_SEP, "[^a-zA-Zа-яА-Я]+").  % regexp describing non-word characters
+-define(WORD_SEP, "[^\\pL\\pN]+").  % regexp describing non-word characters
 
 %% Split String of words of minimum length MinLen
 words(String, MinLen) -> 
