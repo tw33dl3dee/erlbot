@@ -36,8 +36,10 @@ help(about) ->
 	"Генерация случайных предложений на основе цепей Маркова".
 
 handle_event(customevent, {markov, Chan, Message}, Irc) ->
-	Start = lists:last(util:words(Message, 1)),
-	show_markov_sentence(Start, Chan, Irc);
+	case util:words(Message, 1) of
+		[]    -> not_handled;
+		Words -> show_markov_sentence(lists:last(Words), Chan, Irc)
+	end;
 handle_event(cmdevent, {chancmd, Chan, _, ["markov", Word]}, Irc) ->
 	show_markov_sentence(Word, Chan, Irc);
 handle_event(cmdevent, {privcmd, ?USER(Nick), ["markov", Word]}, Irc) ->
@@ -45,10 +47,10 @@ handle_event(cmdevent, {privcmd, ?USER(Nick), ["markov", Word]}, Irc) ->
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.
 
--define(WCHAIN_LEN, 10).
+-define(WCHAIN_MAX_LEN, 10).
 
 show_markov_sentence(Start, Target, Irc) ->
-	case gen_wchain(Start, ?WCHAIN_LEN) of
+	case gen_wchain(Start, ?WCHAIN_MAX_LEN) of
 		[] -> not_handled;
 		Sentence ->
 			Line = util:join(" ", Sentence),
@@ -79,9 +81,9 @@ gen_wchain(W1, WordCount) ->
 	end.
 
 gen_wchain(Words, _, 0) -> lists:reverse(Words);
-gen_wchain(Words, {?WCHAIN_PREFIX} = Prefix, WordCount) ->
-	case next_word(Prefix) of
-		none     -> gen_wchain(Words, Prefix, 0);
+gen_wchain(Words, {?WCHAIN_PREFIX}, WordCount) ->
+	case next_word({?WCHAIN_PREFIX}) of
+		none     -> lists:reverse(Words);
 		NextWord -> gen_wchain([NextWord | Words], {?WCHAIN_PREFIX_SHIFTED, NextWord}, WordCount - 1)
 	end.
 
