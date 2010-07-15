@@ -25,9 +25,9 @@ start() ->
 	gen_server:start({local, ?MODULE}, choice, [], []).
 
 make(Choices) when is_list(Choices), length(Choices) > 1 ->
-	gen_server:call(?MODULE, {choose, Choices});
-make([OnlyChoice]) ->
-	OnlyChoice.
+	gen_server:call(?MODULE, {make_choice, Choices});
+make([{_, OnlyChoice}]) -> OnlyChoice;
+make([OnlyChoice]) -> OnlyChoice.
 
 uniform() ->
 	gen_server:call(?MODULE, uniform).
@@ -46,8 +46,9 @@ init([]) ->
 	random:seed(now()),
 	{ok, undefined}.
 
-handle_call({choose, Choices}, _From, State) ->
-	{reply, choose(Choices), State};
+handle_call({make_choice, Choices}, _From, State) ->
+	Sum = weight_sum(Choices),
+	{reply, make_choice(Choices, Sum), State};
 handle_call({uniform, N}, _From, State) ->
 	{reply, random:uniform(N), State};
 handle_call(uniform, _From, State) ->
@@ -71,26 +72,18 @@ code_change(_Vsn, State, _Extra) ->
 %%% Internal functions
 %%%-------------------------------------------------------------------
 
-choose(Choices) ->
-	Sum = weight_sum(Choices),
-	choose(Choices, Sum).
+make_choice(Choices, Sum) when Sum > 0 -> make_choice(Choices, 0, random:uniform(Sum) - 1);
+make_choice(_, _)                      -> undefined.
 
-choose(Choices, Sum) when Sum > 0 ->
-	choose(Choices, 0, random:uniform(Sum) - 1);
-choose(_, _) ->
-	undefined.
+make_choice([{W, _} | _] = Choices, Quantile, X) when is_integer(W) ->
+	pick_choice(Choices, Quantile, X);
+make_choice([C | Rest], Quantile, X) ->
+	pick_choice([{1, C} | Rest], Quantile, X).
 
-choose([{W, _} | _] = Choices, Quantile, X) when is_integer(W) ->
-	choose2(Choices, Quantile, X);
-choose([C | Rest], Quantile, X) ->
-	choose2([{1, C} | Rest], Quantile, X).
-
-choose2([{W, C} | _], Quantile, X) when X < W + Quantile ->
-	C;
-choose2([{_, C}], _, _) ->
-	C;
-choose2([{W, _} | Rest], Quantile, X) ->
-	choose(Rest, W + Quantile, X).
+pick_choice([{W, C} | _], Quantile, X) 
+  when X < W + Quantile                   -> C;
+pick_choice([{_, C}], _, _)               -> C;
+pick_choice([{W, _} | Rest], Quantile, X) -> make_choice(Rest, W + Quantile, X).
 
 weight_sum(Choices) ->
 	lists:foldl(fun ({W, _}, Sum) when is_integer(W) -> W + Sum; (_, S) -> S + 1 end, 0, Choices).
