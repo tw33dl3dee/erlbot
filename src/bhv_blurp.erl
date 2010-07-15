@@ -21,10 +21,6 @@ help(_) -> none.
 %% Bot can react to any `genmsg', direct or induced from `maybe_appeal'.
 handle_event(_, {genmsg, Chan, _User, Msg}, Irc) ->
 	do_blurp(Irc, Chan, Msg);
-handle_event(_, {Event, Chan, _, _, _}, Irc) when Event =:= mode; Event =:= mymode ->
-	do_blurp(Irc, Chan, none);
-handle_event(_, {nick, Chan, _, _}, Irc) ->
-	do_blurp(Irc, Chan, none);
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.
 
