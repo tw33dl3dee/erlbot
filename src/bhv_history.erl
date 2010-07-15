@@ -9,7 +9,7 @@
 
 -behaviour(irc_behaviour).
 -export([init/1, help/1, handle_event/3]).
--export([fix_wstat/1, get_wstat/2, get_history/2]).
+-export([fix_wstat/1, get_wstat/2, get_history/2, fix_wchain/0]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
@@ -229,7 +229,7 @@ fix_wstat(IrcName) ->
 	irc_client:remove_behaviour(IrcName, ?MODULE),
 	irc_client:add_behaviour(IrcName, ?MODULE),
 	Q = qlc:q([{Ch#chan.name, U#user.ident, Msg} ||
-				  #histent{event = {Event, _, Msg}} = H  <- mnesia:table(histent),
+				  #histent{event = {Event, _, Msg}} = H <- mnesia:table(histent),
 				  Ch <- mnesia:table(chan),
 				  U <- mnesia:table(user),
 				  Ch#chan.cid =:= H#histent.cid,
@@ -388,3 +388,14 @@ fetch_first(Q) ->
 							end) of
 		{atomic, Histent} -> Histent
 	end.
+
+%% WCHAIN support (should be in bhv_wchain, actually, but uses #histent)
+
+fix_wchain() ->
+	Q = qlc:q([Msg ||
+				  #histent{event = {Event, _, Msg}} <- mnesia:table(histent),
+				  Event =:= chanmsg orelse Event =:= action]),
+	mnesia:async_dirty(fun () -> [mnesia:delete({wchain, K}) || K <- mnesia:all_keys(wchain)],
+								 [bhv_markov:update_wchain_text(Msg) || Msg <- qlc:eval(Q)] 
+					   end).
+
