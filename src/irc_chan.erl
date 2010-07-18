@@ -7,7 +7,7 @@
 -export([state_joining/2, state_topic/2, state_names/2, state_names/3, state_joined/2, state_joined/3]).
 
 %%% public interface
--export([start/1, start_link/1, chan_event/2, get_chan_info/1]).
+-export([start_link/1, chan_event/2, get_chan_info/1]).
 
 -record(chan, {name                 :: list(),
 			   topic = {[], [], 0}  :: {list(), list(), integer()},   %% topic, author, ts
@@ -29,9 +29,6 @@
 
 %%% Public interface
 
-start(Name) ->
-	gen_fsm:start(?MODULE, Name, []).
-
 start_link(Name) ->
 	gen_fsm:start_link(?MODULE, Name, []).
 
@@ -41,10 +38,10 @@ chan_event(FsmRef, Event) ->
 	gen_fsm:send_event(FsmRef, Event),
 	chan_event_reply(Event).
 
-chan_event_reply(Event) when ?IS_HIDDEN_EVENT(Event) ->
-	noevent;
-chan_event_reply(Event) ->
-	Event.
+%% For hidden async events, `noevent' is sent back
+chan_event_reply(Event) when ?IS_HIDDEN_EVENT(Event) -> noevent;
+%% Otherwise, event is returned as is
+chan_event_reply(Event)                              -> Event.
 
 get_chan_info(FsmRef) ->
 	gen_fsm:sync_send_event(FsmRef, chan_info, infinity).

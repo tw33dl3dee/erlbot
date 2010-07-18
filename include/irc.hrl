@@ -9,5 +9,4 @@
 -record(irc, {nick              :: list(),     % current bot nick
 			  login             :: list(),     % bot login
 			  is_oper           :: boolean(),  % `true' if bot is server oper 
-			  conn_ref          :: pid(),      % `irc_conn' process pid
 			  data = undefined  :: term()}).   % arbitrary data to store behaviour state

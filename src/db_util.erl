@@ -15,7 +15,6 @@ init_db() ->
 	ok = mnesia:start().
 
 init_table(Name, TabDef) ->
-	ok = init_db(),
 	{atomic, ok} = case mnesia:create_table(Name, TabDef) of
 					   {aborted, {already_exists, Name}} -> {atomic, ok};
 					   E                                 -> E
