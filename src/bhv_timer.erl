@@ -52,14 +52,14 @@ handle_event(_Type, _Event, _Irc) ->
 %% relative time
 parse_time([$+ | TimeSpec]) ->
 	case parse_hhmm(TimeSpec) of 
-		{HH, MM} -> util:convert_time_rel_diff(HH, MM);
+		{HH, MM} -> erlbot_util:convert_time_rel_diff(HH, MM);
 		false    -> false
 	end;
 %% absolute time
 parse_time(TimeSpec) ->
 	case parse_hhmm(TimeSpec) of 
-		{HH, MM} -> case util:convert_time_abs(HH, MM, tomorrow) of
-						{time, DateTime} -> util:time_diff(DateTime, erlang:universaltime());
+		{HH, MM} -> case erlbot_util:convert_time_abs(HH, MM, tomorrow) of
+						{time, DateTime} -> erlbot_util:time_diff(DateTime, erlang:universaltime());
 						undefined ->        false
 					end;
 		false    -> false
@@ -74,7 +74,7 @@ parse_hhmm(TimeSpec) ->
 	end.
 
 announce_timer(Chan, _Nick, Timeout, Irc) ->
-	{{Y, M, D}, {HH, MM, _}} = util:add_seconds(erlang:localtime(), Timeout),
+	{{Y, M, D}, {HH, MM, _}} = erlbot_util:add_seconds(erlang:localtime(), Timeout),
 	Message = io_lib:format("Таймер установлен на ~2..0B:~2..0B ~2..0B/~2..0B/~2..0B"
 							" (через ~2..0B:~2..0B), насяльника!",
 							[HH, MM, Y rem 100, M, D, Timeout div 3600, (Timeout div 60 rem 60)]),

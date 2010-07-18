@@ -25,9 +25,9 @@
 				first_day :: {integer(), integer(), integer()}}).
 
 init(_) -> 	
-	ok = db_util:init_table(lstat, [{disc_copies, [node()]}, {attributes, record_info(fields, lstat)}]),
-	ok = db_util:init_table(cstat, [{disc_copies, [node()]}, {attributes, record_info(fields, cstat)}]),
-	ok = db_util:init_table(uinfo, [{disc_copies, [node()]}, {attributes, record_info(fields, uinfo)}]),
+	ok = erlbot_db:init_table(lstat, [{disc_copies, [node()]}, {attributes, record_info(fields, lstat)}]),
+	ok = erlbot_db:init_table(cstat, [{disc_copies, [node()]}, {attributes, record_info(fields, cstat)}]),
+	ok = erlbot_db:init_table(uinfo, [{disc_copies, [node()]}, {attributes, record_info(fields, uinfo)}]),
 	undefined.
 
 help(chancmd) ->
@@ -101,7 +101,7 @@ statline_to_list({Ident, Lines, Chars, FirstDay}) ->
 
 days_passed(FirstDay) ->
 	{CurDate, _} = erlang:localtime(),
-	case util:date_diff(CurDate, FirstDay) of
+	case erlbot_util:date_diff(CurDate, FirstDay) of
 		0 -> 1;
 		D -> D
 	end.

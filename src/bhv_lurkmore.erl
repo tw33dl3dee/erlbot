@@ -29,5 +29,5 @@ handle_event(_Type, _Event, _Irc) ->
 	not_handled.
 
 lurkmore_topic(Irc, Chan, Topic) ->
-	Url = "http://lurkmore.ru/" ++ util:uri_encode(Topic),
+	Url = "http://lurkmore.ru/" ++ erlbot_util:uri_encode(Topic),
 	ok = irc_conn:action(Irc, Chan, hist, ["доставил: ", Url]).

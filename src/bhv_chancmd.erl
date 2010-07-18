@@ -24,7 +24,7 @@ help(_) -> none.
 
 % User command ends smart appeal
 handle_event(genevent, {chanmsg, Chan, User, [$! | Cmd]}, #irc{data = Data}) ->
-	{new_event, cmdevent, {chancmd, Chan, User, util:split(Cmd)}, dict:erase(Chan, Data)};
+	{new_event, cmdevent, {chancmd, Chan, User, erlbot_util:split(Cmd)}, dict:erase(Chan, Data)};
 handle_event(genevent, {chanmsg, Chan, User, Msg}, Irc) ->
 	AppealRE = io_lib:format("^\\s*~s[:, ](.*)", [Irc#irc.nick]), %"
 	case re:run(Msg, AppealRE, [unicode, {capture, all_but_first, list}]) of

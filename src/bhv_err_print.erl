@@ -26,5 +26,5 @@ handle_event(_, _, _) ->
 	not_handled.
 
 log(Bhv, Reason) ->
-	util:multiline("CRASHED in behaviour `~p' with reason:~n    ~.8p~n~ts", 
-				   [Bhv, Reason, choice:make(["sucks huuuuuge cock :(", "аццки уныл v_v"])]).
+	erlbot_util:multiline("CRASHED in behaviour `~p' with reason:~n    ~.8p~n~ts", 
+						  [Bhv, Reason, choice:make(["sucks huuuuuge cock :(", "аццки уныл v_v"])]).

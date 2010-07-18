@@ -31,18 +31,18 @@
 				count    :: integer()}).
 
 init(_) -> 
-	db_util:create_sequence(),
-	ok = db_util:init_table(user, [{disc_copies, [node()]},
-								   {index, [#user.ident]},
-								   {attributes, record_info(fields, user)}]),
-	ok = db_util:init_table(chan, [{disc_copies, [node()]},
-								   {index, [#chan.name]},
-								   {attributes, record_info(fields, chan)}]),
-	ok = db_util:init_table(histent, [{disc_copies, [node()]},
-									  {type, ordered_set},
-									  {attributes, record_info(fields, histent)}]),
-	ok = db_util:init_table(wstat, [{disc_copies, [node()]},
-									{attributes, record_info(fields, wstat)}]),
+	erlbot_db:create_sequence(),
+	ok = erlbot_db:init_table(user, [{disc_copies, [node()]},
+									 {index, [#user.ident]},
+									 {attributes, record_info(fields, user)}]),
+	ok = erlbot_db:init_table(chan, [{disc_copies, [node()]},
+									 {index, [#chan.name]},
+									 {attributes, record_info(fields, chan)}]),
+	ok = erlbot_db:init_table(histent, [{disc_copies, [node()]},
+										{type, ordered_set},
+										{attributes, record_info(fields, histent)}]),
+	ok = erlbot_db:init_table(wstat, [{disc_copies, [node()]},
+									  {attributes, record_info(fields, wstat)}]),
 	undefined.
 
 help(chancmd) ->
@@ -156,7 +156,7 @@ dump_lastseen(Histents, Chan, Irc) ->
 %% WSTAT -- word statistics
 
 update_wstat(Chan, Ident, Msg) ->
-	Words = util:words(Msg, 2), % don't count 1-letter words
+	Words = erlbot_util:words(Msg, 2), % don't count 1-letter words
 	mnesia:async_dirty(fun () ->
 							   Cid = chanid(Chan),
 							   Uid = userid(Ident),
@@ -274,7 +274,7 @@ userid(Ident) ->
 	case qlc:e(Q) of
 		[Id] -> Id;
 		[]   -> 
-			Id = db_util:sequence(user),
+			Id = erlbot_db:sequence(user),
 			mnesia:write(#user{uid = Id, ident = Ident}),
 			Id
 	end.
@@ -284,7 +284,7 @@ chanid(Channel) ->
 	case qlc:e(Q) of
 		[Id] -> Id;
 		[]   -> 
-			Id = db_util:sequence(channel),
+			Id = erlbot_db:sequence(channel),
 			mnesia:write(#chan{cid = Id, name = Channel}),
 			Id
 	end.
@@ -311,13 +311,13 @@ parse_number(S) ->
 		_                           -> undefined
 	end.
 
-parse_time([$- | HH], MM) -> util:convert_time_rel(list_to_integer(HH), list_to_integer(MM));
-parse_time(HH, MM)        -> util:convert_time_abs(list_to_integer(HH), list_to_integer(MM), yesterday).
+parse_time([$- | HH], MM) -> erlbot_util:convert_time_rel(list_to_integer(HH), list_to_integer(MM));
+parse_time(HH, MM)        -> erlbot_util:convert_time_abs(list_to_integer(HH), list_to_integer(MM), yesterday).
 
 print_hist_header({login_count, LoginCount}, Nick, Chan, Irc) ->
-	irc_conn:privmsg(Irc, Nick, nohist, util:multiline("History for ~s by ~p login(s)", [Chan, LoginCount]));
+	irc_conn:privmsg(Irc, Nick, nohist, erlbot_util:multiline("History for ~s by ~p login(s)", [Chan, LoginCount]));
 print_hist_header({time, From, To}, Nick, Chan, Irc) ->
-	irc_conn:privmsg(Irc, Nick, nohist, util:multiline("History for ~s from ~p to ~p~n", [Chan, From, To])).
+	irc_conn:privmsg(Irc, Nick, nohist, erlbot_util:multiline("History for ~s from ~p to ~p~n", [Chan, From, To])).
 
 %% Trace by specified login count.
 %% TODO: implement it!

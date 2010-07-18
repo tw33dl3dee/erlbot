@@ -14,7 +14,7 @@
 				 value  :: term()}).
 
 init() ->
-	ok = db_util:init_table(config, [{disc_copies, [node()]}, {attributes, record_info(fields, config)}]).
+	ok = erlbot_db:init_table(config, [{disc_copies, [node()]}, {attributes, record_info(fields, config)}]).
 
 get_value(Name, Default) -> 
 	case mnesia:dirty_read(config, Name) of

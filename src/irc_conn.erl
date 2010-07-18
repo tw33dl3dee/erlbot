@@ -411,7 +411,7 @@ add_umodes([], Current, Conn) ->
 add_umodes([Mode | Rest], Current, Conn) ->
 	case irc_modes:umode_to_atom(Mode) of 
 		undefined -> add_umodes(Rest, Current, Conn);
-		M         -> add_umodes(Rest, util:set_flag(M, Current), Conn)
+		M         -> add_umodes(Rest, erlbot_util:set_flag(M, Current), Conn)
 	end.
 
 remove_umodes([], Current, Conn) ->
@@ -419,6 +419,6 @@ remove_umodes([], Current, Conn) ->
 remove_umodes([Mode | Rest], Current, Conn) ->
 	case irc_modes:umode_to_atom(Mode) of 
 		undefined -> remove_umodes(Rest, Current, Conn);
-		M         -> remove_umodes(Rest, util:unset_flag(M, Current), Conn)
+		M         -> remove_umodes(Rest, erlbot_util:unset_flag(M, Current), Conn)
 	end.
 

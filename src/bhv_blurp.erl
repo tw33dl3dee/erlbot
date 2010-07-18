@@ -55,7 +55,7 @@ match_ctx(Message) -> match_ctx(Message, ?BLURP_CTX).
 match_ctx(_, []) ->
 	match_ctx(none);
 match_ctx(Msg, [[Pattern | Matches] | Rest]) ->
-	case util:contains(Msg, Pattern) of
+	case erlbot_util:contains(Msg, Pattern) of
 		true ->
 			Matches;
 		false ->

@@ -25,7 +25,7 @@
 -define(WCHAIN_PREFIX_SHIFTED, W2).  %% word prefix template shifted by 1
 
 init(_) -> 
-	ok = db_util:init_table(wchain, [{disc_copies, [node()]}, {attributes, record_info(fields, wchain)}]),
+	ok = erlbot_db:init_table(wchain, [{disc_copies, [node()]}, {attributes, record_info(fields, wchain)}]),
 	undefined.
 
 help(chancmd) ->
@@ -36,7 +36,7 @@ help(about) ->
 	"Генерация случайных предложений на основе цепей Маркова".
 
 handle_event(customevent, {markov, Chan, Message}, Irc) ->
-	case util:words(Message, 1) of
+	case erlbot_util:words(Message, 1) of
 		[]    -> not_handled;
 		Words -> show_markov_sentence(lists:last(Words), Chan, Irc)
 	end;
@@ -53,12 +53,12 @@ show_markov_sentence(Start, Target, Irc) ->
 	case gen_wchain(Start, ?WCHAIN_MAX_LEN) of
 		[] -> not_handled;
 		Sentence ->
-			Line = util:join(" ", Sentence),
+			Line = erlbot_util:join(" ", Sentence),
 			ok = irc_conn:chanmsg(Irc, Target, hist, [Line, "."])
 	end.
 
 update_wchain_text(Text) ->
-	Words = util:words(Text, 1),
+	Words = erlbot_util:words(Text, 1),
 	ok = update_wchain(Words).
 
 update_wchain([?WCHAIN_PREFIX, Wn | Words]) ->

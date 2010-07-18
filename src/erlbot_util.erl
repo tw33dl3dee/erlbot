@@ -1,4 +1,12 @@
--module(util).
+%%%-------------------------------------------------------------------
+%%% File    : erlbot_util.erl
+%%% Author  : Ivan Korotkov <twee@tweedle-dee.org>
+%%% Description : 
+%%%
+%%% Created : 18 Jul 2010 by Ivan Korotkov <twee@tweedle-dee.org>
+%%%-------------------------------------------------------------------
+-module(erlbot_util).
+
 -author("Ivan Korotkov <twee@tweedle-dee.org>").
 
 -export([multiline/1, multiline/2, split/1, split/2, contains/2, join/2, set_flag/2, unset_flag/2]).
@@ -244,7 +252,7 @@ convert_time_rel_diff(HH, MM) ->
 %% Relative time offset to universal datetime
 convert_time_rel(HH, MM) ->
 	Diff = convert_time_rel_diff(HH, MM),
-	{time, util:add_seconds(erlang:universaltime(), -Diff)}.
+	{time, add_seconds(erlang:universaltime(), -Diff)}.
 
 %% Absolutime time to universal datetime
 %% Shift may be `yesterday'  (when time is in future, it's shifted one day back) 
@@ -264,10 +272,10 @@ convert_time(HH, MM, {_YMD, {HH, MM, _}} = Now, tomorrow) ->
 	convert_time(Now);
 %% Otherwise, it's yesterday...
 convert_time(HH, MM, {YMD, _}, yesterday) ->
-	convert_time({util:add_days(YMD, -1), {HH, MM, 0}});
+	convert_time({add_days(YMD, -1), {HH, MM, 0}});
 %% ... or tomorrow.
 convert_time(HH, MM, {YMD, _}, tomorrow) ->
-	convert_time({util:add_days(YMD, 1), {HH, MM, 0}}).
+	convert_time({add_days(YMD, 1), {HH, MM, 0}}).
 
 %% Local time -> universal time | undefined
 convert_time(LT) ->

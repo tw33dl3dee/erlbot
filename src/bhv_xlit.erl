@@ -47,7 +47,7 @@ handle_event(_Type, _Event, _Irc) ->
 xlit(Irc, Chan, Hist) ->
 	{Nicks, Misspelled} = lists:unzip([{Nick, [L, $\n]} || {Nick, L} <- Hist, is_misspelled(L)]),
 	Arg1 = integer_to_list(length(Misspelled)),
-	{success, Xlitted} = util:execv("xlit2.pl", [Arg1], ?SCRIPT_DIR, Misspelled),
+	{success, Xlitted} = erlbot_util:execv("xlit2.pl", [Arg1], ?SCRIPT_DIR, Misspelled),
 	ok = show_xlitted(Irc, Chan, Xlitted, Nicks).
 
 %% BUG: this should never happen

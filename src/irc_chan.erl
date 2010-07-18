@@ -160,7 +160,7 @@ add_mode(Nick, [$o | Mode], Chan) ->
 	{value, User, Others} = lists:keytake(Nick, 2, Chan#chan.users),
 	add_mode(Nick, Mode, Chan#chan{users = Others ++ [setelement(1, User, op)]});
 add_mode(Nick, [$v | Mode], Chan) ->
-	NewUsers = lists:map(fun ({T, N, F}) when N =:= Nick -> {T, N, util:set_flag(voice, F)};
+	NewUsers = lists:map(fun ({T, N, F}) when N =:= Nick -> {T, N, erlbot_util:set_flag(voice, F)};
 							 (User)                      -> User end, Chan#chan.users),
 	add_mode(Nick, Mode, Chan#chan{users = NewUsers});
 add_mode(Nick, [_ | Mode], Chan) ->
@@ -172,7 +172,7 @@ remove_mode(Nick, [$o | Mode], Chan) ->
 	{value, User, Others} = lists:keytake(Nick, 2, Chan#chan.users),
 	remove_mode(Nick, Mode, Chan#chan{users = [setelement(1, User, user) | Others]});
 remove_mode(Nick, [$v | Mode], Chan) ->
-	NewUsers = lists:map(fun ({T, N, F}) when N =:= Nick -> {T, N, util:unset_flag(voice, F)};
+	NewUsers = lists:map(fun ({T, N, F}) when N =:= Nick -> {T, N, erlbot_util:unset_flag(voice, F)};
 							 (User)                -> User end, Chan#chan.users),
 	remove_mode(Nick, Mode, Chan#chan{users = NewUsers});
 remove_mode(Nick, [_ | Mode], Chan) ->

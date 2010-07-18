@@ -47,7 +47,7 @@ handle_event(cmdevent, {chancmd, Chan, _, ["uptime"]}, Irc) ->
 handle_event(cmdevent, {chancmd, Chan, ?USER(Nick), ["uuid"]}, Irc) ->
 	gen_uuid(Irc, Chan, Nick);
 handle_event(cmdevent, {chancmd, Chan, _, ["time"]}, Irc) ->
-	{success, [Time]} = util:system("date '+%a %b %d %R:%S %Z %Y'"),
+	{success, [Time]} = erlbot_util:system("date '+%a %b %d %R:%S %Z %Y'"),
 	ok = irc_conn:chanmsg(Irc, Chan, nohist, ["Точное время: ", Time, "."]);
 handle_event(cmdevent, {chancmd, Chan, ?USER(Nick), ["ping"]}, Irc) ->
 	ok = case choice:make(?PING_REPLIES(Nick)) of 
@@ -91,5 +91,5 @@ jabberwock(Irc, Chan) ->
 	ok = irc_conn:chanmsg(Irc, Chan, hist, "А вот ХУЙ вам, мне лениво.").
 
 gen_uuid(Irc, Chan, Nick) ->
-	{success, [Uuid]} = util:system("uuidgen"),
+	{success, [Uuid]} = erlbot_util:system("uuidgen"),
 	ok = irc_conn:chanmsg(Irc, Chan, hist, [Nick, ": ", Uuid]).

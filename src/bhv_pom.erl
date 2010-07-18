@@ -25,13 +25,13 @@ help(about) ->
 	"Фазы Луны".
 
 handle_event(cmdevent, {chancmd, Chan, _, ["mooon"]}, Irc) ->
-	{success, [Moon]} = util:system("pom"),
+	{success, [Moon]} = erlbot_util:system("pom"),
 	ok = irc_conn:chanmsg(Irc, Chan, hist, Moon);
 handle_event(cmdevent, {chancmd, Chan, _, ["moooon"]}, Irc) ->
 	% Emacs power!
 	Cmd = "emacs --batch -Q --eval '(progn (lunar-phases) (with-current-buffer  \"*Phases of Moon*\" (message (buffer-string))))' "
 		"2>&1 | grep -v ^Computing | tail -n +5 | head -n 8",
-	{success, Lines} = util:system(Cmd),
+	{success, Lines} = erlbot_util:system(Cmd),
 	ok = irc_conn:bulk_chanmsg(Irc, Chan, hist, Lines);
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.

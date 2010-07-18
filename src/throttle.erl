@@ -95,10 +95,10 @@ code_change(_Vsn, State, _Extra) ->
 %%%-------------------------------------------------------------------
 
 add_trace(Id, TimerRef) ->
-	#trace{id = Id, timer = TimerRef, times = [util:epoch(msec)]}.
+	#trace{id = Id, timer = TimerRef, times = [erlbot_util:epoch(msec)]}.
 
 filter_trace(Trace, MaxCount, Period) ->
-	Now = util:epoch(msec),
+	Now = erlbot_util:epoch(msec),
 	Times = lists:filter(fun (T) when Now - T > Period -> false;
 							 (_)                       -> true end,
 						 [Now | Trace#trace.times]),

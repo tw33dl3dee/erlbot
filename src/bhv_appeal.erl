@@ -52,7 +52,7 @@ handle_appeal(Cause, Source, ?USER(Nick) = User, Msg, Irc) ->
 appeal_type(Msg) -> appeal_type(?APPEAL_REGEX, Msg).
 
 appeal_type([{Type, Regexp} | Rest], Msg) ->
-	case util:contains(Msg, Regexp) of
+	case erlbot_util:contains(Msg, Regexp) of
 		true  -> Type;
 		false -> appeal_type(Rest, Msg)
 	end;

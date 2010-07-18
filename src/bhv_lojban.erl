@@ -42,15 +42,15 @@ handle_event(_Type, _Event, _Irc) ->
 	not_handled.
 
 jbofihe(Irc, Chan, Sentence) ->
-	{_, Lines} = util:system("head -n1 | jbofihe -x", [Sentence, $\n]),
+	{_, Lines} = erlbot_util:system("head -n1 | jbofihe -x", [Sentence, $\n]),
 	ok = irc_conn:bulk_chanmsg(Irc, Chan, hist, Lines).
 
 cmafihe(Irc, Chan, Sentence) ->
-	{_, Lines} = util:system("head -n1 | cmafihe", [Sentence, $\n]),
+	{_, Lines} = erlbot_util:system("head -n1 | cmafihe", [Sentence, $\n]),
 	ok = irc_conn:bulk_chanmsg(Irc, Chan, hist, Lines).
 
 jvocuhadju(Irc, Chan, Words) ->
-	{_, Lines} = util:execvp("jvocuhadju", Words),
+	{_, Lines} = erlbot_util:execvp("jvocuhadju", Words),
 	ok = irc_conn:bulk_chanmsg(Irc, Chan, hist, Lines).
 
 dict(Irc, Chan, Server, Db, Word) ->

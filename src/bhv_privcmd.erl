@@ -19,6 +19,6 @@ init(_) -> undefined.
 help(_) -> none.
 
 handle_event(genevent, {privmsg, User, Msg}, _Irc) ->
-	{new_event, cmdevent, {privcmd, User, util:split(Msg)}, undefined};
+	{new_event, cmdevent, {privcmd, User, erlbot_util:split(Msg)}, undefined};
 handle_event(_Type, _Event, _Irc) ->
 	not_handled.

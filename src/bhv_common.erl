@@ -17,7 +17,7 @@
 %% Execute script from script directory, piping it's output to channel
 %% If error occurs, displays error message and output
 pipe_script(Irc, Chan, Script, Args, Input) ->
-	case util:execv(Script, Args, ?SCRIPT_DIR, Input) of
+	case erlbot_util:execv(Script, Args, ?SCRIPT_DIR, Input) of
 		{success, Lines} ->
 			ok = irc_conn:bulk_chanmsg(Irc, Chan, hist, empty_check(Lines));
 		{{failure, ErrCode}, Trace} ->

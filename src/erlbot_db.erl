@@ -1,4 +1,12 @@
--module(db_util).
+%%%-------------------------------------------------------------------
+%%% File    : erlbot_db.erl
+%%% Author  : Ivan Korotkov <twee@tweedle-dee.org>
+%%% Description : 
+%%%
+%%% Created : 18 Jul 2010 by Ivan Korotkov <twee@tweedle-dee.org>
+%%%-------------------------------------------------------------------
+-module(erlbot_db).
+
 -author("Ivan Korotkov <twee@tweedle-dee.org>").
 
 %% External interfaces
