@@ -6,7 +6,7 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 
 %%% public interface
--export([start_link/0, connect/0, send_irc_command/1]).
+-export([start_link/0, connect/0, send_irc_command/2]).
 
 %% @type irc_event() = {Type, Originator} | {Type, Originator, Arg1} | {Type, Originator, Arg1, Arg2} | etc
 %%              Type = atom()
@@ -33,15 +33,15 @@
 %%% API
 
 start_link() ->
-	gen_server:start_link({local, ?MODULE}, self(), []).
+	gen_server:start_link({local, ?MODULE}, ?MODULE, self(), []).
 
 %% Initiate connection
 connect() ->
 	gen_server:cast(?MODULE, connect).
 
 %% Send IRC command (low-level)
-send_irc_command(Cmd) ->
-	gen_server:cast(?MODULE, {irc_command, Cmd}).
+send_irc_command(IrcRef, Cmd) ->
+	gen_server:cast(IrcRef, {irc_command, Cmd}).
 
 %%% gen_server callbacks
 

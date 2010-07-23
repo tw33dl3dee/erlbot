@@ -69,10 +69,8 @@ binary_to_characters(<<_Invalid:8, _Rest/binary>>, abort, _) ->
 %% If decoded string does not already contain "invalid sequence" marker at this position,
 %% add it. Thus, invalid multi-byte sequence is translated to only one marker.
 binary_to_characters(<<_Invalid:8, Rest/binary>>, skip, [?UTF8_INVALID_SEQ | _] = List) ->
-	io:format("UTF8: skipped byte ~p~n", [_Invalid]),
 	binary_to_characters(Rest, skip, List);
 binary_to_characters(<<_Invalid:8, Rest/binary>>, skip, List) ->
-	io:format("UTF8: skipped byte ~p, added mark~n", [_Invalid]),
 	binary_to_characters(Rest, skip, [?UTF8_INVALID_SEQ | List]);
 binary_to_characters(<<>>, _, List) ->
 	{utf8, lists:reverse(List)}.
@@ -107,7 +105,6 @@ check_split(Head, Rest) ->
 %% @doc Transforms AST into new one, replacing Latin string constants with Unicode strings
 %% @spec parse_transform(list(), list()) -> list()
 parse_transform(Tree, _Options) ->
-	%io:format("Tree: ~p, options: ~p~n", [Tree, _Options]),
 	parse_node(Tree).
 
 parse_node({remote, _, {atom, _, 'LATIN'}, {string, Line, LatinString}}) ->

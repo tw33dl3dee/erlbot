@@ -36,10 +36,9 @@ wait(Id, MaxCount, Period) ->
 wait(Id, MaxCount, Period, PreWait) ->
 	case gen_server:call(?MODULE, {wait, Id, MaxCount, Period}, infinity) of
 		ok ->
-			io:format("~p: nowait~n", [Id]),
 			{ok, nowait};
 		{wait, Delay} ->
-			io:format("~p: waiting ~p~n", [Id, Delay]),
+			error_logger:warning_report([{throttle, Id}, {delay, Delay}]),
 			timer:sleep(PreWait(Delay)),
 			% to ensure that `ok' is returned (no waiting) we pass MaxCount + 1;
 			% if race happens, last `times' element is not yet removed but we ignore it
@@ -81,7 +80,7 @@ handle_cast(_Msg, State) ->
 	{noreply, State}.
 
 handle_info({timeout, _, Id}, State) ->
-	io:format("Removing trace ~p~n", [Id]),
+	error_logger:info_report([{unthrottle, Id}]),
 	case remove_trace(Id, State) of {ok, _, NewState} -> {noreply, NewState} end.
 
 terminate(_Reason, _State) ->

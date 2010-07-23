@@ -13,20 +13,23 @@
 -export([start/2, stop/1]).
 -export([add_behaviour/1, remove_behaviour/1]).
 -export([reload_config/0, reload_code/0]).
--export([deploy/0]).
+-export([start/0, deploy/0]).
 
 %%====================================================================
 %%% Application callbacks
 %%====================================================================
 start(_Type, _StartArgs) ->
-	erlbot_sup:start_link(top),
-	irc_conn:connect().
+	{ok, Pid} = erlbot_sup:start_link(top),
+	irc_conn:connect(),
+	{ok, Pid}.
 
 stop(_State) -> ok.
 
 %%====================================================================
 %%% API
 %%====================================================================
+start() -> application:start(?MODULE).
+
 add_behaviour(BhvMod) ->
 	erlbot_sup:add_behaviour(BhvMod).
 

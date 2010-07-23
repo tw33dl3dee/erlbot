@@ -59,14 +59,15 @@
 
 %% Level = [top | ev]
 start_link(Level) ->
-	supervisor:start_link({local, ?MODULE}, ?MODULE, Level).
+	Name = list_to_atom("erlbot_sup_" ++ atom_to_list(Level)),
+	supervisor:start_link({local, Name}, ?MODULE, Level).
 
 add_behaviour(BhvMod) ->
-	{ok, _} = supervisor:start_child(?MODULE, ?CHILD_BHV(BhvMod)).
+	{ok, _} = supervisor:start_child(erlbot_sup_ev, ?CHILD_BHV(BhvMod)).
 
 remove_behaviour(BhvMod) ->
-	ok = supervisor:terminate_child(?MODULE, BhvMod),
-	supervisor:delete_child(?MODULE, BhvMod).
+	ok = supervisor:terminate_child(erlbot_sup_ev, BhvMod),
+	supervisor:delete_child(erlbot_sup_ev, BhvMod).
 
 %%%-------------------------------------------------------------------
 %%% Callback functions from supervisor

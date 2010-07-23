@@ -1,0 +1,25 @@
+{application, erlbot,
+ [
+  {description, ""},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib,
+                  sasl
+                 ]},
+  {mod, { erlbot, []}},
+  {env, [{host, "irc.twee.cc"},
+         {port, 6667},
+         {ping_timeout, 90000},
+         {sock_timeout, 60000},
+         {maxsend, 450},
+         {conn_rate, {2, 16000}},
+         {nick, "yest"},
+         {login, "yest"},
+         {real_name, "yest"},
+         {msg_interval, 200},
+         {behaviours, []},
+         {autojoin, ["#test"]},
+         {pretend_umode, []}]}
+ ]}.

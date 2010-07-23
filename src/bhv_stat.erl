@@ -58,7 +58,7 @@ update_stat(Ident, Lines, Chars) ->
 
 fix_stat() ->
 	AllUsr = qlc:q([L#lstat.ident || L <- mnesia:table(lstat)]),
-	mnesia:async_dirty(fun () -> [begin io:format("Fix ~s~n", [I]), 
+	mnesia:async_dirty(fun () -> [begin error_logger:info_report([{fix_stat, I}]), 
 										update_stat(I, 0, 0) 
 								  end || I <- qlc:eval(AllUsr)] end).
 
