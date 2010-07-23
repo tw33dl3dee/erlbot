@@ -24,8 +24,8 @@
 -define(CHILD(Mod, Args, Type),     {Mod, {Mod, start_link, Args}, permanent, ?CHILD_SHUTDOWN, Type, [Mod]}).
 -define(CHILD_DYN(Mod, Args, Type), {Mod, {Mod, start_link, Args}, permanent, ?CHILD_SHUTDOWN, Type, dynamic}).
 
--define(CHILD_BHV(Mod),{Mod, {irc_behaviour, start_link, [Mod]},
-						permanent, ?CHILD_SHUTDOWN, worker, irc_behaviour:modules(Mod)}).
+-define(CHILD_BHV(Mod),{Mod, {erlbot_behaviour, start_link, [erlbot_ev, Mod, undefined]},
+						permanent, ?CHILD_SHUTDOWN, worker, erlbot_behaviour:modules(Mod)}).
 
 %%% Process layout:
 %%%
@@ -78,5 +78,6 @@ init(top) ->
 										  ?CHILD(irc_conn, [], worker),
 										  ?CHILD(erlbot_sup, [ev], supervisor)]}};
 init(ev) ->
-	BhvChildren = [?CHILD_BHV(BhvName) || BhvName <- erlbot_config:get_value(behaviours)],
+	{ok, Behaviours} = application:get_env(behaviours),
+	BhvChildren = [?CHILD_BHV(BhvName) || BhvName <- Behaviours],
 	{ok, {{one_for_one, ?MAX_R, ?MAX_T}, [?CHILD_DYN(erlbot_ev, [], worker) | BhvChildren]}}.

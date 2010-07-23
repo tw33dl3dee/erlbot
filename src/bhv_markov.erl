@@ -7,8 +7,8 @@
 %%%-------------------------------------------------------------------
 -module(bhv_markov).
 
--behaviour(irc_behaviour).
--export([init/1, help/1, handle_event/3]).
+-behaviour(erlbot_behaviour).
+-export([init/1, help/1, handle_event/4]).
 -export([update_wchain_text/1, gen_wchain/2]).
 
 -include("utf8.hrl").
@@ -35,26 +35,26 @@ help(privcmd) ->
 help(about) ->
 	"Генерация случайных предложений на основе цепей Маркова".
 
-handle_event(customevent, {markov, Chan, Message}, Irc) ->
+handle_event(customevent, {markov, Chan, Message}, _, _) ->
 	case erlbot_util:words(Message, 1) of
 		[]    -> not_handled;
-		Words -> show_markov_sentence(lists:last(Words), Chan, Irc)
+		Words -> show_markov_sentence(lists:last(Words), Chan)
 	end;
-handle_event(cmdevent, {chancmd, Chan, _, ["markov", Word]}, Irc) ->
-	show_markov_sentence(Word, Chan, Irc);
-handle_event(cmdevent, {privcmd, ?USER(Nick), ["markov", Word]}, Irc) ->
-	show_markov_sentence(Word, Nick, Irc);
-handle_event(_Type, _Event, _Irc) ->
+handle_event(cmdevent, {chancmd, Chan, _, ["markov", Word]}, _, _) ->
+	show_markov_sentence(Word, Chan);
+handle_event(cmdevent, {privcmd, ?USER(Nick), ["markov", Word]}, _, _) ->
+	show_markov_sentence(Word, Nick);
+handle_event(_Type, _Event, _IrcState, _Data) ->
 	not_handled.
 
 -define(WCHAIN_MAX_LEN, 10).
 
-show_markov_sentence(Start, Target, Irc) ->
+show_markov_sentence(Start, Target) ->
 	case gen_wchain(Start, ?WCHAIN_MAX_LEN) of
 		[] -> not_handled;
 		Sentence ->
 			Line = erlbot_util:join(" ", Sentence),
-			ok = irc_conn:chanmsg(Irc, Target, hist, [Line, "."])
+			ok = irc_conn:chanmsg(Target, hist, [Line, "."])
 	end.
 
 update_wchain_text(Text) ->

@@ -7,8 +7,8 @@
 %%%-------------------------------------------------------------------
 -module(bhv_wiki).
 
--behaviour(irc_behaviour).
--export([init/1, help/1, handle_event/3]).
+-behaviour(erlbot_behaviour).
+-export([init/1, help/1, handle_event/4]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
@@ -24,19 +24,19 @@ help(privcmd) ->
 help(about) ->
 	"Цитирование Википедии".
 
-handle_event(cmdevent, {chancmd, Chan, _, ["w" | Topic]}, Irc) when length(Topic) > 0 ->
-	wiki_topic(Irc, Chan, "en", Topic);
-handle_event(cmdevent, {chancmd, Chan, _, ["в" | Topic]}, Irc) when length(Topic) > 0 ->
-	wiki_topic(Irc, Chan, "ru", Topic);
-handle_event(cmdevent, {chancmd, Chan, _, ["ww" | Topic]}, Irc) when length(Topic) > 0 ->
-	wiki_search(Irc, Chan, "en", Topic);
-handle_event(cmdevent, {chancmd, Chan, _, ["вв" | Topic]}, Irc) when length(Topic) > 0 ->
-	wiki_search(Irc, Chan, "ru", Topic);
-handle_event(_Type, _Event, _Irc) ->
+handle_event(cmdevent, {chancmd, Chan, _, ["w" | Topic]}, _, _) when length(Topic) > 0 ->
+	wiki_topic(Chan, "en", Topic);
+handle_event(cmdevent, {chancmd, Chan, _, ["в" | Topic]}, _, _) when length(Topic) > 0 ->
+	wiki_topic(Chan, "ru", Topic);
+handle_event(cmdevent, {chancmd, Chan, _, ["ww" | Topic]}, _, _) when length(Topic) > 0 ->
+	wiki_search(Chan, "en", Topic);
+handle_event(cmdevent, {chancmd, Chan, _, ["вв" | Topic]}, _, _) when length(Topic) > 0 ->
+	wiki_search(Chan, "ru", Topic);
+handle_event(_Type, _Event, _IrcState, _Data) ->
 	not_handled.
 
-wiki_topic(Irc, Chan, Lang, SearchQuery) ->
-	ok = bhv_common:pipe_script(Irc, Chan, "wiki.py", ["-l", Lang | SearchQuery]).
+wiki_topic(Chan, Lang, SearchQuery) ->
+	ok = bhv_common:pipe_script(Chan, "wiki.py", ["-l", Lang | SearchQuery]).
 
-wiki_search(Irc, Chan, Lang, SearchQuery) ->
-	ok = bhv_common:pipe_script(Irc, Chan, "wiki.py", ["-l", Lang, "-s" | SearchQuery]).
+wiki_search(Chan, Lang, SearchQuery) ->
+	ok = bhv_common:pipe_script(Chan, "wiki.py", ["-l", Lang, "-s" | SearchQuery]).

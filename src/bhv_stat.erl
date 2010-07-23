@@ -7,9 +7,9 @@
 %%%-------------------------------------------------------------------
 -module(bhv_stat).
 
--behaviour(irc_behaviour).
--export([init/1, help/1, handle_event/3]).
--export([fix_stat/1, get_stat/0]).
+-behaviour(erlbot_behaviour).
+-export([init/1, help/1, handle_event/4]).
+-export([fix_stat/0, get_stat/0]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
@@ -39,15 +39,15 @@ help(about) ->
 
 %% We could use either `genevent' for counting (which includes public commands to bot) or
 %% `msgevent' (which excludes "<botnick>: " part from appeals.
-handle_event(genevent, {What, _, ?USER2(_, Ident), Msg}, _Irc) when What =:= chanmsg; What =:= action ->
+handle_event(genevent, {What, _, ?USER2(_, Ident), Msg}, _, _) when What =:= chanmsg; What =:= action ->
 	update_stat(Ident, 1, length(Msg));
-%handle_event(msgevent, {_, _, ?USER2(_, Ident), Msg}, _Irc) ->
+%handle_event(msgevent, {_, _, ?USER2(_, Ident), Msg}, _, _) ->
 %	update_stat(Ident, 1, length(Msg));
-handle_event(cmdevent, {chancmd, Chan, ?USER2(_, Ident), ["stat" | _]}, Irc) ->
-	ok = irc_conn:bulk_chanmsg(Irc, Chan, nohist, show_stat(Ident));
-handle_event(cmdevent, {privcmd, ?USER2(Nick, Ident), ["stat" | _]}, Irc) ->
-	ok = irc_conn:bulk_privmsg(Irc, Nick, nohist, show_stat(Ident));
-handle_event(_Type, _Event, _Irc) ->
+handle_event(cmdevent, {chancmd, Chan, ?USER2(_, Ident), ["stat" | _]}, _, _) ->
+	ok = irc_conn:bulk_chanmsg(Chan, nohist, show_stat(Ident));
+handle_event(cmdevent, {privcmd, ?USER2(Nick, Ident), ["stat" | _]}, _, _) ->
+	ok = irc_conn:bulk_privmsg(Nick, nohist, show_stat(Ident));
+handle_event(_Type, _Event, _IrcState, _Data) ->
 	not_handled.
 
 update_stat(Ident, Lines, Chars) ->
@@ -56,9 +56,7 @@ update_stat(Ident, Lines, Chars) ->
 	mnesia:async_dirty(fun update_first_day/1, [Ident]),
 	ok.
 
-fix_stat(IrcName) ->
-	irc_client:remove_behaviour(IrcName, ?MODULE),
-	irc_client:add_behaviour(IrcName, ?MODULE),
+fix_stat() ->
 	AllUsr = qlc:q([L#lstat.ident || L <- mnesia:table(lstat)]),
 	mnesia:async_dirty(fun () -> [begin io:format("Fix ~s~n", [I]), 
 										update_stat(I, 0, 0) 

@@ -7,8 +7,8 @@
 %%%-------------------------------------------------------------------
 -module(bhv_blurp).
 
--behaviour(irc_behaviour).
--export([init/1, help/1, handle_event/3]).
+-behaviour(erlbot_behaviour).
+-export([init/1, help/1, handle_event/4]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
@@ -19,9 +19,9 @@ init(_) -> undefined.
 help(_) -> none.
 
 %% Bot can react to any `genmsg', direct or induced from `maybe_appeal'.
-handle_event(_, {genmsg, Chan, _User, Msg}, Irc) ->
-	do_blurp(Irc, Chan, Msg);
-handle_event(_Type, _Event, _Irc) ->
+handle_event(_, {genmsg, Chan, _User, Msg}, _, _) ->
+	do_blurp(Chan, Msg);
+handle_event(_Type, _Event, _IrcState, _Data) ->
 	not_handled.
 
 -define(BLURP_DELAY, 1000).   % msec
@@ -39,12 +39,12 @@ handle_event(_Type, _Event, _Irc) ->
 					["спокойн.*ночи", 5, % 1/5
 					 "Спокойной ночи, приятных снов, желаю увидеть ослов и козлов!"]]).
 
-do_blurp(Irc, Chan, Message) ->
+do_blurp(Chan, Message) ->
 	[RevProb | Words] = match_ctx(Message),
 	case choice:make([{1, do}, {RevProb - 1, dont}]) of
 		do ->
 			timer:sleep(?BLURP_DELAY),
-			print_blurp(Irc, Chan, Message, Words);
+			print_blurp(Chan, Message, Words);
 		dont ->
 			not_handled
 	end.
@@ -62,7 +62,7 @@ match_ctx(Msg, [[Pattern | Matches] | Rest]) ->
 			match_ctx(Msg, Rest)
 	end.
 
-print_blurp(_Irc, Chan, Message, [markov]) ->
+print_blurp(Chan, Message, [markov]) ->
 	{new_event, customevent, {markov, Chan, Message}, undefined};
-print_blurp(Irc, Chan, _Message, Words) ->
-	ok = irc_conn:chanmsg(Irc, Chan, hist, choice:make(Words)).
+print_blurp(Chan, _Message, Words) ->
+	ok = irc_conn:chanmsg(Chan, hist, choice:make(Words)).

@@ -7,9 +7,9 @@
 %%%-------------------------------------------------------------------
 -module(bhv_history).
 
--behaviour(irc_behaviour).
--export([init/1, help/1, handle_event/3]).
--export([fix_wstat/1, get_wstat/2, get_history/2, fix_wchain/0]).
+-behaviour(erlbot_behaviour).
+-export([init/1, help/1, handle_event/4]).
+-export([fix_wstat/0, get_wstat/2, get_history/2, fix_wchain/0]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
@@ -58,72 +58,72 @@ verbose_help() ->
 	["    время может задаваться как h.mm, h:mm, -h.mm, -h:mm",
 	 "    (отрицательное время считается от текущего)"].
 
-handle_event(genevent, {chanmsg, Chan, ?USER2(Nick, Ident), Msg}, _Irc) ->
+handle_event(genevent, {chanmsg, Chan, ?USER2(Nick, Ident), Msg}, _, _) ->
 	update_wstat(Chan, Ident, Msg),
 	save_histent(Chan, Ident, {chanmsg, Nick, Msg});
-handle_event(genevent, {action, Chan, ?USER2(Nick, Ident), Msg}, _Irc) ->
+handle_event(genevent, {action, Chan, ?USER2(Nick, Ident), Msg}, _, _) ->
 	update_wstat(Chan, Ident, Msg),
 	save_histent(Chan, Ident, {action, Nick, Msg});
-handle_event(selfevent, {chanmsg, Chan, hist, Msg}, Irc) ->
-	save_histent(Chan, me, {chanmsg, my_nick(Irc), Msg});
-handle_event(selfevent, {action, Chan, hist, Msg}, Irc) ->
-	save_histent(Chan, me, {action, my_nick(Irc), Msg});
-handle_event(chanevent, {topic, Chan, ?USER2(Nick, Ident), Topic}, _Irc) ->
+handle_event(selfevent, {chanmsg, Chan, hist, Msg}, IrcState, _) ->
+	save_histent(Chan, me, {chanmsg, IrcState#irc_state.nick, Msg});
+handle_event(selfevent, {action, Chan, hist, Msg}, IrcState, _) ->
+	save_histent(Chan, me, {action, IrcState#irc_state.nick, Msg});
+handle_event(chanevent, {topic, Chan, ?USER2(Nick, Ident), Topic}, IrcState, _) ->
 	save_histent(Chan, Ident, {topic, Nick, Topic});
-handle_event(chanevent, {mytopic, Chan, _, Topic}, Irc) ->
-	save_histent(Chan, me, {topic, my_nick(Irc), Topic});
-handle_event(chanevent, {join, Chan, ?USER2(Nick, Ident)}, _Irc) ->
+handle_event(chanevent, {mytopic, Chan, _, Topic}, IrcState, _) ->
+	save_histent(Chan, me, {topic, IrcState#irc_state.nick, Topic});
+handle_event(chanevent, {join, Chan, ?USER2(Nick, Ident)}, IrcState, _) ->
 	save_histent(Chan, Ident, {join, Nick});
-handle_event(chanevent, {joined, Chan, Topic, _}, Irc) ->
-	save_histent(Chan, me, {joined, my_nick(Irc), Topic});
-handle_event(chanevent, {part, Chan, ?USER2(Nick, Ident), Reason}, _Irc) ->
+handle_event(chanevent, {joined, Chan, Topic, _}, IrcState, _) ->
+	save_histent(Chan, me, {joined, IrcState#irc_state.nick, Topic});
+handle_event(chanevent, {part, Chan, ?USER2(Nick, Ident), Reason}, IrcState, _) ->
 	save_histent(Chan, Ident, {part, Nick, Reason});
-handle_event(chanevent, {parted, Chan}, Irc) ->
-	save_histent(Chan, me, {part, my_nick(Irc), []});
-handle_event(chanevent, {quit, Chan, ?USER2(Nick, Ident), Reason}, _Irc) ->
+handle_event(chanevent, {parted, Chan}, IrcState, _) ->
+	save_histent(Chan, me, {part, IrcState#irc_state.nick, []});
+handle_event(chanevent, {quit, Chan, ?USER2(Nick, Ident), Reason}, IrcState, _) ->
 	save_histent(Chan, Ident, {quit, Nick, Reason});
-handle_event(chanevent, {kick, Chan, ?USER2(Nick1, Ident), Nick2, Reason}, _Irc) ->
+handle_event(chanevent, {kick, Chan, ?USER2(Nick1, Ident), Nick2, Reason}, IrcState, _) ->
 	save_histent(Chan, Ident, {kick, Nick1, Nick2, Reason});
-handle_event(chanevent, {kicked, Chan, ?USER2(Nick, Ident), Reason}, Irc) ->
-	save_histent(Chan, Ident, {kick, Nick, my_nick(Irc), Reason});
-handle_event(chanevent, {mode, Chan, ?USER2(Nick1, Ident), Mode, Nick2}, _Irc) ->
+handle_event(chanevent, {kicked, Chan, ?USER2(Nick, Ident), Reason}, IrcState, _) ->
+	save_histent(Chan, Ident, {kick, Nick, IrcState#irc_state.nick, Reason});
+handle_event(chanevent, {mode, Chan, ?USER2(Nick1, Ident), Mode, Nick2}, IrcState, _) ->
 	save_histent(Chan, Ident, {mode, Nick1, Mode, Nick2});
-handle_event(chanevent, {mymode, Chan, ?USER2(Nick, Ident), Mode, _}, Irc) ->
-	save_histent(Chan, Ident, {mode, Nick, Mode, my_nick(Irc)});
-handle_event(chanevent, {nick, Chan, Nick2, ?USER2(Nick1, Ident)}, _Irc) ->
+handle_event(chanevent, {mymode, Chan, ?USER2(Nick, Ident), Mode, _}, IrcState, _) ->
+	save_histent(Chan, Ident, {mode, Nick, Mode, IrcState#irc_state.nick});
+handle_event(chanevent, {nick, Chan, Nick2, ?USER2(Nick1, Ident)}, _, _) ->
 	save_histent(Chan, Ident, {nick, Nick1, Nick2});
-handle_event(cmdevent, {privcmd, ?USER(Nick), ["hist", Chan | Rest]}, Irc) when ?IS_CHAN(Chan) ->
-	show_history(Nick, Chan, Rest, Irc);
-handle_event(cmdevent, {privcmd, ?USER(Nick), ["hist" | _]}, Irc) ->
-	give_help(Nick, Irc);
-handle_event(cmdevent, {chancmd, Chan, ?USER(Nick), ["hist" | Rest]}, Irc) ->
-	show_history(Nick, Chan, Rest, Irc);
-handle_event(cmdevent, {chancmd, Chan, _, ["lastseen", TargetNick]}, Irc) ->
-	show_lastseen(Chan, {nick, TargetNick}, Irc);
-handle_event(cmdevent, {chancmd, Chan, _, ["wstat"]}, Irc) ->
-	show_wstat(Chan, Chan, all, Irc);
-handle_event(cmdevent, {chancmd, Chan, _, ["wstat", TargetNick]}, Irc) ->
-	show_wstat(Chan, Chan, {nick, TargetNick}, Irc);
-handle_event(cmdevent, {privcmd, ?USER(Nick), ["wstat", Chan]}, Irc) ->
-	show_wstat(Chan, Nick, all, Irc);
-handle_event(cmdevent, {privcmd, ?USER(Nick), ["wstat", Chan, TargetNick]}, Irc) ->
-	show_wstat(Chan, Nick, {nick, TargetNick}, Irc);
-handle_event(_Type, _Event, _Irc) ->
+handle_event(cmdevent, {privcmd, ?USER(Nick), ["hist", Chan | Rest]}, _, _) when ?IS_CHAN(Chan) ->
+	show_history(Nick, Chan, Rest);
+handle_event(cmdevent, {privcmd, ?USER(Nick), ["hist" | _]}, _, _) ->
+	give_help(Nick);
+handle_event(cmdevent, {chancmd, Chan, ?USER(Nick), ["hist" | Rest]}, _, _) ->
+	show_history(Nick, Chan, Rest);
+handle_event(cmdevent, {chancmd, Chan, _, ["lastseen", TargetNick]}, _, _) ->
+	show_lastseen(Chan, {nick, TargetNick});
+handle_event(cmdevent, {chancmd, Chan, _, ["wstat"]}, _, _) ->
+	show_wstat(Chan, Chan, all);
+handle_event(cmdevent, {chancmd, Chan, _, ["wstat", TargetNick]}, _, _) ->
+	show_wstat(Chan, Chan, {nick, TargetNick});
+handle_event(cmdevent, {privcmd, ?USER(Nick), ["wstat", Chan]}, _, _) ->
+	show_wstat(Chan, Nick, all);
+handle_event(cmdevent, {privcmd, ?USER(Nick), ["wstat", Chan, TargetNick]}, _, _) ->
+	show_wstat(Chan, Nick, {nick, TargetNick});
+handle_event(_Type, _Event, _IrcState, _Data) ->
 	not_handled.
 
-give_help(Nick, Irc) ->
-	irc_conn:bulk_privmsg(Irc, Nick, nohist, ["Ебани тебя оса..."]),
-	ok = irc_conn:bulk_privmsg(Irc, Nick, nohist, verbose_help()).
+give_help(Nick) ->
+	irc_conn:bulk_privmsg(Nick, nohist, ["Ебани тебя оса..."]),
+	ok = irc_conn:bulk_privmsg(Nick, nohist, verbose_help()).
 
 %% LASTSEEN -- when user was last seen on channel
 
-show_lastseen(Chan, Target, Irc) ->
+show_lastseen(Chan, Target) ->
 	case trace_lastseen(Chan, Target) of
-		[] -> dump_lastseen([], Chan, Irc);
+		[] -> dump_lastseen([], Chan);
 		[#histent{uid = Uid} = LastByNick] ->	
 			case trace_lastseen(Chan, {uid, Uid}) of
-				[LastByNick] -> dump_lastseen([LastByNick], Chan, Irc);
-				[LastById]   -> dump_lastseen([LastById, LastByNick], Chan, Irc)
+				[LastByNick] -> dump_lastseen([LastByNick], Chan);
+				[LastById]   -> dump_lastseen([LastById, LastByNick], Chan)
 			end
 	end.
 
@@ -149,9 +149,9 @@ trace_lastseen(Chan, {nick, Nick}) ->
 				  ?HIST_EVENT_BYNICK(H#histent.event, Nick)], [{join, lookup}]),
 	fetch_first(Q).
 
-dump_lastseen(Histents, Chan, Irc) ->
-	bhv_common:empty_check(Irc, Chan, Histents),
-	dump_histents(long, lists:sort(Histents), Chan, Irc).
+dump_lastseen(Histents, Chan) ->
+	bhv_common:empty_check(Chan, Histents),
+	dump_histents(long, lists:sort(Histents), Chan).
 
 %% WSTAT -- word statistics
 
@@ -164,9 +164,9 @@ update_wstat(Chan, Ident, Msg) ->
 							   ok
 					   end).
 
-show_wstat(Chan, Source, Target, Irc) ->
+show_wstat(Chan, Source, Target) ->
 	Wstat = get_wstat(Chan, Target),
-	dump_wstat(Wstat, Source, Irc).
+	dump_wstat(Wstat, Source).
 
 get_wstat(Chan, {nick, TargetNick}) ->
 	case trace_lastseen(Chan, {nick, TargetNick}) of
@@ -214,20 +214,18 @@ top_wstat(StatByUser) ->
 					   end, Stat),
 	lists:keysort(1, dict:to_list(TopStat)).
 
-dump_wstat(TopStat, Source, Irc) ->
-	bhv_common:empty_check(Irc, Source, TopStat),
-	[dump_wstat_user(Id, Total, Words, Source, Irc) || 
+dump_wstat(TopStat, Source) ->
+	bhv_common:empty_check(Source, TopStat),
+	[dump_wstat_user(Id, Total, Words, Source) || 
 		{Id, {Total, Words}} <- TopStat, 
 		Total >= ?WSTAT_MIN_SHOW_COUNT],
 	ok.
 
-dump_wstat_user(Ident, _Total, Words, Chan, Irc) ->
-	ok = irc_conn:chanmsg(Irc, Chan, hist,
+dump_wstat_user(Ident, _Total, Words, Chan) ->
+	ok = irc_conn:chanmsg(Chan, hist,
 						  [Ident, ": ", [[Word, " (", integer_to_list(Count), ") "] || {Count, Word} <- Words]]).
 
-fix_wstat(IrcName) ->
-	irc_client:remove_behaviour(IrcName, ?MODULE),
-	irc_client:add_behaviour(IrcName, ?MODULE),
+fix_wstat() ->
 	Q = qlc:q([{Ch#chan.name, U#user.ident, Msg} ||
 				  #histent{event = {Event, _, Msg}} = H <- mnesia:table(histent),
 				  Ch <- mnesia:table(chan),
@@ -249,12 +247,12 @@ save_histent(Chan, Ident, Event) ->
 														  event     = Event})
 							end).
 
-show_history(Nick, Chan, Param, Irc) ->
+show_history(Nick, Chan, Param) ->
 	case parse_hist_param(Param) of
-		undefined -> give_help(Nick, Irc);
-		P -> print_hist_header(P, Nick, Chan, Irc),
+		undefined -> give_help(Nick);
+		P -> print_hist_header(P, Nick, Chan),
 			 Histents = get_history(Chan, P),
-			 ok = dump_histents(short, Histents, Nick, Irc)
+			 ok = dump_histents(short, Histents, Nick)
 	end.
 
 % Convert current datetime to timestamp suitable for storing in DB.
@@ -314,10 +312,10 @@ parse_number(S) ->
 parse_time([$- | HH], MM) -> erlbot_util:convert_time_rel(list_to_integer(HH), list_to_integer(MM));
 parse_time(HH, MM)        -> erlbot_util:convert_time_abs(list_to_integer(HH), list_to_integer(MM), yesterday).
 
-print_hist_header({login_count, LoginCount}, Nick, Chan, Irc) ->
-	irc_conn:privmsg(Irc, Nick, nohist, erlbot_util:multiline("History for ~s by ~p login(s)", [Chan, LoginCount]));
-print_hist_header({time, From, To}, Nick, Chan, Irc) ->
-	irc_conn:privmsg(Irc, Nick, nohist, erlbot_util:multiline("History for ~s from ~p to ~p~n", [Chan, From, To])).
+print_hist_header({login_count, LoginCount}, Nick, Chan) ->
+	irc_conn:privmsg(Nick, nohist, erlbot_util:multiline("History for ~s by ~p login(s)", [Chan, LoginCount]));
+print_hist_header({time, From, To}, Nick, Chan) ->
+	irc_conn:privmsg(Nick, nohist, erlbot_util:multiline("History for ~s from ~p to ~p~n", [Chan, From, To])).
 
 %% Trace by specified login count.
 %% TODO: implement it!
@@ -335,9 +333,9 @@ get_history(Chan, {time, From, To}) ->
 		{atomic, Histents} -> Histents
 	end.
 
-dump_histents(TimeFormat, Histents, Target, Irc) ->
+dump_histents(TimeFormat, Histents, Target) ->
 	Lines = [histent_to_list(TimeFormat, H) || H <- Histents],
-	ok = irc_conn:bulk_privmsg(Irc, Target, nohist, Lines).
+	ok = irc_conn:bulk_privmsg(Target, nohist, Lines).
 
 histent_to_list(TimeFormat, #histent{timestamp = TS, event = Event}) ->
 	[timestamp_to_list(TimeFormat, TS), " ", event_to_list(Event)].
@@ -377,8 +375,6 @@ event_to_list(Ev) ->
 	["??? какая-то Неведомая Ебанная Хуйня: ", io_lib:format("~p", [Ev])].
 
 %% Utility
-
-my_nick(#irc{nick = Nick}) -> Nick.
 
 fetch_first(Q) ->
 	case mnesia:transaction(fun () -> C = qlc:cursor(Q),

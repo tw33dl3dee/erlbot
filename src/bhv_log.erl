@@ -7,8 +7,8 @@
 %%%-------------------------------------------------------------------
 -module(bhv_log).
 
--behaviour(irc_behaviour).
--export([init/1, help/1, handle_event/3]).
+-behaviour(erlbot_behaviour).
+-export([init/1, help/1, handle_event/4]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
@@ -18,6 +18,6 @@ init(_) -> undefined.
 
 help(_) -> none.
 
-handle_event(Type, Event, _Irc) ->
-	ok = io:format("*** ~p: ~p~n", [Type, Event]).
+handle_event(Type, Event, _IrcState, _Data) ->
+	ok = error_logger:info_report([irc_event, {type, Type}, {event, Event}]).
 

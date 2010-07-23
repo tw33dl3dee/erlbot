@@ -7,8 +7,8 @@
 %%%-------------------------------------------------------------------
 -module(bhv_greet).
 
--behaviour(irc_behaviour).
--export([init/1, help/1, handle_event/3]).
+-behaviour(erlbot_behaviour).
+-export([init/1, help/1, handle_event/4]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
@@ -19,13 +19,13 @@ init(_) -> [].
 
 help(_) -> none.
 
-handle_event(chanevent, {joined, Chan, _, _}, Irc) ->
-	case lists:member(Chan, Irc#irc.data) of
+handle_event(chanevent, {joined, Chan, _, _}, _, Data) ->
+	case lists:member(Chan, Data) of
 		true ->
 			not_handled;
 		false ->
-			bhv_common:identify(Irc, Chan, greet),
-			{ok, [Chan | Irc#irc.data]}
+			bhv_common:identify(Chan, greet),
+			{ok, [Chan | Data]}
 	end;
-handle_event(_Type, _Event, _Irc) ->
+handle_event(_Type, _Event, _IrcState, _Data) ->
 	not_handled.

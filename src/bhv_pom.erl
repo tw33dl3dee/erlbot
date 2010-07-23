@@ -7,8 +7,8 @@
 %%%-------------------------------------------------------------------
 -module(bhv_pom).
 
--behaviour(irc_behaviour).
--export([init/1, help/1, handle_event/3]).
+-behaviour(erlbot_behaviour).
+-export([init/1, help/1, handle_event/4]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
@@ -24,14 +24,14 @@ help(privcmd) ->
 help(about) ->
 	"Фазы Луны".
 
-handle_event(cmdevent, {chancmd, Chan, _, ["mooon"]}, Irc) ->
+handle_event(cmdevent, {chancmd, Chan, _, ["mooon"]}, _, _) ->
 	{success, [Moon]} = erlbot_util:system("pom"),
-	ok = irc_conn:chanmsg(Irc, Chan, hist, Moon);
-handle_event(cmdevent, {chancmd, Chan, _, ["moooon"]}, Irc) ->
+	ok = irc_conn:chanmsg(Chan, hist, Moon);
+handle_event(cmdevent, {chancmd, Chan, _, ["moooon"]}, _, _) ->
 	% Emacs power!
 	Cmd = "emacs --batch -Q --eval '(progn (lunar-phases) (with-current-buffer  \"*Phases of Moon*\" (message (buffer-string))))' "
 		"2>&1 | grep -v ^Computing | tail -n +5 | head -n 8",
 	{success, Lines} = erlbot_util:system(Cmd),
-	ok = irc_conn:bulk_chanmsg(Irc, Chan, hist, Lines);
-handle_event(_Type, _Event, _Irc) ->
+	ok = irc_conn:bulk_chanmsg(Chan, hist, Lines);
+handle_event(_Type, _Event, _IrcState, _Data) ->
 	not_handled.

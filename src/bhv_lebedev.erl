@@ -7,8 +7,8 @@
 %%%-------------------------------------------------------------------
 -module(bhv_lebedev).
 
--behaviour(irc_behaviour).
--export([init/1, help/1, handle_event/3]).
+-behaviour(erlbot_behaviour).
+-export([init/1, help/1, handle_event/4]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
@@ -24,21 +24,21 @@ help(privcmd) ->
 help(about) ->
 	"Линч Лебедева".
 
-handle_event(chanevent, {joined, Chan, ?TOPIC(""), _}, Irc) ->
-	lynch(Irc, Chan, topic);
-handle_event(cmdevent, {chancmd, Chan, _, ["lynch", "topic" | _]}, Irc) ->
-	lynch(Irc, Chan, topic);
-handle_event(cmdevent, {chancmd, Chan, _, ["lynchtopic" | _]}, Irc) ->
-	lynch(Irc, Chan, topic);
-handle_event(cmdevent, {chancmd, Chan, _, ["lynch" | _]}, Irc) ->
-	lynch(Irc, Chan, message);
-handle_event(_Type, _Event, _Irc) ->
+handle_event(chanevent, {joined, Chan, ?TOPIC(""), _}, _, _) ->
+	lynch(Chan, topic);
+handle_event(cmdevent, {chancmd, Chan, _, ["lynch", "topic" | _]}, _, _) ->
+	lynch(Chan, topic);
+handle_event(cmdevent, {chancmd, Chan, _, ["lynchtopic" | _]}, _, _) ->
+	lynch(Chan, topic);
+handle_event(cmdevent, {chancmd, Chan, _, ["lynch" | _]}, _, _) ->
+	lynch(Chan, message);
+handle_event(_Type, _Event, _IrcState, _Data) ->
 	not_handled.
 
 -define(LYNCH_FILE, "data/lynch.txt").
 
-lynch(Irc, Chan, Target) ->
-	print_lynch(Irc, Chan, Target, lynch_message()).
+lynch(Chan, Target) ->
+	print_lynch(Chan, Target, lynch_message()).
 
 lynch_message() ->
 	{ok, Data} = file:read_file(?LYNCH_FILE),
@@ -46,5 +46,5 @@ lynch_message() ->
 	LineNo = choice:uniform(length(Lines)),
 	lists:nth(LineNo, Lines).
 
-print_lynch(Irc, Chan, topic, Lynch) ->   ok = irc_conn:topic(Irc, Chan, Lynch);
-print_lynch(Irc, Chan, message, Lynch) -> ok = irc_conn:chanmsg(Irc, Chan, nohist, Lynch).
+print_lynch(Chan, topic, Lynch) ->   ok = irc_conn:topic(Chan, Lynch);
+print_lynch(Chan, message, Lynch) -> ok = irc_conn:chanmsg(Chan, nohist, Lynch).

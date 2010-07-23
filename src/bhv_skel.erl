@@ -7,8 +7,8 @@
 %%%-------------------------------------------------------------------
 -module(bhv_skel).
 
--behaviour(irc_behaviour).
--export([init/1, help/1, handle_event/3]).
+-behaviour(erlbot_behaviour).
+-export([init/1, help/1, handle_event/4]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
@@ -23,5 +23,5 @@ help(privcmd) ->
 help(about) ->
 	"Behaviour skeleton".
 
-handle_event(_Type, _Event, _Irc) ->
+handle_event(_Type, _Event, _IrcState, _Data) ->
 	not_handled.

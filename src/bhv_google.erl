@@ -7,8 +7,8 @@
 %%%-------------------------------------------------------------------
 -module(bhv_google).
 
--behaviour(irc_behaviour).
--export([init/1, help/1, handle_event/3]).
+-behaviour(erlbot_behaviour).
+-export([init/1, help/1, handle_event/4]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
@@ -27,38 +27,38 @@ help(privcmd) ->
 help(about) ->
 	"Поиск по Google".
 
-handle_event(cmdevent, {chancmd, Chan, _, ["gg" | Query]}, Irc) when length(Query) > 0 ->
-	google_search(Irc, Chan, "en", Query);
-handle_event(cmdevent, {chancmd, Chan, _, ["гг" | Query]}, Irc) when length(Query) > 0 ->
-	google_search(Irc, Chan, "ru", Query);
-handle_event(cmdevent, {chancmd, Chan, _, ["gc" | Query]}, Irc) when length(Query) > 0 ->
-	google_calc(Irc, Chan, "en", Query);
-handle_event(cmdevent, {chancmd, Chan, _, ["гк" | Query]}, Irc) when length(Query) > 0 ->
-	google_calc(Irc, Chan, "ru", Query);
-handle_event(cmdevent, {chancmd, Chan, _, ["gd" | Query]}, Irc) when length(Query) > 0 ->
-	google_define(Irc, Chan, "en", Query);
-handle_event(cmdevent, {chancmd, Chan, _, ["гд" | Query]}, Irc) when length(Query) > 0 ->
-	google_define(Irc, Chan, "ru", Query);
-handle_event(cmdevent, {chancmd, Chan, _, ["vs", Word1, Word2]}, Irc) ->
-	google_fight(Irc, Chan, "ru", Word1, Word2);
-handle_event(cmdevent, {chancmd, Chan, _, [Lang | Words]}, Irc) 
+handle_event(cmdevent, {chancmd, Chan, _, ["gg" | Query]}, _, _) when length(Query) > 0 ->
+	google_search(Chan, "en", Query);
+handle_event(cmdevent, {chancmd, Chan, _, ["гг" | Query]}, _, _) when length(Query) > 0 ->
+	google_search(Chan, "ru", Query);
+handle_event(cmdevent, {chancmd, Chan, _, ["gc" | Query]}, _, _) when length(Query) > 0 ->
+	google_calc(Chan, "en", Query);
+handle_event(cmdevent, {chancmd, Chan, _, ["гк" | Query]}, _, _) when length(Query) > 0 ->
+	google_calc(Chan, "ru", Query);
+handle_event(cmdevent, {chancmd, Chan, _, ["gd" | Query]}, _, _) when length(Query) > 0 ->
+	google_define(Chan, "en", Query);
+handle_event(cmdevent, {chancmd, Chan, _, ["гд" | Query]}, _, _) when length(Query) > 0 ->
+	google_define(Chan, "ru", Query);
+handle_event(cmdevent, {chancmd, Chan, _, ["vs", Word1, Word2]}, _, _) ->
+	google_fight(Chan, "ru", Word1, Word2);
+handle_event(cmdevent, {chancmd, Chan, _, [Lang | Words]}, _, _) 
   when Lang =:= "en-ru"; Lang =:= "ru-en"; Lang =:= "de-ru"; Lang =:= "ru-de" ->
-	[google_trans(Irc, Chan, Lang, Word) || Word <- Words],
+	[google_trans(Chan, Lang, Word) || Word <- Words],
 	ok;
-handle_event(_Type, _Event, _Irc) ->
+handle_event(_Type, _Event, _IrcState, _Data) ->
 	not_handled.
 
-google_search(Irc, Chan, Lang, Query) ->
-	ok = bhv_common:pipe_script(Irc, Chan, "google.py", ["-l", Lang | Query]).
+google_search(Chan, Lang, Query) ->
+	ok = bhv_common:pipe_script(Chan, "google.py", ["-l", Lang | Query]).
 
-google_calc(Irc, Chan, Lang, Query) ->
-	ok = bhv_common:pipe_script(Irc, Chan, "google.py", ["-l", Lang, "-c" | Query]).
+google_calc(Chan, Lang, Query) ->
+	ok = bhv_common:pipe_script(Chan, "google.py", ["-l", Lang, "-c" | Query]).
 
-google_define(Irc, Chan, Lang, Query) ->
-	ok = bhv_common:pipe_script(Irc, Chan, "google.py", ["-l", Lang, "-d" | Query]).
+google_define(Chan, Lang, Query) ->
+	ok = bhv_common:pipe_script(Chan, "google.py", ["-l", Lang, "-d" | Query]).
 
-google_fight(Irc, Chan, Lang, Word1, Word2) ->
-	ok = bhv_common:pipe_script(Irc, Chan, "google.py", ["-l", Lang, Word1, "-f", Word2]).
+google_fight(Chan, Lang, Word1, Word2) ->
+	ok = bhv_common:pipe_script(Chan, "google.py", ["-l", Lang, Word1, "-f", Word2]).
 
-google_trans(Irc, Chan, Dict, Word) ->
-	ok = bhv_common:pipe_script(Irc, Chan, "google.py", ["-D", Dict, Word]).
+google_trans(Chan, Dict, Word) ->
+	ok = bhv_common:pipe_script(Chan, "google.py", ["-D", Dict, Word]).

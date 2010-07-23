@@ -54,7 +54,7 @@ handle_call({uniform, N}, _From, State) ->
 handle_call(uniform, _From, State) ->
 	{reply, random:uniform(), State};
 handle_call(_Request, _From, State) ->
-	{reply, nosuchcall, State}.
+	{reply, unknown_call, State}.
 
 handle_cast(_Msg, State) ->
 	{noreply, State}.

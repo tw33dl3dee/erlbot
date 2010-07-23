@@ -7,8 +7,8 @@
 %%%-------------------------------------------------------------------
 -module(bhv_rejoin).
 
--behaviour(irc_behaviour).
--export([init/1, help/1, handle_event/3]).
+-behaviour(erlbot_behaviour).
+-export([init/1, help/1, handle_event/4]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
@@ -19,7 +19,7 @@ init(_) -> undefined.
 help(_) -> none.
 
 %% TODO: rejoin when kick by someone
-handle_event(customevent, {rejoin, Chan}, Irc) ->
-	ok = irc_conn:join(Irc, Chan);
-handle_event(_Type, _Event, _Irc) ->
+handle_event(customevent, {rejoin, Chan}, _, _) ->
+	ok = irc_conn:join(Chan);
+handle_event(_Type, _Event, _IrcState, _Data) ->
 	not_handled.

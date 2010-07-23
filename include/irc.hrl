@@ -5,8 +5,9 @@
 
 -define(NICK_REGEX, "[" "a-z" "A-Z" "0-9" "_" "\\-" "\\[\\]" "\\\\" "`" "\\^" "{}" "]+").
 
-%% This record is passed to all IRC behaviours
--record(irc, {nick              :: list(),     % current bot nick
-			  login             :: list(),     % bot login
-			  is_oper           :: boolean(),  % `true' if bot is server oper 
-			  data = undefined  :: term()}).   % arbitrary data to store behaviour state
+%% Common data that is passed to all behaviours
+-record(irc_state, {nick         :: list(),		  % current bot nick
+					login        :: list(),		  % bot login
+					is_servop    :: boolean(),    % `true' if bot is server oper 
+					umode        :: [atom()]}).   % list of umodes
+					

@@ -7,8 +7,8 @@
 %%%-------------------------------------------------------------------
 -module(bhv_giveop).
 
--behaviour(irc_behaviour).
--export([init/1, help/1, handle_event/3]).
+-behaviour(erlbot_behaviour).
+-export([init/1, help/1, handle_event/4]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
@@ -20,8 +20,8 @@ init(_) -> undefined.
 %% Only Gods shall know about this service, not mere mortals.
 help(_) -> none.
 
-handle_event(cmdevent, {privcmd, ?USER(Nick), [?MAGIC_WORD]}, Irc) ->
-	irc_conn:for_each_channel(Irc, fun (Chan) -> irc_conn:mode(Irc, Chan, Nick, "+o") end, Nick),
+handle_event(cmdevent, {privcmd, ?USER(Nick), [?MAGIC_WORD]}, _, _) ->
+	irc_conn:for_each_channel(fun (Chan) -> irc_conn:mode(Chan, Nick, "+o") end, Nick),
 	ok;
-handle_event(_Type, _Event, _Irc) ->
+handle_event(_Type, _Event, _IrcState, _Data) ->
 	not_handled.

@@ -47,13 +47,13 @@ send_irc_command(Cmd) ->
 
 %% real connect is deferred 
 init(Owner) ->
-	{ok, #state{owner   = Owner, 
-				host    = erlbot_config:get_value(host),
-				ping    = erlbot_config:get_value(ping_timeout),
-				maxsend = erlbot_config:get_value(maxsend)}}.
+	{ok, Host}    = application:get_env(host),
+	{ok, Ping}    = application:get_env(ping_timeout),
+	{ok, MaxSend} = application:get_env(maxsend),
+	{ok, #state{owner = Owner, host = Host, ping = Ping, maxsend = MaxSend}}.
 
 handle_call(_Req, _From, State) ->
-	{reply, nosuchcall, State, State#state.ping}.
+	{reply, unknown_call, State, State#state.ping}.
 
 handle_cast({irc_command, Cmd}, State) ->
 	{noreply, do_command(Cmd, State), State#state.ping};
@@ -87,8 +87,8 @@ code_change(_Vsn, State, _Extra) ->
 do_connect(#state{host = Host} = State) ->
 	error_logger:info_report([{connecting, Host}]),
 	conn_throttle(State),
-	Port        = erlbot_config:get_value(port),
-	SockTimeout = erlbot_config:get_value(sock_timeout),
+	{ok, Port}        = application:get_env(port),
+	{ok, SockTimeout} = application:get_env(sock_timeout),
 	case gen_tcp:connect(Host, Port, 
 						 [binary,
 						  {packet, line},
@@ -106,7 +106,7 @@ do_connect(#state{host = Host} = State) ->
 	end.
 
 conn_throttle(#state{host = Host}) ->
-	{MaxConn, Period} = erlbot_config:get_value(conn_rate),
+	{ok, {MaxConn, Period}} = application:get_env(conn_rate),
 	throttle:wait(Host, MaxConn, Period,
 				  fun (Delay) ->
 						  error_logger:warning_report([{throttled, Delay}]),

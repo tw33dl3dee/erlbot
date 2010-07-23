@@ -7,8 +7,8 @@
 %%%-------------------------------------------------------------------
 -module(bhv_suicide).
 
--behaviour(irc_behaviour).
--export([init/1, help/1, handle_event/3]).
+-behaviour(erlbot_behaviour).
+-export([init/1, help/1, handle_event/4]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
@@ -34,69 +34,70 @@ help(about) ->
 
 -define(MAX_KICK_POINTS, ((?MAX_KICKS - 1)*?POINTS_PER_KICK)).
 
-handle_event(chanevent, {joined, Chan, _, _}, Irc) ->
-	case dict:find(Chan, Irc#irc.data) of
+handle_event(chanevent, {joined, Chan, _, _}, _, Data) ->
+	case dict:find(Chan, Data) of
 		{ok, {Kicker, _}} ->
-			taunt(Irc, Chan, Kicker),
-			{ok, dict:erase(Chan, Irc#irc.data)};
+			taunt(Chan, Kicker),
+			{ok, dict:erase(Chan, Data)};
 		error ->
 			not_handled
 	end;
-handle_event(customevent, {suicide, Chan, Nick}, Irc) ->
-	suicide(Irc, Chan, Nick, ?DEFAULT_SUICIDE_TIME);
-handle_event(cmdevent, {chancmd, Chan, ?USER(Nick), ["suicide"]}, Irc) ->
-	suicide(Irc, Chan, Nick, ?DEFAULT_SUICIDE_TIME);
-handle_event(cmdevent, {chancmd, Chan, ?USER(Nick), ["suicide", Secs]}, Irc) ->
+handle_event(customevent, {suicide, Chan, Nick}, IrcState, Data) ->
+	suicide(Chan, Nick, ?DEFAULT_SUICIDE_TIME, IrcState, Data);
+handle_event(cmdevent, {chancmd, Chan, ?USER(Nick), ["suicide"]}, IrcState, Data) ->
+	suicide(Chan, Nick, ?DEFAULT_SUICIDE_TIME, IrcState, Data);
+handle_event(cmdevent, {chancmd, Chan, ?USER(Nick), ["suicide", Secs]}, IrcState, Data) ->
 	case catch list_to_integer(Secs) of 
 		{'EXIT', _} ->
 			not_handled;
 		S when S > 0, S < ?MAX_SUICIDE_TIME->
-			suicide(Irc, Chan, Nick, S);
+			suicide(Chan, Nick, S, IrcState, Data);
 		_ ->
-			bhv_common:fuckoff(Irc, Chan, Nick),
+			bhv_common:fuckoff(Chan, Nick),
 			ok
 	end;
-handle_event(chanevent, {kicked, Chan, ?USER(Nick), _}, #irc{nick = Nick, data = Data}) ->
+handle_event(chanevent, {kicked, Chan, ?USER(Nick), _}, #irc_state{nick = Nick}, Data) ->
 	case dict:find(Chan, Data) of 
 		{ok, {_, KickTime}} ->
 			{delayed_event, KickTime*1000, customevent, {rejoin, Chan}, Data};
 		error ->
 			not_handled
 	end;
-handle_event(customevent, {suicide_disable, Who}, #irc{data = Data}) ->
+handle_event(customevent, {suicide_disable, Who}, _, Data) ->
 	disable(Who, Data);
-handle_event(customevent, {suicide_disable, Who, Timeout}, #irc{data = Data}) ->
+handle_event(customevent, {suicide_disable, Who, Timeout}, _, Data) ->
 	disable(Timeout, Who, Data);
-handle_event(customevent, {suicide_enable, all}, #irc{data = Data}) ->
+handle_event(customevent, {suicide_enable, all}, _, Data) ->
 	enable_all(Data);
-handle_event(customevent, {suicide_enable, Who}, #irc{data = Data}) ->
+handle_event(customevent, {suicide_enable, Who}, _, Data) ->
 	enable(Who, Data);
-handle_event(msgevent, {_, _, ?USER(Nick), _}, #irc{data = Data}) ->
+handle_event(msgevent, {_, _, ?USER(Nick), _}, _, Data) ->
 	case dict:find(Nick, Data) of
 		{ok, KickPoints} when is_integer(KickPoints) ->
 			{ok, dict:store(Nick, KickPoints - 1, Data)};
 		_ ->
 			not_handled
 	end;
-handle_event(_Type, _Event, _Irc) ->
+handle_event(_Type, _Event, _IrcState, _Data) ->
 	not_handled.
 
-suicide(#irc{data = Data} = Irc, Chan, Kicker, Secs) ->
+suicide(Chan, Kicker, Secs, IrcState, Data) ->
 	case dict:find(Kicker, Data) of
 		{ok, disabled} ->
-			bhv_common:fuckoff(Irc, Chan, Kicker),
-			ok;
+			ok = bhv_common:fuckoff(Chan, Kicker);
 		{ok, KickPoints} when KickPoints > ?MAX_KICK_POINTS ->
-			irc_conn:chanmsg(Irc, Chan, hist, disabled_reason(Kicker)),
+			irc_conn:chanmsg(Chan, hist, disabled_reason(Kicker)),
 			disable(?SUICIDE_DISABLE_TIMEOUT, Kicker, Data);
 		{ok, KickPoints} ->
-			commit(Irc, Chan, Kicker, Secs, dict:store(Kicker, KickPoints + ?POINTS_PER_KICK, Data));
+			commit(Chan, Kicker, Secs, IrcState, 
+				   dict:store(Kicker, KickPoints + ?POINTS_PER_KICK, Data));
 		error ->
-			commit(Irc, Chan, Kicker, Secs, dict:store(Kicker, ?POINTS_PER_KICK, Data))
+			commit(Chan, Kicker, Secs, IrcState, 
+				   dict:store(Kicker, ?POINTS_PER_KICK, Data))
 	end.
 
-commit(#irc{nick = Nick} = Irc, Chan, Kicker, Secs, Data) ->
-	irc_conn:kick(Irc, Chan, Nick, suicide_reason(Kicker)),
+commit(Chan, Kicker, Secs, #irc_state{nick = Nick}, Data) ->
+	irc_conn:kick(Chan, Nick, suicide_reason(Kicker)),
 	{ok, dict:store(Chan, {Kicker, Secs}, Data)}.
 
 enable(Who, Data) ->
@@ -127,7 +128,7 @@ suicide_reason(Kicker) ->
 						{2, {action,  "суицидален"}},
 						{1, {chanmsg, "Не ждали??? А я тут, суки!!!"}}]).
 
-taunt(Irc, Chan, _Kicker) ->
+taunt(Chan, _Kicker) ->
 	case choice:make(?TAUNT_REPLIES) of
-		{Action, Msg} -> ok = irc_conn:Action(Irc, Chan, nohist, Msg)
+		{Action, Msg} -> ok = irc_conn:Action(Chan, nohist, Msg)
 	end.

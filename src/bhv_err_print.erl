@@ -7,8 +7,8 @@
 %%%-------------------------------------------------------------------
 -module(bhv_err_print).
 
--behaviour(irc_behaviour).
--export([init/1, help/1, handle_event/3]).
+-behaviour(erlbot_behaviour).
+-export([init/1, help/1, handle_event/4]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
@@ -18,11 +18,11 @@ init(_) -> undefined.
 
 help(_) -> none.
 
-handle_event(exitevent, {Bhv, Chan, Reason}, Irc) when ?IS_CHAN(Chan) ->
-	ok = irc_conn:bulk_action(Irc, Chan, hist, log(Bhv, Reason));
-handle_event(exitevent, {Bhv, Nick, Reason}, Irc) when Nick =/= undefined ->
-	ok = irc_conn:bulk_privmsg(Irc, Nick, nohist, log(Bhv, Reason));
-handle_event(_, _, _) ->
+handle_event(exitevent, {Bhv, Chan, Reason}, _, _) when ?IS_CHAN(Chan) ->
+	ok = irc_conn:bulk_action(Chan, hist, log(Bhv, Reason));
+handle_event(exitevent, {Bhv, Nick, Reason}, _, _) when Nick =/= undefined ->
+	ok = irc_conn:bulk_privmsg(Nick, nohist, log(Bhv, Reason));
+handle_event(_Type, _Event, _IrcState, _Data) ->
 	not_handled.
 
 log(Bhv, Reason) ->

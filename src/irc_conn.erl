@@ -16,7 +16,7 @@
 
 %% -record(conf, {nick       = [] :: list(),     %% initial nick requested
 %% 			   login      = [] :: list(),     %% login field in USER and OPER commands (defaults to nick)
-%% 			   long_name  = [] :: list(),     %% long name in USER command (defaults to nick)
+%% 			   real_name  = [] :: list(),     %% long name in USER command (defaults to nick)
 %% 			   oper_pass  = [] :: list(),     %% password in OPER command (won't do OPER if not specified)
 %% 			   umode      = [] :: list(),     %% umode spec to request initially (like, "+F")
 %% 			   pretend_umode = [] :: list(),     %% umode spec which is implied (used as workaround for absent +F)
@@ -27,7 +27,7 @@
 -record(conn, {nick                      :: list(),    %% actual nick (may differ from initially requested one)
 			   nick_suffix = 1           :: integer(), %% suffix appended to nick on nick collision
 			   login                     :: list(),    %% actual login used
-			   is_oper   = false         :: boolean(),
+			   is_servop   = false       :: boolean(), %% true if server oper
 			   umode     = []            :: [atom()],  %% actual umodes set
 			   irc_proto_ref             :: pid(),
 			   priv_senders = dict:new() :: dict(),    %% bulk privmsg sender processes, nick -> pid()
@@ -96,9 +96,9 @@ for_each_channel(Fun, Nick) ->
 
 init(_) ->
 	{ok, IrcPid} = irc_proto:start_link(),
-	{ok, state_not_connected, #conn{nick  = erlbot_config:get_value(nick),
-									login = erlbot_config:get_value(login), 
-									irc_proto_ref = IrcPid}}.
+	{ok, Nick}	= application:get_env(nick),
+	{ok, Login} = application:get_env(login),
+	{ok, state_not_connected, #conn{nick  = Nick, login = Login, irc_proto_ref = IrcPid}}.
 
 handle_info({'DOWN', _, process, Pid, _}, StateName, StateData) ->
 	Channels = dict:filter(fun (_, V) when V =:= Pid -> false; (_, _) -> true end, StateData#conn.chan_fsms),
@@ -107,7 +107,7 @@ handle_info({'DOWN', _, process, Pid, _}, StateName, StateData) ->
 handle_info({'EXIT', _, Reason}, _StateName, StateData) when Reason =/= normal ->
 	{stop, Reason, StateData};
 handle_info({irc, IrcProto, Event}, StateName, #conn{irc_proto_ref = IrcProto} = StateData) ->
-	error_logger:info_report([{irc_event, Event}]),
+	error_logger:info_report([{irc_proto_event, Event}]),
 	send_event(Event),
 	{next_state, StateName, StateData};
 handle_info(_Info, StateName, StateData) ->
@@ -148,7 +148,7 @@ state_not_connected(connect, Conn) ->
 	{next_state, state_connecting, Conn}.
 
 state_connecting({notice, _, _}, Conn) ->
-	Umode = erlbot_config:get_value(pretend_umode),
+	{ok, Umode} = application:get_env(pretend_umode),
 	{next_state, state_auth_nick, auth_login(apply_umode(Umode, Conn))};
 state_connecting(_, Conn) ->
 	{next_state, state_connecting, Conn}.
@@ -157,9 +157,9 @@ state_auth_nick(Event, Conn) when element(1, Event) =:= erroneusnickname;
 								  element(1, Event) =:= nicknameinuse ->
 	{next_state, state_auth_nick, auth_login(next_nick(Conn))};
 state_auth_nick({myinfo, _, _, _, _, _}, Conn) ->
-	case erlbot_config:get_value(oper_pass) of
-		undefined -> {next_state, state_auth_end, Conn};
-		OperPass  -> {next_state, state_auth_oper, auth_oper(Conn, OperPass)}
+	case application:get_env(oper_pass) of
+		undefined      -> {next_state, state_auth_end, Conn};
+		{ok, OperPass} -> {next_state, state_auth_oper, auth_oper(Conn, OperPass)}
 	end;
 state_auth_nick(_, Conn) ->
 	{next_state, state_auth_nick, Conn}.
@@ -168,8 +168,8 @@ state_auth_oper(Event, Conn) when element(1, Event) =:= nooperhost;
 								  element(1, Event) =:= passwdmismatch -> 
 	{next_state, state_connected, autojoin(Conn)};
 state_auth_oper({youreoper, _, _}, Conn) ->
-	{next_state, state_connected, autojoin(retry_nick(set_umode(Conn#conn{is_oper = true},
-																erlbot_config:get_value(umode))))};
+	{ok, Umode} = application:get_env(umode),
+	{next_state, state_connected, autojoin(retry_nick(set_umode(Conn#conn{is_servop = true}, Umode)))};
 state_auth_oper(_, Conn) ->
 	{next_state, state_auth_oper, Conn}.
 
@@ -347,9 +347,10 @@ notify_selfevent(Event, Conn) ->
 %% Propagate event to notifier
 notify(noevent, _, Conn)  -> Conn;
 notify(Event, Type, Conn) -> 
-	erlbot_ev:notify({Type, Event, #irc{nick = Conn#conn.nick, 
-										login = Conn#conn.login, 
-										is_oper = Conn#conn.is_oper}}),
+	erlbot_ev:notify({Type, Event, #irc_state{nick      = Conn#conn.nick, 
+											  login     = Conn#conn.login, 
+											  is_servop = Conn#conn.is_servop,
+											  umode     = Conn#conn.umode}}),
 	Conn.
 
 %% Perform IRC command (low-level)
@@ -366,34 +367,39 @@ do_irc_command(Cmd, #conn{irc_proto_ref = IrcRef} = Conn) ->
 	notify_selfevent(Cmd, Conn).
 
 auth_login(#conn{nick = Nick, login = Login} = Conn) ->
-	do_irc_command({user, Login, erlbot_config:get_value(long_name)}, 
+	{ok, RealName} = application:get_env(real_name),
+	do_irc_command({user, Login, RealName}, 
 				   do_irc_command({nick, Nick}, Conn)).
 
 retry_nick(Conn) ->
-	do_irc_command({nick, erlbot_config:get_value(nick)}, Conn).
+	{ok, OrigNick} = application:get_env(nick),
+	do_irc_command({nick, OrigNick}, Conn).
 
 auth_oper(Conn, OperPass) ->
 	do_irc_command({oper, Conn#conn.login, OperPass}, Conn).
 
-set_umode(#conn{is_oper = false} = Conn, _) -> 
+set_umode(#conn{is_servop = false} = Conn, _) -> 
 	Conn;  % must be oper
 set_umode(Conn, [])    -> Conn;
 set_umode(Conn, Umode) -> do_irc_command({umode, Umode}, Conn).
 
 next_nick(#conn{nick_suffix = Suffix} = Conn) ->
-	OrigNick = erlbot_config:get_value(nick),
+	{ok, OrigNick} = application:get_env(nick),
 	Conn#conn{nick = OrigNick ++ "_" ++ integer_to_list(Suffix), nick_suffix = Suffix + 1}.
 
 autojoin(Conn) ->
-	Channels = erlbot_config:get_value(autojoin),
-	lists:foldl(fun (Ch, C) -> do_irc_command({join, Ch}, C) end, Conn, Channels).
+	case application:get_env(autojoin) of
+		{ok, Channels} -> lists:foldl(fun (Ch, C) -> do_irc_command({join, Ch}, C) end, Conn, Channels);
+		undefined      -> Conn
+	end.
 
 -define(MIN_MSG_THROTTLE, 1).  %% Throttle delay (in msec) used when no flood restrictions are appplied.
 
 msg_throttle(#conn{umode = M}) ->
 	case lists:member(nofloodlimits, M) of
 		true  -> timer:sleep(?MIN_MSG_THROTTLE);
-		false -> timer:sleep(erlbot_config:get_value(msg_interval))
+		false -> {ok, MsgInterval} = application:get_env(msg_interval),
+				 timer:sleep(MsgInterval)
 	end.
 
 pong(Server, Conn) ->

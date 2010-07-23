@@ -7,8 +7,8 @@
 %%%-------------------------------------------------------------------
 -module(bhv_privcmd).
 
--behaviour(irc_behaviour).
--export([init/1, help/1, handle_event/3]).
+-behaviour(erlbot_behaviour).
+-export([init/1, help/1, handle_event/4]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
@@ -18,7 +18,7 @@ init(_) -> undefined.
 
 help(_) -> none.
 
-handle_event(genevent, {privmsg, User, Msg}, _Irc) ->
-	{new_event, cmdevent, {privcmd, User, erlbot_util:split(Msg)}, undefined};
-handle_event(_Type, _Event, _Irc) ->
+handle_event(genevent, {privmsg, User, Msg}, _, D) ->
+	{new_event, cmdevent, {privcmd, User, erlbot_util:split(Msg)}, D};
+handle_event(_Type, _Event, _IrcState, _Data) ->
 	not_handled.

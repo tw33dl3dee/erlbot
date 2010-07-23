@@ -7,8 +7,8 @@
 %%%-------------------------------------------------------------------
 -module(bhv_xlit).
 
--behaviour(irc_behaviour).
--export([init/1, help/1, handle_event/3]).
+-behaviour(erlbot_behaviour).
+-export([init/1, help/1, handle_event/4]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
@@ -26,36 +26,36 @@ help(about) ->
 
 -define(MAX_XLIT_LINES, 5).
 
-handle_event(msgevent, {_, Chan, ?USER(Nick), Msg}, #irc{data = Data}) ->
+handle_event(msgevent, {_, Chan, ?USER(Nick), Msg}, _, Data) ->
 	case dict:find(Chan, Data) of
 		{ok, Hist} ->
 			{ok, dict:store(Chan, lists:sublist([{Nick, Msg} | Hist], ?MAX_XLIT_LINES), Data)};
 		error ->
 			{ok, dict:store(Chan, [{Nick, Msg}], Data)}
 	end;
-handle_event(cmdevent, {chancmd, Chan, _, ["xlit"]}, Irc) ->
-	case dict:find(Chan, Irc#irc.data) of
+handle_event(cmdevent, {chancmd, Chan, _, ["xlit"]}, _, Data) ->
+	case dict:find(Chan, Data) of
 		{ok, Hist} ->
-			xlit(Irc, Chan, lists:reverse(Hist)),
-			{ok, dict:erase(Chan, Irc#irc.data)};
+			xlit(Chan, lists:reverse(Hist)),
+			{ok, dict:erase(Chan, Data)};
 		error ->
 			not_handled
 	end;
-handle_event(_Type, _Event, _Irc) ->
+handle_event(_Type, _Event, _IrcState, _Data) ->
 	not_handled.
 
-xlit(Irc, Chan, Hist) ->
+xlit(Chan, Hist) ->
 	{Nicks, Misspelled} = lists:unzip([{Nick, [L, $\n]} || {Nick, L} <- Hist, is_misspelled(L)]),
 	Arg1 = integer_to_list(length(Misspelled)),
 	{success, Xlitted} = erlbot_util:execv("xlit2.pl", [Arg1], ?SCRIPT_DIR, Misspelled),
-	ok = show_xlitted(Irc, Chan, Xlitted, Nicks).
+	ok = show_xlitted(Chan, Xlitted, Nicks).
 
 %% BUG: this should never happen
-show_xlitted(Irc, Chan, Xlitted, Nicks) when length(Xlitted) =/= length(Nicks) ->
-	ok = bhv_common:error(Irc, Chan, [io_lib:format("~p =/= ~p", [length(Xlitted), length(Nicks)])]);
-show_xlitted(Irc, Chan, Xlitted, Nicks) ->
+show_xlitted(Chan, Xlitted, Nicks) when length(Xlitted) =/= length(Nicks) ->
+	ok = bhv_common:error(Chan, [io_lib:format("~p =/= ~p", [length(Xlitted), length(Nicks)])]);
+show_xlitted(Chan, Xlitted, Nicks) ->
 	Out = [["#XLIT: <", Nick, "> ", L] || {L, Nick} <- lists:zip(Xlitted, Nicks), length(L) > 0],
-	irc_conn:bulk_chanmsg(Irc, Chan, hist, Out).
+	irc_conn:bulk_chanmsg(Chan, hist, Out).
 
 -define(MIN_LATINS_RATIO, 0.5).  % Minimum ratio of latin letters that line must contain.
 

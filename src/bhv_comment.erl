@@ -7,8 +7,8 @@
 %%%-------------------------------------------------------------------
 -module(bhv_comment).
 
--behaviour(irc_behaviour).
--export([init/1, help/1, handle_event/3]).
+-behaviour(erlbot_behaviour).
+-export([init/1, help/1, handle_event/4]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
@@ -18,12 +18,12 @@ init(_) -> undefined.
 
 help(_) -> none.
 
-handle_event(chanevent, {topic, Chan, ?USER(Nick), _}, Irc) ->
-	make_comment(topic, Chan, Nick, Irc);
+handle_event(chanevent, {topic, Chan, ?USER(Nick), _}, _, _) ->
+	make_comment(topic, Chan, Nick);
 %% Bot can comment any `genmsg', direct or induced from `maybe_appeal'.
-handle_event(_, {genmsg, Chan, ?USER(Nick), _}, Irc) ->
-	make_comment(message, Chan, Nick, Irc);
-handle_event(_Type, _Event, _Irc) ->
+handle_event(_, {genmsg, Chan, ?USER(Nick), _}, _, _) ->
+	make_comment(message, Chan, Nick);
+handle_event(_Type, _Event, _IrcState, _Data) ->
 	not_handled.
 
 -define(COMMENT_REV_PROB, 50).  % 1/50th
@@ -38,24 +38,24 @@ handle_event(_Type, _Event, _Irc) ->
 								 [pos, Nick, ", ты гений!"],
 								 [pos, Nick, ": чмоки, противный"]]).
 
-make_comment(topic, Chan, Nick, Irc) ->
-	make_comment(?TOPIC_COMMENTS(Nick), Chan, Nick, Irc);
-make_comment(message, Chan, Nick, Irc) ->
+make_comment(topic, Chan, Nick) ->
+	make_comment(?TOPIC_COMMENTS(Nick), Chan, Nick);
+make_comment(message, Chan, Nick) ->
     case choice:make([{1, do}, {?COMMENT_REV_PROB - 1, dont}]) of
-        do   -> make_comment(?MESSAGE_COMMENTS(Nick), Chan, Nick, Irc);
+        do   -> make_comment(?MESSAGE_COMMENTS(Nick), Chan, Nick);
         dont -> ok
     end;
-make_comment(Alternatives, Chan, Nick, Irc) ->
+make_comment(Alternatives, Chan, Nick) ->
 	case choice:make(Alternatives) of
 		[Emotion | Msg] ->
-			make_emotional_comment(Emotion, Chan, Nick, Msg, Irc)
+			make_emotional_comment(Emotion, Chan, Nick, Msg)
 	end.
 
 -define(SUICIDE_DISABLE_TIMEOUT, 120000).
 
-make_emotional_comment(pos, Chan, Nick, Msg, Irc) ->
-	irc_conn:chanmsg(Irc, Chan, hist, Msg),
+make_emotional_comment(pos, Chan, Nick, Msg) ->
+	irc_conn:chanmsg(Chan, hist, Msg),
 	{new_event, customevent, {suicide_enable, Nick}, undefined};
-make_emotional_comment(neg, Chan, Nick, Msg, Irc) ->
-	irc_conn:chanmsg(Irc, Chan, hist, Msg),
+make_emotional_comment(neg, Chan, Nick, Msg) ->
+	irc_conn:chanmsg(Chan, hist, Msg),
 	{new_event, customevent, {suicide_disable, Nick, ?SUICIDE_DISABLE_TIMEOUT}, undefined}.

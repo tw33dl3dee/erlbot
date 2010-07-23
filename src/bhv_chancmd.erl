@@ -7,8 +7,8 @@
 %%%-------------------------------------------------------------------
 -module(bhv_chancmd).
 
--behaviour(irc_behaviour).
--export([init/1, help/1, handle_event/3]).
+-behaviour(erlbot_behaviour).
+-export([init/1, help/1, handle_event/4]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
@@ -23,29 +23,29 @@ help(_) -> none.
 -define(APPEAL_TIMEOUT, 30).  %% How much time (in sec) can pass after bot stops accepting smart appeal
 
 % User command ends smart appeal
-handle_event(genevent, {chanmsg, Chan, User, [$! | Cmd]}, #irc{data = Data}) ->
+handle_event(genevent, {chanmsg, Chan, User, [$! | Cmd]}, _, Data) ->
 	{new_event, cmdevent, {chancmd, Chan, User, erlbot_util:split(Cmd)}, dict:erase(Chan, Data)};
-handle_event(genevent, {chanmsg, Chan, User, Msg}, Irc) ->
-	AppealRE = io_lib:format("^\\s*~s[:, ](.*)", [Irc#irc.nick]), %"
+handle_event(genevent, {chanmsg, Chan, User, Msg}, #irc_state{nick = Nick}, Data) ->
+	AppealRE = io_lib:format("^\\s*~s[:, ](.*)", [Nick]), %"
 	case re:run(Msg, AppealRE, [unicode, {capture, all_but_first, list}]) of
 		{match, [Rest]} ->
 			% Real appeal doesn't start anything (anyway most probably bot answers later)
-			{new_event, msgevent, {appeal, Chan, User, Rest}, Irc#irc.data};
+			{new_event, msgevent, {appeal, Chan, User, Rest}, Data};
 		nomatch ->
-			check_genmsg(Chan, User, Msg, Irc)
+			check_genmsg(Chan, User, Msg, Data)
 	end;
-handle_event(genevent, {action, Chan, User, Action}, Irc) ->
-	check_genmsg(Chan, User, Action, Irc);
+handle_event(genevent, {action, Chan, User, Action}, _, Data) ->
+	check_genmsg(Chan, User, Action, Data);
 % Own channel message (including ACTION) starts smart appeal. 
-handle_event(selfevent, {Cmd, Chan, _, _}, #irc{data = Data}) when Cmd =:= chanmsg; Cmd =:= action ->
+handle_event(selfevent, {Cmd, Chan, _, _}, _, Data) when Cmd =:= chanmsg; Cmd =:= action ->
 	{ok, dict:store(Chan, {?MAX_LINES, erlang:now()}, Data)};
 % Currently unused.
-handle_event(customevent, {cancel_appeal, Chan}, #irc{data = Data}) ->
+handle_event(customevent, {cancel_appeal, Chan}, _, Data) ->
 	{ok, dict:erase(Chan, Data)};
-handle_event(_Type, _Event, _Irc) ->
+handle_event(_Type, _Event, _IrcState, _Data) ->
 	not_handled.
 
-check_genmsg(Chan, User, Msg, #irc{data = Data}) ->
+check_genmsg(Chan, User, Msg, Data) ->
 	{M2, S2, _} = Now = erlang:now(),
 	case dict:find(Chan, Data) of
 		error ->

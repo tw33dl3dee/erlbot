@@ -1,16 +1,16 @@
 %%%-------------------------------------------------------------------
-%%% File    : irc_behaviour.erl
+%%% File    : erlbot_behaviour.erl
 %%% Author  : Ivan Korotkov <twee@tweedle-dee.org>
 %%% Description : 
 %%%
 %%% Created : 2 Oct 2009 by Ivan Korotkov <twee@tweedle-dee.org>
 %%%-------------------------------------------------------------------
--module(irc_behaviour).
+-module(erlbot_behaviour).
 
 -behaviour(gen_event).
 
-%% External exports
--export([add_behaviour/2, add_behaviour/3, modules/1]).
+%% API
+-export([start_link/3, modules/1]).
 
 %% Meta-information
 -export([behaviour_info/1]).
@@ -29,33 +29,30 @@
 
 %% Special: define behaviour callbacks
 behaviour_info(callbacks) ->
-    [{handle_event,3}, {init,1}, {help,1}];
+    [{handle_event,4}, {init,1}, {help,1}];
 behaviour_info(_) ->
     undefined.
 
-add_behaviour(EvMgr, BhvMod) ->
-	event_sup:start_link(EvMgr, undef, ?MODULE, BhvMod).
+start_link(EvMgr, BhvMod, BhvArg) ->
+	event_sup:start_link(EvMgr, ?MODULE, {BhvMod, BhvArg}).
 
-add_behaviour(EvMgr, BhvMod, BhvArgs) ->
-	event_sup:start_link(EvMgr, undef, ?MODULE, {BhvMod, BhvArgs}).
-
-modules(BhvMod) ->
-	[irc_behaviour, event_sup, BhvMod].
+%% Used in supervisor children specifications
+%% BUG: _BhvMod itself won't be listed anywhere
+%% (`erlbot_ev' will list `erlbot_behaviour' for all behaviours)
+modules(_BhvMod) -> [event_sup].
 
 %%%-------------------------------------------------------------------
 %%% Callback functions from gen_event
 %%%-------------------------------------------------------------------
 
-init(BhvMod) when is_atom(BhvMod) ->
-	{ok, #state{mod = BhvMod, data = BhvMod:init(undefined)}};
-init({BhvMod, BhvArgs}) when is_atom(BhvMod) ->
-	{ok, #state{mod = BhvMod, data = BhvMod:init(BhvArgs)}}.
+init({BhvMod, BhvArg}) when is_atom(BhvMod) ->
+	{ok, #state{mod = BhvMod, data = BhvMod:init(BhvArg)}}.
 
 handle_info(_Info, State) ->
 	{ok, State}.
 
 handle_call(_Request, State) ->
-	{ok, nosuchcall, State}.
+	{ok, unknown_call, State}.
 
 %% `specevent' is special event type which is not passed to `handle_event' of behaviours
 %% Special events currently defined:
@@ -64,14 +61,14 @@ handle_call(_Request, State) ->
 %%   future compatibility it must return either `ok' or `not_handled')
 %%   Orig is the event originator (for error logging) and is ignored
 
-handle_event({specevent, {eval, _Orig, EvalFun}, _Irc} = E, State) ->
+handle_event({specevent, {eval, _Orig, EvalFun}, _} = E, State) ->
 	Result = (catch EvalFun(State#state.mod)),
 	process_event(Result, E, State);
-handle_event({Type, Event, Irc} = E, #state{mod = M, data = D} = State) ->
-	Result = (catch M:handle_event(Type, Event, Irc#irc{data = D})),
+handle_event({Type, Event, IrcState} = E, #state{mod = M, data = D} = State) ->
+	Result = (catch M:handle_event(Type, Event, IrcState, D)),
 	process_event(Result, E, State);
-handle_event(Event, State) ->
-	io:format("unparseable event: ~p~n", [Event]),
+handle_event(_Event, State) ->
+	error_logger:error_report([{unexpected_irc_event, _Event}]),
 	{ok, State}.
 
 terminate(_Reason, _State) ->
@@ -103,7 +100,7 @@ process_event([Result], Event, State) ->
 process_event([Result | Rest], Event, State) ->
 	process_event(Result, Event, State),
 	process_event(Rest, Event, State);
-process_event(Result, {_Type, Event, Irc}, #state{mod = M} = State) ->
+process_event(Result, {_Type, Event, IrcState}, State) ->
 	case Result of
 		not_handled ->
 			{ok, State};
@@ -112,17 +109,17 @@ process_event(Result, {_Type, Event, Irc}, #state{mod = M} = State) ->
 		{ok, Data} ->
 			{ok, State#state{data = Data}};
 		{new_event, NewType, NewEvent, Data} ->
-			gen_event:notify(self(), {NewType, NewEvent, Irc}),
+			erlbot_ev:notify({NewType, NewEvent, IrcState}),
 			{ok, State#state{data = Data}};
 		{delayed_event, Delay, NewType, NewEvent, Data} ->
-			timer:apply_after(Delay, gen_event, notify, [self(), {NewType, NewEvent, Irc}]),
+			erlbot_ev:delayed_notify(Delay, {NewType, NewEvent, IrcState}),
 			{ok, State#state{data = Data}};
 		{'EXIT', Reason} ->
-			gen_event:notify(self(), {exitevent, {M, followup(Event), Reason}, Irc}),
+			erlbot_ev:notify({exitevent, {State#state.mod, followup(Event), Reason}, IrcState}),
 			{'EXIT', Reason};
 		Unexpected ->
 			Reason = {unexpected_retval, Unexpected},
-			gen_event:notify(self(), {exitevent, {M, followup(Event), Reason}, Irc}),
+			erlbot_ev:notify({exitevent, {State#state.mod, followup(Event), Reason}, IrcState}),
 			{'EXIT', Reason}
 	end.
 

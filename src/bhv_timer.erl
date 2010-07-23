@@ -7,8 +7,8 @@
 %%%-------------------------------------------------------------------
 -module(bhv_timer).
 
--behaviour(irc_behaviour).
--export([init/1, help/1, handle_event/3]).
+-behaviour(erlbot_behaviour).
+-export([init/1, help/1, handle_event/4]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
@@ -28,25 +28,25 @@ help(about) ->
 %% reschedule it for this timeout (msec).
 -define(RESCHEDULE_TIMEOUT, 30000).
 
-handle_event(cmdevent, {chancmd, Chan, ?USER(Nick), ["timer", Time | Rest]}, Irc) ->
+handle_event(cmdevent, {chancmd, Chan, ?USER(Nick), ["timer", Time | Rest]}, _, D) ->
 	Message = string:join(Rest, " "),
 	case parse_time(Time) of
 		false ->
 			not_handled;
 		Timeout ->
-			announce_timer(Chan, Nick, Timeout, Irc),
-			{delayed_event, 1000*Timeout, customevent, {timer_expire, Chan, Nick, Message}, undefined}
+			announce_timer(Chan, Nick, Timeout),
+			{delayed_event, 1000*Timeout, customevent, {timer_expire, Chan, Nick, Message}, D}
 	end;
-handle_event(customevent, {timer_expire, Chan, Nick, Message}, Irc) ->
-	case lists:member(Chan, irc_conn:get_channels(Irc)) of
+handle_event(customevent, {timer_expire, Chan, Nick, Message}, _, D) ->
+	case lists:member(Chan, irc_conn:get_channels()) of
 		true ->
-			irc_conn:chanmsg(Irc, Chan, hist, ["========== НАПОМИНАНИЕ от ", Nick, " =========="]),
-			ok = irc_conn:chanmsg(Irc, Chan, hist, Message);
+			irc_conn:chanmsg(Chan, hist, ["========== НАПОМИНАНИЕ от ", Nick, " =========="]),
+			ok = irc_conn:chanmsg(Chan, hist, Message);
 		false ->
 			%% user not present, reschedule reminder
-			{delayed_event, ?RESCHEDULE_TIMEOUT, customevent, {timer_expire, Chan, Nick, Message}, undefined}
+			{delayed_event, ?RESCHEDULE_TIMEOUT, customevent, {timer_expire, Chan, Nick, Message}, D}
 	end;
-handle_event(_Type, _Event, _Irc) ->
+handle_event(_Type, _Event, _IrcState, _Data) ->
 	not_handled.
 
 %% relative time
@@ -73,9 +73,9 @@ parse_hhmm(TimeSpec) ->
 			false
 	end.
 
-announce_timer(Chan, _Nick, Timeout, Irc) ->
+announce_timer(Chan, _Nick, Timeout) ->
 	{{Y, M, D}, {HH, MM, _}} = erlbot_util:add_seconds(erlang:localtime(), Timeout),
 	Message = io_lib:format("Таймер установлен на ~2..0B:~2..0B ~2..0B/~2..0B/~2..0B"
 							" (через ~2..0B:~2..0B), насяльника!",
 							[HH, MM, Y rem 100, M, D, Timeout div 3600, (Timeout div 60 rem 60)]),
-	ok = irc_conn:chanmsg(Irc, Chan, hist, Message).
+	ok = irc_conn:chanmsg(Chan, hist, Message).

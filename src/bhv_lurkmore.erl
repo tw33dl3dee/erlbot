@@ -7,8 +7,8 @@
 %%%-------------------------------------------------------------------
 -module(bhv_lurkmore).
 
--behaviour(irc_behaviour).
--export([init/1, help/1, handle_event/3]).
+-behaviour(erlbot_behaviour).
+-export([init/1, help/1, handle_event/4]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
@@ -23,11 +23,13 @@ help(privcmd) ->
 help(about) ->
 	"Ссылка на топик Луркмора".
 
-handle_event(cmdevent, {chancmd, Chan, _, [Cmd | Topic]}, Irc) when Cmd =:= "l" orelse Cmd =:= "л", length(Topic) > 0 ->
-	lurkmore_topic(Irc, Chan, string:join(Topic, " "));
-handle_event(_Type, _Event, _Irc) ->
+handle_event(cmdevent, {chancmd, Chan, _, ["l" | Topic]}, _, _) when length(Topic) > 0 ->
+	lurkmore_topic(Chan, string:join(Topic, " "));
+handle_event(cmdevent, {chancmd, Chan, _, ["л" | Topic]}, _, _) when length(Topic) > 0 ->
+	lurkmore_topic(Chan, string:join(Topic, " "));
+handle_event(_Type, _Event, _IrcState, _Data) ->
 	not_handled.
 
-lurkmore_topic(Irc, Chan, Topic) ->
+lurkmore_topic(Chan, Topic) ->
 	Url = "http://lurkmore.ru/" ++ erlbot_util:uri_encode(Topic),
-	ok = irc_conn:action(Irc, Chan, hist, ["доставил: ", Url]).
+	ok = irc_conn:action(Chan, hist, ["доставил: ", Url]).

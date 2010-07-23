@@ -47,5 +47,4 @@ reload_code() ->
 	ModList.
 
 deploy() ->
-	ok = erlbot_db:init_db(),
-	ok = erlbot_config:init().
+	ok = erlbot_db:init_db().

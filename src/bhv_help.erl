@@ -7,8 +7,8 @@
 %%%-------------------------------------------------------------------
 -module(bhv_help).
 
--behaviour(irc_behaviour).
--export([init/1, help/1, handle_event/3]).
+-behaviour(erlbot_behaviour).
+-export([init/1, help/1, handle_event/4]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
@@ -28,61 +28,61 @@ help(privcmd) ->
 help(about) ->
 	"Справка по командам бота".
 
-handle_event(cmdevent, {chancmd, _Chan, ?USER(Nick), ["help" | Query]}, Irc) ->
-	show_help(Nick, Query, Irc);
-handle_event(cmdevent, {privcmd, ?USER(Nick), ["help" | Query]}, Irc) ->
-	show_help(Nick, Query, Irc);
-handle_event(customevent, {end_help, Target}, Irc) ->
-	ok = irc_conn:bulk_action(Irc, Target, nohist, ["няшка =^_^="]);
-handle_event(_Type, _Event, _Irc) ->
+handle_event(cmdevent, {chancmd, _Chan, ?USER(Nick), ["help" | Query]}, _, _) ->
+	show_help(Nick, Query);
+handle_event(cmdevent, {privcmd, ?USER(Nick), ["help" | Query]}, _, _) ->
+	show_help(Nick, Query);
+handle_event(customevent, {end_help, Target}, _, _) ->
+	ok = irc_conn:bulk_action(Target, nohist, ["няшка =^_^="]);
+handle_event(_Type, _Event, _IrcState, _Data) ->
 	not_handled.
 
-show_help(Target, ["list"], Irc) ->	
-	irc_conn:bulk_action(Irc, Target, nohist, ["-- ахуенно полезный и функциональный бот.", "умеет:"]),
+show_help(Target, ["list"]) ->	
+	irc_conn:bulk_action(Target, nohist, ["-- ахуенно полезный и функциональный бот.", "умеет:"]),
 	ShowCmds = fun (?MODULE) -> not_handled;
-				   (BhvName) -> show_bhv_help(Irc, Target, BhvName) 
+				   (BhvName) -> show_bhv_help(Target, BhvName) 
 			   end,
 	[{new_event, specevent, {eval, Target, ShowCmds}, undefined},
 	 {new_event, customevent, {end_help, Target}, undefined}];
-show_help(Target, ["mod"], Irc) ->
-	ShowBhvs = fun (BhvName) -> show_bhv_info(Irc, Target, BhvName) end,
+show_help(Target, ["mod"]) ->
+	ShowBhvs = fun (BhvName) -> show_bhv_info(Target, BhvName) end,
 	{new_event, specevent, {eval, Target, ShowBhvs}, undefined};
-show_help(Target, ["!" ++ CmdName], Irc) ->
-	ShowCmd = fun (BhvName) -> show_cmd_info(Irc, Target, BhvName, CmdName, chancmd) end,
+show_help(Target, ["!" ++ CmdName]) ->
+	ShowCmd = fun (BhvName) -> show_cmd_info(Target, BhvName, CmdName, chancmd) end,
 	{new_event, specevent, {eval, Target, ShowCmd}, undefined};
-show_help(Target, ["/msg", CmdName], Irc) ->
-	ShowCmd = fun (BhvName) -> show_cmd_info(Irc, Target, BhvName, CmdName, privcmd) end,
+show_help(Target, ["/msg", CmdName]) ->
+	ShowCmd = fun (BhvName) -> show_cmd_info(Target, BhvName, CmdName, privcmd) end,
 	{new_event, specevent, {eval, Target, ShowCmd}, undefined};
-show_help(Target, [BhvName], Irc) ->
-	case catch show_bhv_help(Irc, Target, list_to_existing_atom(BhvName)) of
+show_help(Target, [BhvName]) ->
+	case catch show_bhv_help(Target, list_to_existing_atom(BhvName)) of
 		{'EXIT', _} ->
-			ok = irc_conn:chanmsg(Irc, Target, hist, unknown_bhv_msg());
+			ok = irc_conn:chanmsg(Target, hist, unknown_bhv_msg());
 		_ ->
 			ok
 	end;
-show_help(Target, _, Irc) ->
-	show_bhv_help(Irc, Target, ?MODULE).
+show_help(Target, _) ->
+	show_bhv_help(Target, ?MODULE).
 
 % Show list of behaviour's commands
-show_bhv_help(Irc, Target, BhvName) ->
+show_bhv_help(Target, BhvName) ->
 	ChanCmds = full_cmd_list(BhvName, chancmd),
 	PrivCmds = full_cmd_list(BhvName, privcmd),
 	case ChanCmds ++ PrivCmds of
 		[]      -> not_handled;
 		CmdList ->
-			ok = irc_conn:bulk_action(Irc, Target, nohist, [bhv_header(BhvName) | tabify(CmdList)])
+			ok = irc_conn:bulk_action(Target, nohist, [bhv_header(BhvName) | tabify(CmdList)])
 	end.
 
 %% Show brief behaviour info (`bhv_info')
-show_bhv_info(Irc, Target, BhvName) ->
-	ok = irc_conn:bulk_action(Irc, Target, nohist, bhv_info(BhvName)).
+show_bhv_info(Target, BhvName) ->
+	ok = irc_conn:bulk_action(Target, nohist, bhv_info(BhvName)).
 
 %% Find help for specific command
-show_cmd_info(Irc, Target, BhvName, CmdName, CmdType) ->
+show_cmd_info(Target, BhvName, CmdName, CmdType) ->
 	case BhvName:help(CmdType) of
 		none    -> not_handled;
 		CmdList ->
-			L = [irc_conn:bulk_action(Irc, Target, nohist, [[cmd_prefix(CmdType), Name, " : ", Help, 
+			L = [irc_conn:bulk_action(Target, nohist, [[cmd_prefix(CmdType), Name, " : ", Help, 
 															 " (", atom_to_list(BhvName), ")"]])
 				 || {Name, Help} <- CmdList, contains_cmd(Name, CmdName)],
 			case length(L) of 0 -> not_handled; _ -> ok end

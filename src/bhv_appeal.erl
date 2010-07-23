@@ -7,8 +7,8 @@
 %%%-------------------------------------------------------------------
 -module(bhv_appeal).
 
--behaviour(irc_behaviour).
--export([init/1, help/1, handle_event/3]).
+-behaviour(erlbot_behaviour).
+-export([init/1, help/1, handle_event/4]).
 
 -include("irc.hrl").
 -include("utf8.hrl").
@@ -20,21 +20,21 @@ init(_) -> undefined.
 
 help(_) -> none.
 
-handle_event(msgevent, {appeal, Chan, User, Msg}, Irc) ->
-	handle_appeal(direct, Chan, User, Msg, Irc);
-handle_event(msgevent, {maybe_appeal, Chan, User, Msg}, Irc) ->
-	handle_appeal({indirect, chan}, Chan, User, Msg, Irc);
-handle_event(cmdevent, {privcmd, ?USER(Nick) = User, Words}, Irc) ->
-	handle_appeal({indirect, priv}, Nick, User, string:join(Words, " "), Irc);
-handle_event(_Type, _Event, _Irc) ->
+handle_event(msgevent, {appeal, Chan, User, Msg}, _, _) ->
+	handle_appeal(direct, Chan, User, Msg);
+handle_event(msgevent, {maybe_appeal, Chan, User, Msg}, _, _) ->
+	handle_appeal({indirect, chan}, Chan, User, Msg);
+handle_event(cmdevent, {privcmd, ?USER(Nick) = User, Words}, _, _) ->
+	handle_appeal({indirect, priv}, Nick, User, string:join(Words, " "));
+handle_event(_Type, _Event, _IrcState, _Data) ->
 	not_handled.
 
 %% Source may be user nickname or channel name
 %% Cause = `direct' | {`indirect', `chan'} | {`indirect', `priv'}
-handle_appeal(Cause, Source, ?USER(Nick) = User, Msg, Irc) ->
+handle_appeal(Cause, Source, ?USER(Nick) = User, Msg) ->
 	AppealType = appeal_type(Msg),
 	case appeal_react(AppealType, Source, Nick, Cause) of
-		{message_react, Method, ReplyMsg} -> message_react(Irc, Source, Method, ReplyMsg);
+		{message_react, Method, ReplyMsg} -> message_react(Source, Method, ReplyMsg);
 		%% Induced `genmsg' is `customevent' which means that `msgevent' 
 		%% (as `genmsg', `appeal' or `maybe_appeal') occurs once per user message
 		not_handled when Cause =:= {indirect, chan} -> 
@@ -68,6 +68,6 @@ appeal_react(fuckoff, Chan, Nick, _)
 appeal_react(_, _, _, direct)           -> {message_react, chanmsg, "Ня!"};
 appeal_react(_, _Source, _Nick, _Cause) -> not_handled.
 
-message_react(Irc, Source, Method, Msg) ->
+message_react(Source, Method, Msg) ->
 	timer:sleep(?APPEAL_DELAY),
-	ok = irc_conn:Method(Irc, Source, hist, Msg).
+	ok = irc_conn:Method(Source, hist, Msg).
