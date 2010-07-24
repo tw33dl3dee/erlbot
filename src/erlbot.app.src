@@ -1,25 +1,24 @@
 {application, erlbot,
  [
   {description, ""},
-  {vsn, "1"},
+  {vsn, "3"},
   {registered, []},
   {applications, [
                   kernel,
                   stdlib,
                   sasl
                  ]},
-  {mod, { erlbot, []}},
-  {env, [{host, "irc.twee.cc"},
-         {port, 6667},
-         {ping_timeout, 90000},
-         {sock_timeout, 60000},
-         {maxsend, 450},
-         {conn_rate, {2, 16000}},
-         {nick, "yest"},
-         {login, "yest"},
-         {real_name, "yest"},
-         {msg_interval, 200},
-         {behaviours, []},
-         {autojoin, ["#test"]},
-         {pretend_umode, []}]}
+  {mod, {erlbot, []}},
+  {modules, [erlbot, erlbot_behaviour, erlbot_config, erlbot_db, erlbot_ev, erlbot_sup, erlbot_util, 
+             irc_chan, irc_codes, irc_conn, irc_modes, irc_proto,
+             choice, sha1, throttle, utf8, event_sup,
+             bhv_appeal, bhv_bash, bhv_blurp, bhv_bnopnya, bhv_chancmd, bhv_comment, bhv_common, 
+             bhv_err_print, bhv_getop, bhv_giveop, bhv_google, bhv_greet, bhv_help, bhv_history, 
+             bhv_lebedev, bhv_log, bhv_lojban, bhv_lurkmore, bhv_markov, bhv_misc, bhv_pom, 
+             bhv_privcmd, bhv_rejoin, bhv_skel, bhv_stat, bhv_suicide, bhv_timer, bhv_wiki, bhv_xlit
+             ]},
+  {registered, [irc_proto, irc_conn,    
+                throttle, choice, 
+                erlbot, erlbot_sup_top, erlbot_sup_ev, erlbot_config, erlbot_ev]},
+  {env, [{config_files, ["erlbot.conf", "local.conf"]}]}
  ]}.
