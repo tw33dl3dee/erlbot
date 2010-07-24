@@ -27,6 +27,7 @@
 -define(CHILD_BHV(Mod),{Mod, {erlbot_behaviour, start_link, [erlbot_ev, Mod, undefined]},
 						permanent, ?CHILD_SHUTDOWN, worker, erlbot_behaviour:modules(Mod)}).
 
+%%%-------------------------------------------------------------------
 %%% Process layout:
 %%%
 %%% + erlbot_app
@@ -56,6 +57,17 @@
 %%%     --- event_sup(BhvName2)
 %%%     |
 %%%     ...
+%%%-------------------------------------------------------------------
+
+%%%-------------------------------------------------------------------
+%%% Configuration
+%%%
+%%% Key           | Description                             | Default 
+%%% ------------------------------------------------------------------
+%%% behaviours    | list of behaviour modules to load       | []
+%%%
+%%%-------------------------------------------------------------------
+
 
 %% Level = [top | ev]
 start_link(Level) ->
@@ -79,6 +91,6 @@ init(top) ->
 										  ?CHILD(irc_conn, [], worker),
 										  ?CHILD(erlbot_sup, [ev], supervisor)]}};
 init(ev) ->
-	{ok, Behaviours} = application:get_env(behaviours),
+	Behaviours = erlbot_config:get_value(behaviours, []),
 	BhvChildren = [?CHILD_BHV(BhvName) || BhvName <- Behaviours],
 	{ok, {{one_for_one, ?MAX_R, ?MAX_T}, [?CHILD_DYN(erlbot_ev, [], worker) | BhvChildren]}}.

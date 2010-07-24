@@ -1,28 +1,43 @@
+%%%-------------------------------------------------------------------
+%%% File    : irc_conn.erl
+%%% Author  : Ivan Korotkov <twee@tweedle-dee.org>
+%%% Description : 
+%%%
+%%% Created : 24 Jul 2010 by Ivan Korotkov <twee@tweedle-dee.org>
+%%%-------------------------------------------------------------------
 -module(irc_conn).
 -author("Ivan Korotkov <twee@tweedle-dee.org>").
 
-%% gen_fsm
+%%% gen_fsm
 -behaviour(gen_fsm).
 -export([init/1, terminate/3, code_change/4, handle_info/3, handle_event/3, handle_sync_event/4]).
 -export([state_not_connected/2, state_connecting/2, state_auth_nick/2, state_auth_oper/2, 
 		 state_auth_end/2, state_connected/2, state_connected/3]).
 
-%% public interface
+%%% API
 -export([start_link/0, connect/0]).
 -export([chanmsg/3, privmsg/3, action/3, join/1, part/1, quit/1, mode/3, umode/1, kick/3, topic/2, nick/1]).
 -export([get_channels_info/0, get_channels/0, get_channel_info/1]).
 -export([for_each_channel/1, for_each_channel/2, is_user_present/2]).
 -export([bulk_chanmsg/3, bulk_action/3, bulk_privmsg/3]).
 
-%% -record(conf, {nick       = [] :: list(),     %% initial nick requested
-%% 			   login      = [] :: list(),     %% login field in USER and OPER commands (defaults to nick)
-%% 			   real_name  = [] :: list(),     %% long name in USER command (defaults to nick)
-%% 			   oper_pass  = [] :: list(),     %% password in OPER command (won't do OPER if not specified)
-%% 			   umode      = [] :: list(),     %% umode spec to request initially (like, "+F")
-%% 			   pretend_umode = [] :: list(),     %% umode spec which is implied (used as workaround for absent +F)
-%% 			   autojoin   = [] :: [list()],   %% channels to join automatically
-%% 			   msg_interval = 200,            %% minimal interval between messages when sending long bulks
-%% 			   conn_rate    = {2, 16000}}).   %% maximum connection rate
+%%%-------------------------------------------------------------------
+%%% Configuration
+%%%
+%%% Key            | Description                                                      | Default 
+%%% ---------------------------------------------------------------------------------------------
+%%% nick           | initial nick requested                                           | REQUIRED
+%%% login          | login field in USER and OPER commands                            | nick
+%%% real_name      | long name in USER command                                        | nick
+%%% oper_pass      | password in OPER command (no OPER is performed if empty)         | ""
+%%% umode          | umode specs to request initially (like, ["+F"])                  | []
+%%% pretend_umode  | umode specs which are pretended (workaround for absent +F)       | []
+%%% autojoin       | channels to join automatically                                   | []
+%%% msg_interval   | minimal interval between messages when sending lots of lines     | 200
+%%%
+%%%-------------------------------------------------------------------
+
+-define(DEFAULT_MSG_INTERVAL, 200).
 
 -record(conn, {nick                      :: list(),    %% actual nick (may differ from initially requested one)
 			   nick_suffix = 1           :: integer(), %% suffix appended to nick on nick collision
@@ -35,7 +50,9 @@
 
 -include("irc.hrl").
 
+%%%-------------------------------------------------------------------
 %%% API
+%%%-------------------------------------------------------------------
 
 start_link() ->
 	gen_fsm:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -92,12 +109,14 @@ for_each_channel(Fun) -> [Fun(Chan) || Chan <- get_channels()].
 for_each_channel(Fun, Nick) ->
 	[Fun(Chan) || {Chan, _, Users} <- get_channels_info(), find_user(Nick, Users)].
 
-%%% gen_fsm callbacks
+%%%-------------------------------------------------------------------
+%%% Callback functions from gen_fsm
+%%%-------------------------------------------------------------------
 
 init(_) ->
 	{ok, IrcPid} = irc_proto:start_link(),
-	{ok, Nick}	= application:get_env(nick),
-	{ok, Login} = application:get_env(login),
+	Nick  = erlbot_config:get_value(nick, required),
+	Login = erlbot_config:get_value(login, Nick),
 	{ok, state_not_connected, #conn{nick  = Nick, login = Login, irc_proto_ref = IrcPid}}.
 
 handle_info({'DOWN', _, process, Pid, _}, StateName, StateData) ->
@@ -148,7 +167,7 @@ state_not_connected(connect, Conn) ->
 	{next_state, state_connecting, Conn}.
 
 state_connecting({notice, _, _}, Conn) ->
-	{ok, Umode} = application:get_env(pretend_umode),
+	Umode = erlbot_config:get_value(pretend_umode, []),
 	{next_state, state_auth_nick, auth_login(apply_umode(Umode, Conn))};
 state_connecting(_, Conn) ->
 	{next_state, state_connecting, Conn}.
@@ -157,9 +176,9 @@ state_auth_nick(Event, Conn) when element(1, Event) =:= erroneusnickname;
 								  element(1, Event) =:= nicknameinuse ->
 	{next_state, state_auth_nick, auth_login(next_nick(Conn))};
 state_auth_nick({myinfo, _, _, _, _, _}, Conn) ->
-	case application:get_env(oper_pass) of
-		undefined      -> {next_state, state_auth_end, Conn};
-		{ok, OperPass} -> {next_state, state_auth_oper, auth_oper(Conn, OperPass)}
+	case erlbot_config:get_value(oper_pass) of
+		undefined -> {next_state, state_auth_end, Conn};
+		OperPass  -> {next_state, state_auth_oper, auth_oper(Conn, OperPass)}
 	end;
 state_auth_nick(_, Conn) ->
 	{next_state, state_auth_nick, Conn}.
@@ -168,7 +187,7 @@ state_auth_oper(Event, Conn) when element(1, Event) =:= nooperhost;
 								  element(1, Event) =:= passwdmismatch -> 
 	{next_state, state_connected, autojoin(Conn)};
 state_auth_oper({youreoper, _, _}, Conn) ->
-	{ok, Umode} = application:get_env(umode),
+	Umode = erlbot_config:get_value(umode, []),
 	{next_state, state_connected, autojoin(retry_nick(set_umode(Conn#conn{is_servop = true}, Umode)))};
 state_auth_oper(_, Conn) ->
 	{next_state, state_auth_oper, Conn}.
@@ -215,7 +234,9 @@ state_connected({get_channel_info, Chan}, _From, Conn) ->
 			{reply, Error, state_connected, Conn}
 	end.
 
+%%--------------------------------------------------------------------
 %%% Internal functions
+%%--------------------------------------------------------------------
 
 %% Determine real message type (action/chan/priv) based on target (nick/channel)
 msgtype(action, Chan)  when ?IS_CHAN(Chan) -> action;
@@ -367,13 +388,12 @@ do_irc_command(Cmd, #conn{irc_proto_ref = IrcRef} = Conn) ->
 	notify_selfevent(Cmd, Conn).
 
 auth_login(#conn{nick = Nick, login = Login} = Conn) ->
-	{ok, RealName} = application:get_env(real_name),
+	RealName = erlbot_config:get_value(real_name, Nick),
 	do_irc_command({user, Login, RealName}, 
 				   do_irc_command({nick, Nick}, Conn)).
 
 retry_nick(Conn) ->
-	{ok, OrigNick} = application:get_env(nick),
-	do_irc_command({nick, OrigNick}, Conn).
+	do_irc_command({nick, erlbot_config:get_value(nick, required)}, Conn).
 
 auth_oper(Conn, OperPass) ->
 	do_irc_command({oper, Conn#conn.login, OperPass}, Conn).
@@ -384,22 +404,19 @@ set_umode(Conn, [])    -> Conn;
 set_umode(Conn, Umode) -> do_irc_command({umode, Umode}, Conn).
 
 next_nick(#conn{nick_suffix = Suffix} = Conn) ->
-	{ok, OrigNick} = application:get_env(nick),
-	Conn#conn{nick = OrigNick ++ "_" ++ integer_to_list(Suffix), nick_suffix = Suffix + 1}.
+	Conn#conn{nick = erlbot_config:get_value(nick, required) ++ "_" ++ integer_to_list(Suffix), 
+			  nick_suffix = Suffix + 1}.
 
 autojoin(Conn) ->
-	case application:get_env(autojoin) of
-		{ok, Channels} -> lists:foldl(fun (Ch, C) -> do_irc_command({join, Ch}, C) end, Conn, Channels);
-		undefined      -> Conn
-	end.
+	Channels = erlbot_config:get_value(autojoin, []),
+	lists:foldl(fun (Ch, C) -> do_irc_command({join, Ch}, C) end, Conn, Channels).
 
--define(MIN_MSG_THROTTLE, 1).  %% Throttle delay (in msec) used when no flood restrictions are appplied.
+-define(MIN_MSG_INTERVAL, 1).  %% Throttle delay (in msec) used when no flood restrictions are appplied.
 
 msg_throttle(#conn{umode = M}) ->
 	case lists:member(nofloodlimits, M) of
-		true  -> timer:sleep(?MIN_MSG_THROTTLE);
-		false -> {ok, MsgInterval} = application:get_env(msg_interval),
-				 timer:sleep(MsgInterval)
+		true  -> timer:sleep(?MIN_MSG_INTERVAL);
+		false -> timer:sleep(erlbot_config:get_value(msg_interval, ?DEFAULT_MSG_INTERVAL))
 	end.
 
 pong(Server, Conn) ->
