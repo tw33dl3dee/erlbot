@@ -83,9 +83,9 @@ terminate(_Reason, _State) ->
 code_change(_OldVsn, State, _Extra) ->
 	{ok, State}.
 
-%%--------------------------------------------------------------------
+%%%--------------------------------------------------------------------
 %%% Internal functions
-%%--------------------------------------------------------------------
+%%%--------------------------------------------------------------------
 
 process_value(K, [{K, V}], _)  -> V;
 process_value(K, [], required) -> throw({key_missing, K});
@@ -124,25 +124,25 @@ set_new_config(Terms) ->
 				  lists:keysort(1, NewConfig), 
 				  [], [], []).
 
-update_config([{K1, V1} | T1] = L1, [{K2, V2} | T2] = L2, N, C, D) ->
+update_config([{K1, V1} | T1] = L1, [{K2, V2} | T2] = L2, C, N, R) ->
 	if K1 > K2  -> ets:insert(?TAB_NAME, {K2, V2}),
-				   update_config(L1, T2, [{K2, V2} | N], C, D);
+				   update_config(L1, T2, C, [{K2, V2} | N], R);
 	   K1 < K2  -> ets:delete(?TAB_NAME, K1),
-				   update_config(T1, L2, N, C, [{K1, V1} | D]);
+				   update_config(T1, L2, C, N, [{K1, V1} | R]);
 	   V1 /= V2 -> ets:insert(?TAB_NAME, {K2, V2}),
-				   update_config(T1, T2, N, [{K1, V1, V2} | C], D);
-	   true     -> update_config(T1, T2, N, C, D)
+				   update_config(T1, T2, [{K1, V1, V2} | C], N, R);
+	   true     -> update_config(T1, T2, C, N, R)
 	end;
-update_config([], [{K2, V2} | T2], N, C, D) ->
+update_config([], [{K2, V2} | T2], C, N, R) ->
 	ets:insert(?TAB_NAME, {K2, V2}),
-	update_config([], T2, [{K2, V2} | N], C, D);
-update_config([{K1, V1} | T1], [], N, C, D) ->
+	update_config([], T2, C, [{K2, V2} | N], R);
+update_config([{K1, V1} | T1], [], C, N, R) ->
 	ets:delete(?TAB_NAME, K1),
-	update_config(T1, [], N, C, [{K1, V1} | D]);
-update_config([], [], N, C, D) ->
-	{lists:reverse(N),
-	 lists:reverse(C),
-	 lists:reverse(D)}.
+	update_config(T1, [], C, N, [{K1, V1} | R]);
+update_config([], [], Changed, New, Removed) ->
+	{lists:reverse(Changed),
+	 lists:reverse(New),
+	 lists:reverse(Removed)}.
 
 conf_files() ->
 	case application:get_env(erlbot, config_files) of
@@ -153,7 +153,7 @@ conf_files() ->
 log_config_load(Updates) ->
 	case Updates of 
 		{[], [], []} -> error_logger:info_report([config_unchanged]);
-		{N, C, D}    -> error_logger:info_report([config_changed, {new, N}, {changed, C}, {deleted, D}]),
+		{C, N, R}    -> error_logger:info_report([config_changed, {new, N}, {changed, C}, {removed, R}]),
 						error_logger:info_report([config | lists:keysort(1, ets:tab2list(?TAB_NAME))])
 	end,
 	Updates.
@@ -170,16 +170,16 @@ stateless_test_() ->
 	 [?_assertEqual(update_config([{b, 1}, {c, 2}, {p, 3}, {q, 4}],
 								  [{a, 0}, {b, 2}, {c, 2}, {r, 5}, {z, 6}],
 								  [], [], []),
-					{[{a, 0}, {r, 5}, {z, 6}],
-					 [{b, 1, 2}],
+					{[{b, 1, 2}],
+					 [{a, 0}, {r, 5}, {z, 6}],
 					 [{p, 3}, {q, 4}]}
 				   ),
 
 	  ?_assertEqual(update_config([{b, 1}, {c, 2}, {p, 3}, {q, 4}],
 								  [{a, 0}, {b, 2}, {c, 2}],
 								  [], [], []),
-					{[{a, 0}],
-					 [{b, 1, 2}],
+					{[{b, 1, 2}],
+					 [{a, 0}],
 					 [{p, 3}, {q, 4}]}
 				   ),
 
@@ -207,8 +207,8 @@ stateful_test_() ->
 	  fun (Tab) -> ets:delete(Tab) end,
 
 	 [?_assertEqual(set_new_config(dict:from_list([{b, 1}, {c, 2}, {p, 3}, {q, 4}])),
-					{[{b, 1}, {c, 2}, {p, 3}, {q, 4}], 
-					 [], 
+					{[], 
+					 [{b, 1}, {c, 2}, {p, 3}, {q, 4}],
 					 []}
 				   ),
 
@@ -217,8 +217,8 @@ stateful_test_() ->
 				   ),
 	  
 	  ?_assertEqual(set_new_config(dict:from_list([{a, 0}, {b, 2}, {c, 2}, {r, 5}, {z, 6}])),
-					{[{a, 0}, {r, 5}, {z, 6}],
-					 [{b, 1, 2}],
+					{[{b, 1, 2}],
+					 [{a, 0}, {r, 5}, {z, 6}],
 					 [{p, 3}, {q, 4}]}
 				   ),
 	  
