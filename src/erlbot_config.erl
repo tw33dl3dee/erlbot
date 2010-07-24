@@ -52,8 +52,10 @@ reload() ->
 
 init(_) ->
 	Tab = ets:new(?TAB_NAME, [named_table]),
-	load_config(),
-	{ok, Tab}.
+	case load_config() of
+		{error, E} -> {'EXIT', E};
+		_          -> {ok, Tab}
+	end.
 
 handle_call(reload, _From, State) ->
     {reply, load_config(), State};
@@ -98,14 +100,14 @@ load_config() ->
 load_config_terms(ConfFiles) -> load_config_terms(dict:new(), ConfFiles).
 
 load_config_terms(Terms, [ConfFile | ConfFiles]) ->
-	case file:path_consult([code:priv_dir(erlbot)], ConfFile) of
+	case file:consult(ConfFile) of
 		{error, {L, M, T}} -> 
 			error_logger:error_report([config_error, {file, ConfFile}, {line, L}, {mod, M}, {term, T}]),
 			{error, {ConfFile, {L, M, T}}};
 		{error, E} ->
 			error_logger:error_report([config_error, {file, ConfFile}, {error, E}]),
 			{error, {ConfFile, E}};
-		{ok, Terms2, _} ->
+		{ok, Terms2} ->
 			error_logger:info_report([config_loaded, {file, ConfFile}]),
 			load_config_terms(merge_config_terms(Terms, Terms2), ConfFiles)
 	end;

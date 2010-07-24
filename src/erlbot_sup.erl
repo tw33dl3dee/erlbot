@@ -88,6 +88,7 @@ remove_behaviour(BhvMod) ->
 init(top) ->
 	{ok, {{one_for_one, ?MAX_R, ?MAX_T}, [?CHILD(throttle, [], worker), 
 										  ?CHILD(choice, [], worker),
+										  ?CHILD(erlbot_config, [], worker),
 										  ?CHILD(irc_conn, [], worker),
 										  ?CHILD(erlbot_sup, [ev], supervisor)]}};
 init(ev) ->
