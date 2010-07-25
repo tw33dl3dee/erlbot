@@ -94,8 +94,24 @@ error_msg() ->
 -define(MIN_GREETS, 3).
 -define(MAX_GREETS, 6).
 
+version_digit($0) -> "ноль";
+version_digit($1) -> "один";
+version_digit($2) -> "два";
+version_digit($3) -> "три";
+version_digit($4) -> "четыре";
+version_digit($5) -> "пять";
+version_digit($6) -> "шесть";
+version_digit($7) -> "семь";
+version_digit($8) -> "восемь";
+version_digit($9) -> "девять";
+version_digit(_)  -> "".
+
+version_to_string(Vsn) -> 
+	[version_digit(D) || D <- Vsn].
+
 identify(Chan, short) ->
-	irc_conn:action(Chan, nohist, "нядваноль"),
+	[Vsn] = [Vsn || {erlbot, _, Vsn} <- application:which_applications()],
+	irc_conn:action(Chan, nohist, ["ня", version_to_string(Vsn)]),
 	timer:sleep(500),
 	ok = irc_conn:action(Chan, nohist, choice:make(["векторен и гипертекстов",
 														 "металлическ и блестящ"]));

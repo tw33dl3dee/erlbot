@@ -1,7 +1,7 @@
 {application, erlbot,
  [
-  {description, ""},
-  {vsn, "3"},
+  {description, "ERLBOT"},
+  {vsn, "3.0"},
   {registered, []},
   {applications, [
                   kernel,
