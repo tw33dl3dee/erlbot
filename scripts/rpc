@@ -1,0 +1,35 @@
+#!/usr/bin/env escript 
+%% -*- erlang -*-
+%%! -pa ebin -name rpcclient
+
+-define(HELP(Cmd, HelpStr), 
+		main([Cmd | _]) ->
+			   io:format("Usage: ~ts ~ts ~ts~n", [filename:basename(escript:script_name()),
+												  Cmd, HelpStr])).
+main(["reload", Node]) ->
+	make_call(Node, erlbot, reload, []);
+?HELP("reload", "<node>");
+main(["bcast", Node, Method, Msg]) ->
+	Fun = list_to_atom(Method),
+	make_call(Node, irc_conn, for_each_channel, [fun (Chan) -> irc_conn:Fun(Chan, hist, Msg) end]);
+?HELP("bcast", "<node> [chanmsg|action] <message>");
+main(["chanmsg", Node, Chan, Msg]) ->
+	make_call(Node, irc_conn, chanmsg, [Chan, hist, Msg]);
+?HELP("chanmsg", "<node> <channel> <message>");
+main(["action", Node, Chan, Msg]) ->
+	make_call(Node, irc_conn, action, [Chan, hist, Msg]);
+?HELP("action", "<node> <channel> <message>");
+main(["control", Node, Command | Args]) ->
+	make_call(Node, irc_conn, list_to_atom(Command), Args);
+?HELP("control", "<node> <command> args...");
+main(_) ->
+	io:format("Usage: ~ts [reload|bcast|chanmsg|action|control>] [args...]~n", 
+			  [filename:basename(escript:script_name())]).
+
+make_call(Node, Mod, Fun, Args) ->
+	case rpc:call(list_to_atom(Node), Mod, Fun, Args) of
+		{badrpc, Reason} ->
+			io:format(standard_error, "~p:~p(~p) failed: ~p~n", [Mod, Fun, Args, Reason]);
+		Res ->
+			io:format("~p:~p(~p) -> ~p~n", [Mod, Fun, Args, Res])
+	end.
