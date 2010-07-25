@@ -12,10 +12,10 @@
 # see contrib/hooks/ for a sample, or uncomment the next line and
 # rename the file to "post-receive".
 
-NODE=$(./scripts/erlbot where)
-
 unset GIT_DIR
 cd ..
+
+NODE=$(./scripts/erlbot where)
 
 read FROM TO HEAD
 echo $FROM $TO $HEAD
