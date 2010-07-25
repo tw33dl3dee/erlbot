@@ -1,3 +1,0 @@
-#!/bin/sh
-
-exec screen -O -d -m -S nya -h 10000 erl -pa ebin/ -name nya -s irc_client run

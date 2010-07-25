@@ -4,7 +4,7 @@
 
 main([Node, Action | Args]) ->
 	Method = list_to_atom(Action),
-	case rpc:call(list_to_atom(Node), irc_conn, Method, [irc | Args]) of
+	case rpc:call(list_to_atom(Node), irc_conn, Method, Args) of
 		{badrpc, Reason} ->
 			io:format(standard_error, "RPC call failed: ~p~n", [Reason]);
 		Res ->
