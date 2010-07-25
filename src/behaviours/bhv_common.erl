@@ -7,7 +7,7 @@
 %%%-------------------------------------------------------------------
 -module(bhv_common).
 
--export([empty_check/1, empty_check/2, error/2, fuckoff/2, identify/2]).
+-export([empty_check/1, empty_check/2, error/2, fuckoff/2]).
 -export([pipe_script/4, pipe_script/3]).
 
 -include("irc.hrl").
@@ -55,72 +55,3 @@ fuckoff_msg() ->
 
 error_msg() -> 
 	choice:make(["Усе поломалось, насяльника :("]).
-
--define(GREETINGS, ["shaking...",
-					"liquefying bytes... ",
-					"homogenizing goo... ",
-					"testing ozone... ",
-					"processing... ",
-					"spinning violently around the y-axis... ",
-					"iodizing... ",
-					"stretching images... ",
-					"reconstituting sounds... ",
-					"faithfully re-imagining... ",
-					"scraping funds... ",
-					"applying innovation... ",
-					"constructing emotional depth... ",
-					"debating games as art... ",
-					"placating publishers.., ",
-					"meticulously diagramming fun... ",
-					"filtering moral... ",
-					"testing for perfection... ",
-					"revolving independence... ",
-					"tokenizing innovation... ",
-					"self affirming... ",
-					"dissolving relationships... ",
-					"deterministically simulating the future... ",
-					"exceeding cpu quota... ",
-					"swapping time and space... ",
-					"embiggening prototypes... ",
-					"sandbagging expectations... ",
-					"challenging everything... ",
-					"distilling beauty... ",
-					"blitting powers of two... ",
-					"manufacturing social responsibility... ",
-					"bending the spoon... ",
-					"constructing non-linear narrative..."]).
-
-%% Min and max number of greeting messages bot displays on join
--define(MIN_GREETS, 3).
--define(MAX_GREETS, 6).
-
-version_digit($0) -> "ноль";
-version_digit($1) -> "один";
-version_digit($2) -> "два";
-version_digit($3) -> "три";
-version_digit($4) -> "четыре";
-version_digit($5) -> "пять";
-version_digit($6) -> "шесть";
-version_digit($7) -> "семь";
-version_digit($8) -> "восемь";
-version_digit($9) -> "девять";
-version_digit(_)  -> "".
-
-version_to_string(Vsn) -> 
-	[version_digit(D) || D <- Vsn].
-
-identify(Chan, short) ->
-	[Vsn] = [Vsn || {erlbot, _, Vsn} <- application:which_applications()],
-	irc_conn:action(Chan, nohist, ["ня", version_to_string(Vsn)]),
-	timer:sleep(500),
-	ok = irc_conn:action(Chan, nohist, choice:make(["векторен и гипертекстов",
-														 "металлическ и блестящ"]));
-identify(Chan, long) ->
-	identify(Chan, short),
-	irc_conn:action(Chan, nohist, ["обитает по адресу: ", "http://tweedle-dee.org/bzr/erlbot/"]),
-	ok = irc_conn:chanmsg(Chan, nohist, ["Советы и предложения постить сюды: ", 
-											  "http://redmine.tweedle-dee.org/projects/erlbot/issues/new"]);
-identify(Chan, greet) ->
-	NumGreets = choice:uniform(?MIN_GREETS, ?MAX_GREETS),
-	Greets = [choice:make(?GREETINGS) || _I <- lists:seq(1, NumGreets)],
-	ok = irc_conn:bulk_action(Chan, nohist, Greets).

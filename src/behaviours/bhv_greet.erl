@@ -20,11 +20,52 @@ help(_) -> none.
 
 handle_event(chanevent, {joined, Chan, _, _}, _, Data) ->
 	case lists:member(Chan, Data) of
-		true ->
-			not_handled;
-		false ->
-			bhv_common:identify(Chan, greet),
-			{ok, [Chan | Data]}
+		true -> not_handled;
+		false -> greet(Chan),
+				 {ok, [Chan | Data]}
 	end;
 handle_event(_Type, _Event, _IrcState, _Data) ->
 	not_handled.
+
+-define(GREETINGS, ["shaking...",
+					"liquefying bytes... ",
+					"homogenizing goo... ",
+					"testing ozone... ",
+					"processing... ",
+					"spinning violently around the y-axis... ",
+					"iodizing... ",
+					"stretching images... ",
+					"reconstituting sounds... ",
+					"faithfully re-imagining... ",
+					"scraping funds... ",
+					"applying innovation... ",
+					"constructing emotional depth... ",
+					"debating games as art... ",
+					"placating publishers.., ",
+					"meticulously diagramming fun... ",
+					"filtering moral... ",
+					"testing for perfection... ",
+					"revolving independence... ",
+					"tokenizing innovation... ",
+					"self affirming... ",
+					"dissolving relationships... ",
+					"deterministically simulating the future... ",
+					"exceeding cpu quota... ",
+					"swapping time and space... ",
+					"embiggening prototypes... ",
+					"sandbagging expectations... ",
+					"challenging everything... ",
+					"distilling beauty... ",
+					"blitting powers of two... ",
+					"manufacturing social responsibility... ",
+					"bending the spoon... ",
+					"constructing non-linear narrative..."]).
+
+%% Min and max number of greeting messages bot displays on join
+-define(MIN_GREETS, 3).
+-define(MAX_GREETS, 6).
+
+greet(Chan) ->
+	NumGreets = choice:uniform(?MIN_GREETS, ?MAX_GREETS),
+	Greets = [choice:make(?GREETINGS) || _I <- lists:seq(1, NumGreets)],
+	ok = irc_conn:bulk_action(Chan, nohist, Greets).

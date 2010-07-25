@@ -58,9 +58,9 @@ handle_event(cmdevent, {chancmd, Chan, _, ["dice", Max | _]}, _, _) ->
 		_ ->            not_handled
 	end;
 handle_event(cmdevent, {chancmd, Chan, _, ["identify" | _]}, _, _) ->
-	bhv_common:identify(Chan, long);
+	identify(Chan);
 handle_event(cmdevent, {chancmd, Chan, _, ["id" | _]}, _, _) ->
-	bhv_common:identify(Chan, long);
+	identify(Chan);
 handle_event(_Type, _Event, _IrcState, _Data) ->
 	not_handled.
 
@@ -92,3 +92,31 @@ jabberwock(Chan) ->
 gen_uuid(Chan, Nick) ->
 	{success, [Uuid]} = erlbot_util:system("uuidgen"),
 	ok = irc_conn:chanmsg(Chan, hist, [Nick, ": ", Uuid]).
+
+
+version_digit($0) -> "ноль";
+version_digit($1) -> "один";
+version_digit($2) -> "два";
+version_digit($3) -> "три";
+version_digit($4) -> "четыре";
+version_digit($5) -> "пять";
+version_digit($6) -> "шесть";
+version_digit($7) -> "семь";
+version_digit($8) -> "восемь";
+version_digit($9) -> "девять";
+version_digit(_)  -> "".
+
+version_to_string(Vsn) -> 
+	[version_digit(D) || D <- Vsn].
+
+-define(BUGTRACK_URL, "http://redmine.tweedle-dee.org/projects/erlbot/issues/new").
+
+identify(Chan) ->
+	[Vsn] = [Vsn || {erlbot, _, Vsn} <- application:which_applications()],
+	irc_conn:action(Chan, nohist, ["ня", version_to_string(Vsn)]),
+	timer:sleep(500),
+	irc_conn:action(Chan, nohist, choice:make(["векторен и гипертекстов",
+											   "металлическ и блестящ",
+											   "готичен и православен"])),
+	ok = irc_conn:chanmsg(Chan, nohist, ["Советы и предложения постить сюды: ", 
+										 ?BUGTRACK_URL]).
