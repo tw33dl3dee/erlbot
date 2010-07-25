@@ -33,8 +33,8 @@ behaviour_info(callbacks) ->
 behaviour_info(_) ->
     undefined.
 
-start_link(EvMgr, BhvMod, BhvArg) ->
-	event_sup:start_link(EvMgr, ?MODULE, {BhvMod, BhvArg}).
+start_link(EvMgr, BhvMod, BhvArgs) ->
+	event_sup:start_link(EvMgr, ?MODULE, {BhvMod, BhvArgs}).
 
 %% Used in supervisor children specifications
 %% BUG: _BhvMod itself won't be listed anywhere
@@ -64,6 +64,18 @@ handle_call(_Request, State) ->
 handle_event({specevent, {eval, _Orig, EvalFun}, _} = E, State) ->
 	Result = (catch EvalFun(State#state.mod)),
 	process_event(Result, E, State);
+
+%% `config_change' is another special event type, sent when behaviour must update 
+%%   it's configuration. BhvName:config_change(NewConfig, Data) is called 
+%%   (return value may be `not_handled', `ok', {`ok', NewData}).
+
+handle_event({config_change, C, N, R}, State) ->
+	case erlbot_config:find_change(State#state.mod, C, N, R) of 
+		{changed, _, V2} -> handler_config_change(V2, State);
+		{new, V2}        -> handler_config_change(V2, State);
+		{removed, _}     -> handler_config_change(undefined, State);
+		false            -> {ok, State}
+	end;
 handle_event({Type, Event, IrcState} = E, #state{mod = M, data = D} = State) ->
 	Result = (catch M:handle_event(Type, Event, IrcState, D)),
 	process_event(Result, E, State);
@@ -93,7 +105,7 @@ code_change(_Vsn, State, _Extra) ->
 %%   exception:      fail
 %%   list of anything mentioned above:
 %%     each element is processed (possibly generating new events in that order);
-%%     data/exception is meaningful in last item only; otherwise ignored.
+%%     BUG: data/exception is meaningful in last item only; otherwise ignored.
 
 process_event([Result], Event, State) ->
 	process_event(Result, Event, State);
@@ -121,6 +133,20 @@ process_event(Result, {_Type, Event, IrcState}, State) ->
 			Reason = {unexpected_retval, Unexpected},
 			erlbot_ev:notify({exitevent, {State#state.mod, followup(Event), Reason}, IrcState}),
 			{'EXIT', Reason}
+	end.
+
+handler_config_change(NewConfig, #state{mod = M, data = D} = State) ->
+	case erlang:function_exported(M, config_change, 2) of
+		false -> error_logger:warning_report([behaviour_config_change_unsupported, {module, M}]),
+				 {ok, State};
+		true ->
+			error_logger:info_report([behaviour_config_change, {module, M}, {arg, NewConfig}]),
+			case catch M:config_change(NewConfig, D) of
+				not_handled          -> {ok, State};
+				ok                   -> {ok, State};
+				{ok, Data}           -> {ok, State#state{data = Data}};
+				Any                  -> Any
+			end
 	end.
 
 %% Originator of the event (channel name or nick name) where stack trace or any other log may be sent.

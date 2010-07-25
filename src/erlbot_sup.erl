@@ -11,7 +11,8 @@
 
 %%% API
 -export([start_link/1]).
--export([add_behaviour/1, remove_behaviour/1, get_behaviours/0]).
+-export([add_behaviour/2, remove_behaviour/1]).
+-export([get_behaviours/0]).
 -export([config_change/3]).
 
 %%% supervisor callbacks
@@ -25,8 +26,8 @@
 -define(CHILD(Mod, Args, Type),     {Mod, {Mod, start_link, Args}, permanent, ?CHILD_SHUTDOWN, Type, [Mod]}).
 -define(CHILD_DYN(Mod, Args, Type), {Mod, {Mod, start_link, Args}, permanent, ?CHILD_SHUTDOWN, Type, dynamic}).
 
--define(CHILD_BHV(Mod),{Mod, {erlbot_behaviour, start_link, [erlbot_ev, Mod, undefined]},
-						permanent, ?CHILD_SHUTDOWN, worker, erlbot_behaviour:modules(Mod)}).
+-define(CHILD_BHV(Mod, Args),{Mod, {erlbot_behaviour, start_link, [erlbot_ev, Mod, Args]},
+							  permanent, ?CHILD_SHUTDOWN, worker, erlbot_behaviour:modules(Mod)}).
 
 %%%-------------------------------------------------------------------
 %%% Process layout:
@@ -74,14 +75,19 @@ start_link(Level) ->
 	Name = list_to_atom("erlbot_sup_" ++ atom_to_list(Level)),
 	supervisor:start_link({local, Name}, ?MODULE, Level).
 
-add_behaviour(BhvMod) ->
-	{ok, _} = supervisor:start_child(erlbot_sup_ev, ?CHILD_BHV(BhvMod)),
-	ok = error_logger:info_report([{behaviour_added, BhvMod}]).
+add_behaviour(Mod) ->
+	add_behaviour(Mod, behaviour_args(Mod)).
 
-remove_behaviour(BhvMod) ->
-	ok = supervisor:terminate_child(erlbot_sup_ev, BhvMod),
-	supervisor:delete_child(erlbot_sup_ev, BhvMod),
-	ok = error_logger:info_report([{behaviour_removed, BhvMod}]).
+add_behaviour(Mod, Args) ->
+	Res = supervisor:start_child(erlbot_sup_ev, ?CHILD_BHV(Mod, Args)),
+	error_logger:info_report([behaviour_added, {module, Mod}, {args, Args}]),
+	Res.
+
+remove_behaviour(Mod) ->
+	supervisor:terminate_child(erlbot_sup_ev, Mod),
+	Res = supervisor:delete_child(erlbot_sup_ev, Mod),
+	error_logger:info_report([behaviour_removed, {module, Mod}]),
+	Res.
 
 get_behaviours() ->
 	[Id || {Id, _, _, _} <- supervisor:which_children(erlbot_sup_ev), Id =/= erlbot_ev].
@@ -89,18 +95,15 @@ get_behaviours() ->
 %% Handles internal config change 
 %% (not app(4) config, which is handled by erlbot:config_change/3)
 config_change(Changed, New, Removed) ->
-	case lists:keyfind(behaviours, 1, Changed) of
-		{behaviours, _, NewBhv} -> load_behaviours(NewBhv);
-		false ->
-			case lists:keyfind(behaviours, 1, New) of
-				{behaviours, NewBhv} -> load_behaviours(NewBhv);
-				false -> 
-					case lists:keyfind(behaviours, 1, Removed) of
-						{behaviours, _} -> load_behaviours([]);
-						false -> ok
-					end
-			end
-	end.
+	% Reload behaviour list
+	case erlbot_config:find_change(behaviours, Changed, New, Removed) of 
+		{changed, OldBhv, NewBhv} -> reload_behaviours(OldBhv, NewBhv);
+		{new, NewBhv}             -> reload_behaviours([], NewBhv);
+		{removed, OldBhv}         -> reload_behaviours(OldBhv, []);
+		false                     -> ok
+	end,
+	% Reload behaviour configs
+	ok = erlbot_ev:notify({config_change, Changed, New, Removed}).
 
 %%%-------------------------------------------------------------------
 %%% Callback functions from supervisor
@@ -114,15 +117,17 @@ init(top) ->
 										  ?CHILD(irc_conn, [[connect]], worker)]}};
 init(ev) ->
 	Behaviours = erlbot_config:get_value(behaviours, []),
-	BhvChildren = [?CHILD_BHV(BhvName) || BhvName <- Behaviours],
+	BhvChildren = [?CHILD_BHV(Mod, behaviour_args(Mod)) || Mod <- Behaviours],
 	{ok, {{one_for_one, ?MAX_R, ?MAX_T}, [?CHILD_DYN(erlbot_ev, [], worker) | BhvChildren]}}.
 
 %%%--------------------------------------------------------------------
 %%% Internal functions
 %%%--------------------------------------------------------------------
 
-load_behaviours(NewBhv) -> 
-	OldBhv = get_behaviours(),
+reload_behaviours(OldBhv, NewBhv) -> 
 	[remove_behaviour(Bhv) || Bhv <- OldBhv -- NewBhv],
 	[add_behaviour(Bhv)    || Bhv <- NewBhv -- OldBhv],
 	ok.
+
+behaviour_args(Mod) ->
+	erlbot_config:get_value(Mod).

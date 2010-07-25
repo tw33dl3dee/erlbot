@@ -14,6 +14,7 @@
 -export([start_link/0, reload/0]).
 -export([get_value/1, get_value/2, get_all_keys/0]).
 -export([set_value/2, unset_value/1]).
+-export([find_change/4]).
 
 %%% gen_server
 -behaviour(gen_server).
@@ -45,6 +46,20 @@ unset_value(Name) ->
 
 reload() ->
 	gen_server:call(?MODULE, reload).
+
+find_change(Key, Changed, New, Removed) ->
+	case lists:keyfind(Key, 1, Changed) of
+		{Key, OldVal, NewVal} -> {changed, OldVal, NewVal};
+		false ->
+			case lists:keyfind(Key, 1, New) of
+				{Key, NewVal} -> {new, NewVal};
+				false -> 
+					case lists:keyfind(Key, 1, Removed) of
+						{Key, OldVal} -> {removed, OldVal};
+						false      -> false
+					end
+			end
+	end.
 
 %%%-------------------------------------------------------------------
 %%% Callback functions from gen_server
