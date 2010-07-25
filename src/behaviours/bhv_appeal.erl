@@ -12,7 +12,6 @@
 
 -include("irc.hrl").
 -include("utf8.hrl").
--include("bhv_common.hrl").
 
 -define(APPEAL_DELAY, 500).  % delay in ms between bot answer to appeal
 

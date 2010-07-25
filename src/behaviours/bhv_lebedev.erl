@@ -12,7 +12,6 @@
 
 -include("utf8.hrl").
 -include("irc.hrl").
--include("bhv_common.hrl").
 
 init(_) -> undefined.
 
@@ -35,7 +34,7 @@ handle_event(cmdevent, {chancmd, Chan, _, ["lynch" | _]}, _, _) ->
 handle_event(_Type, _Event, _IrcState, _Data) ->
 	not_handled.
 
--define(LYNCH_FILE, "data/lynch.txt").
+-define(LYNCH_FILE, "priv/data/lynch.txt").
 
 lynch(Chan, Target) ->
 	print_lynch(Chan, Target, lynch_message()).

@@ -12,7 +12,6 @@
 
 -include("utf8.hrl").
 -include("irc.hrl").
--include("bhv_common.hrl").
 
 %% List of channels already presented ourselves on.
 init(_) -> [].

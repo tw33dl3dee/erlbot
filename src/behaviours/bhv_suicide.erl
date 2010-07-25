@@ -12,7 +12,6 @@
 
 -include("utf8.hrl").
 -include("irc.hrl").
--include("bhv_common.hrl").
 
 %% Data is a dict mapping Channel -> {KickerNick, KickTime} and User -> 'disabled' | KickPoints
 %% where 'disabled' means that User cannot kick bot, KickPoints is user's penalty for kicking bot.

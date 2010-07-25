@@ -12,12 +12,12 @@
 
 -include("irc.hrl").
 -include("utf8.hrl").
--include("bhv_common.hrl").
 
 %% Execute script from script directory, piping it's output to channel
 %% If error occurs, displays error message and output
 pipe_script(Chan, Script, Args, Input) ->
-	case erlbot_util:execv(Script, Args, ?SCRIPT_DIR, Input) of
+	% BUG: use code:priv_dir
+	case erlbot_util:execv(Script, Args, "priv/bin", Input) of
 		{success, Lines} ->
 			ok = irc_conn:bulk_chanmsg(Chan, hist, empty_check(Lines));
 		{{failure, ErrCode}, Trace} ->

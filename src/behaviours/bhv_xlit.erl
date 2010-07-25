@@ -12,7 +12,6 @@
 
 -include("utf8.hrl").
 -include("irc.hrl").
--include("bhv_common.hrl").
 
 %% Dict: Channel -> [{Nick, Message}] (last MAX_XLIT_LINES entries for each channel)
 init(_) -> dict:new().
@@ -47,7 +46,8 @@ handle_event(_Type, _Event, _IrcState, _Data) ->
 xlit(Chan, Hist) ->
 	{Nicks, Misspelled} = lists:unzip([{Nick, [L, $\n]} || {Nick, L} <- Hist, is_misspelled(L)]),
 	Arg1 = integer_to_list(length(Misspelled)),
-	{success, Xlitted} = erlbot_util:execv("xlit2.pl", [Arg1], ?SCRIPT_DIR, Misspelled),
+	% BUG: use code:priv_dir
+	{success, Xlitted} = erlbot_util:execv("xlit2.pl", [Arg1], "priv/bin", Misspelled),
 	ok = show_xlitted(Chan, Xlitted, Nicks).
 
 %% BUG: this should never happen

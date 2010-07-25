@@ -12,7 +12,6 @@
 
 -include("utf8.hrl").
 -include("irc.hrl").
--include("bhv_common.hrl").
 
 init(_) -> undefined.
 
