@@ -11,7 +11,7 @@
 
 %%% API
 -export([start_link/1]).
--export([add_behaviour/2, remove_behaviour/1]).
+-export([add_behaviour/1, add_behaviour/2, remove_behaviour/1]).
 -export([get_behaviours/0]).
 -export([config_change/3]).
 
