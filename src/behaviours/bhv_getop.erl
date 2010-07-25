@@ -8,20 +8,21 @@
 -module(bhv_getop).
 
 -behaviour(erlbot_behaviour).
--export([init/1, help/1, handle_event/4]).
+-export([init/1, help/1, handle_event/4, config_change/2]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
 -include("bhv_common.hrl").
--include(".secret.hrl").
 
 -define(OP_BOT_NICK, "dumbot").
 
-init(_) -> undefined.
+init(MagicWord) -> MagicWord.
+
+config_change(MagicWord, _) -> {ok, MagicWord}.
 
 help(_) -> none.
 
-handle_event(chanevent, {joined, Chan, _, _}, _, _) ->
-	ok = irc_conn:privmsg(?OP_BOT_NICK, nohist, [?MAGIC_WORD, " ", Chan]);
+handle_event(chanevent, {joined, Chan, _, _}, _, Magic) ->
+	ok = irc_conn:privmsg(?OP_BOT_NICK, nohist, [Magic, " ", Chan]);
 handle_event(_Type, _Event, _IrcState, _Data) ->
 	not_handled.
