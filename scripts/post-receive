@@ -12,15 +12,17 @@
 # see contrib/hooks/ for a sample, or uncomment the next line and
 # rename the file to "post-receive".
 
+NODE=nya@magrathea.twee.cc
+
 unset GIT_DIR
 cd ..
 
 read FROM TO HEAD
 echo $FROM $TO $HEAD
 git checkout -f
-make
-tools/reload nya@magrathea.twee.cc
+./rebar compile
+./scripts/reload $NODE
 (IFS=$'\n'
 for LINE in `git log --reverse --pretty=format:"%h %an (%ar): %s" $FROM..$TO`; do
-	tools/bcast nya@magrathea.twee.cc action "$LINE"
+	./scripts/bcast $NODE action "$LINE"
 done)
