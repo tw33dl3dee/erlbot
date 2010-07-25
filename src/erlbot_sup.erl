@@ -110,8 +110,8 @@ init(top) ->
 	{ok, {{one_for_one, ?MAX_R, ?MAX_T}, [?CHILD(throttle, [], worker), 
 										  ?CHILD(choice, [], worker),
 										  ?CHILD(erlbot_config, [], worker),
-										  ?CHILD(irc_conn, [], worker),
-										  ?CHILD(erlbot_sup, [ev], supervisor)]}};
+										  ?CHILD(erlbot_sup, [ev], supervisor),
+										  ?CHILD(irc_conn, [[connect]], worker)]}};
 init(ev) ->
 	Behaviours = erlbot_config:get_value(behaviours, []),
 	BhvChildren = [?CHILD_BHV(BhvName) || BhvName <- Behaviours],

@@ -15,15 +15,13 @@
 %% API
 -export([start/0, deploy/0]).
 -export([add_behaviour/1, remove_behaviour/1]).
--export([reload_config/0, reload_code/0]).
+-export([reload_config/0, reload_code/0, reload/0]).
 
 %%====================================================================
 %%% Application callbacks
 %%====================================================================
 start(_Type, _StartArgs) ->
-	{ok, Pid} = erlbot_sup:start_link(top),
-	irc_conn:connect(),
-	{ok, Pid}.
+	erlbot_sup:start_link(top).
 
 stop(_State) -> ok.
 
@@ -52,6 +50,10 @@ reload_code() ->
 			   end || {M, F} <- code:all_loaded(), is_list(F), is_changed(M)],
 	error_logger:info_report([modules_reloaded | ModList]),
 	{ok, ModList}.
+
+reload() ->
+	{reload_code(),
+	 reload_config()}.
 
 deploy() ->
 	ok = erlbot_db:init_db().

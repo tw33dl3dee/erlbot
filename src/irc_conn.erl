@@ -15,7 +15,7 @@
 		 state_auth_end/2, state_connected/2, state_connected/3]).
 
 %%% API
--export([start_link/0, connect/0]).
+-export([start_link/1, connect/0]).
 -export([chanmsg/3, privmsg/3, action/3, join/1, part/1, quit/1, mode/3, umode/1, kick/3, topic/2, nick/1]).
 -export([get_channels_info/0, get_channels/0, get_channel_info/1]).
 -export([for_each_channel/1, for_each_channel/2, is_user_present/2]).
@@ -30,8 +30,8 @@
 %%% login          | login field in USER and OPER commands                            | nick
 %%% real_name      | long name in USER command                                        | nick
 %%% oper_pass      | password in OPER command (no OPER is performed if empty)         | ""
-%%% umode          | umode specs to request initially (like, ["+F"])                  | []
-%%% pretend_umode  | umode specs which are pretended (workaround for absent +F)       | []
+%%% umode          | umode spec to request initially (like, "+F")                     | ""
+%%% pretend_umode  | umode spec which are pretended (workaround for absent +F)        | ""
 %%% autojoin       | channels to join automatically                                   | []
 %%% msg_interval   | minimal interval between messages when sending lots of lines     | 200
 %%%
@@ -54,7 +54,12 @@
 %%% API
 %%%-------------------------------------------------------------------
 
-start_link() ->
+start_link([connect]) ->
+	case start_link([]) of
+		{ok, Pid} -> connect(), {ok, Pid};
+		Any       -> Any
+	end;
+start_link([]) ->
 	gen_fsm:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 %% Initiate connection
