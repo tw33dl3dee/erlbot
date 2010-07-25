@@ -75,18 +75,18 @@ start_link(Level) ->
 	Name = list_to_atom("erlbot_sup_" ++ atom_to_list(Level)),
 	supervisor:start_link({local, Name}, ?MODULE, Level).
 
-add_behaviour(Mod) ->
-	add_behaviour(Mod, behaviour_args(Mod)).
+add_behaviour(BhvMod) ->
+	add_behaviour(BhvMod, behaviour_config(BhvMod)).
 
-add_behaviour(Mod, Args) ->
-	Res = supervisor:start_child(erlbot_sup_ev, ?CHILD_BHV(Mod, Args)),
-	error_logger:info_report([behaviour_added, {module, Mod}, {args, Args}]),
+add_behaviour(BhvMod, BhvConfig) ->
+	Res = supervisor:start_child(erlbot_sup_ev, ?CHILD_BHV(BhvMod, BhvConfig)),
+	error_logger:info_report([behaviour_added, {module, BhvMod}, {arg, BhvConfig}]),
 	Res.
 
-remove_behaviour(Mod) ->
-	supervisor:terminate_child(erlbot_sup_ev, Mod),
-	Res = supervisor:delete_child(erlbot_sup_ev, Mod),
-	error_logger:info_report([behaviour_removed, {module, Mod}]),
+remove_behaviour(BhvMod) ->
+	supervisor:terminate_child(erlbot_sup_ev, BhvMod),
+	Res = supervisor:delete_child(erlbot_sup_ev, BhvMod),
+	error_logger:info_report([behaviour_removed, {module, BhvMod}]),
 	Res.
 
 get_behaviours() ->
@@ -117,7 +117,7 @@ init(top) ->
 										  ?CHILD(irc_conn, [[connect]], worker)]}};
 init(ev) ->
 	Behaviours = erlbot_config:get_value(behaviours, []),
-	BhvChildren = [?CHILD_BHV(Mod, behaviour_args(Mod)) || Mod <- Behaviours],
+	BhvChildren = [?CHILD_BHV(Mod, behaviour_config(Mod)) || Mod <- Behaviours],
 	{ok, {{one_for_one, ?MAX_R, ?MAX_T}, [?CHILD_DYN(erlbot_ev, [], worker) | BhvChildren]}}.
 
 %%%--------------------------------------------------------------------
@@ -129,5 +129,5 @@ reload_behaviours(OldBhv, NewBhv) ->
 	[add_behaviour(Bhv)    || Bhv <- NewBhv -- OldBhv],
 	ok.
 
-behaviour_args(Mod) ->
+behaviour_config(Mod) ->
 	erlbot_config:get_value(Mod).

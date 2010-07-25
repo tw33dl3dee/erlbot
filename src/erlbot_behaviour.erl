@@ -33,8 +33,8 @@ behaviour_info(callbacks) ->
 behaviour_info(_) ->
     undefined.
 
-start_link(EvMgr, BhvMod, BhvArgs) ->
-	event_sup:start_link(EvMgr, ?MODULE, {BhvMod, BhvArgs}).
+start_link(EvMgr, BhvMod, BhvConfig) ->
+	event_sup:start_link(EvMgr, ?MODULE, {BhvMod, BhvConfig}).
 
 %% Used in supervisor children specifications
 %% BUG: _BhvMod itself won't be listed anywhere
@@ -45,8 +45,8 @@ modules(_BhvMod) -> [event_sup].
 %%% Callback functions from gen_event
 %%%-------------------------------------------------------------------
 
-init({BhvMod, BhvArg}) when is_atom(BhvMod) ->
-	{ok, #state{mod = BhvMod, data = BhvMod:init(BhvArg)}}.
+init({BhvMod, BhvConfig}) when is_atom(BhvMod) ->
+	{ok, #state{mod = BhvMod, data = BhvMod:init(BhvConfig)}}.
 
 handle_info(_Info, State) ->
 	{ok, State}.
@@ -71,9 +71,9 @@ handle_event({specevent, {eval, _Orig, EvalFun}, _} = E, State) ->
 
 handle_event({config_change, C, N, R}, State) ->
 	case erlbot_config:find_change(State#state.mod, C, N, R) of 
-		{changed, _, V2} -> handler_config_change(V2, State);
-		{new, V2}        -> handler_config_change(V2, State);
-		{removed, _}     -> handler_config_change(undefined, State);
+		{changed, _, V2} -> config_change(V2, State);
+		{new, V2}        -> config_change(V2, State);
+		{removed, _}     -> config_change(undefined, State);
 		false            -> {ok, State}
 	end;
 handle_event({Type, Event, IrcState} = E, #state{mod = M, data = D} = State) ->
@@ -135,7 +135,7 @@ process_event(Result, {_Type, Event, IrcState}, State) ->
 			{'EXIT', Reason}
 	end.
 
-handler_config_change(NewConfig, #state{mod = M, data = D} = State) ->
+config_change(NewConfig, #state{mod = M, data = D} = State) ->
 	case erlang:function_exported(M, config_change, 2) of
 		false -> error_logger:warning_report([behaviour_config_change_unsupported, {module, M}]),
 				 {ok, State};
