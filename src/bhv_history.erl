@@ -68,25 +68,25 @@ handle_event(selfevent, {chanmsg, Chan, hist, Msg}, IrcState, _) ->
 	save_histent(Chan, me, {chanmsg, IrcState#irc_state.nick, Msg});
 handle_event(selfevent, {action, Chan, hist, Msg}, IrcState, _) ->
 	save_histent(Chan, me, {action, IrcState#irc_state.nick, Msg});
-handle_event(chanevent, {topic, Chan, ?USER2(Nick, Ident), Topic}, IrcState, _) ->
+handle_event(chanevent, {topic, Chan, ?USER2(Nick, Ident), Topic}, _, _) ->
 	save_histent(Chan, Ident, {topic, Nick, Topic});
 handle_event(chanevent, {mytopic, Chan, _, Topic}, IrcState, _) ->
 	save_histent(Chan, me, {topic, IrcState#irc_state.nick, Topic});
-handle_event(chanevent, {join, Chan, ?USER2(Nick, Ident)}, IrcState, _) ->
+handle_event(chanevent, {join, Chan, ?USER2(Nick, Ident)}, _, _) ->
 	save_histent(Chan, Ident, {join, Nick});
 handle_event(chanevent, {joined, Chan, Topic, _}, IrcState, _) ->
 	save_histent(Chan, me, {joined, IrcState#irc_state.nick, Topic});
-handle_event(chanevent, {part, Chan, ?USER2(Nick, Ident), Reason}, IrcState, _) ->
+handle_event(chanevent, {part, Chan, ?USER2(Nick, Ident), Reason}, _, _) ->
 	save_histent(Chan, Ident, {part, Nick, Reason});
 handle_event(chanevent, {parted, Chan}, IrcState, _) ->
 	save_histent(Chan, me, {part, IrcState#irc_state.nick, []});
-handle_event(chanevent, {quit, Chan, ?USER2(Nick, Ident), Reason}, IrcState, _) ->
+handle_event(chanevent, {quit, Chan, ?USER2(Nick, Ident), Reason}, _, _) ->
 	save_histent(Chan, Ident, {quit, Nick, Reason});
-handle_event(chanevent, {kick, Chan, ?USER2(Nick1, Ident), Nick2, Reason}, IrcState, _) ->
+handle_event(chanevent, {kick, Chan, ?USER2(Nick1, Ident), Nick2, Reason}, _, _) ->
 	save_histent(Chan, Ident, {kick, Nick1, Nick2, Reason});
 handle_event(chanevent, {kicked, Chan, ?USER2(Nick, Ident), Reason}, IrcState, _) ->
 	save_histent(Chan, Ident, {kick, Nick, IrcState#irc_state.nick, Reason});
-handle_event(chanevent, {mode, Chan, ?USER2(Nick1, Ident), Mode, Nick2}, IrcState, _) ->
+handle_event(chanevent, {mode, Chan, ?USER2(Nick1, Ident), Mode, Nick2}, _, _) ->
 	save_histent(Chan, Ident, {mode, Nick1, Mode, Nick2});
 handle_event(chanevent, {mymode, Chan, ?USER2(Nick, Ident), Mode, _}, IrcState, _) ->
 	save_histent(Chan, Ident, {mode, Nick, Mode, IrcState#irc_state.nick});
