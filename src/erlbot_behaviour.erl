@@ -112,7 +112,7 @@ process_event(Result, {_Type, Event, IrcState}, State) ->
 			erlbot_ev:notify({NewType, NewEvent, IrcState}),
 			{ok, State#state{data = Data}};
 		{delayed_event, Delay, NewType, NewEvent, Data} ->
-			erlbot_ev:delayed_notify(Delay, {NewType, NewEvent, IrcState}),
+			erlbot_ev:delayed_notify({NewType, NewEvent, IrcState}, Delay),
 			{ok, State#state{data = Data}};
 		{'EXIT', Reason} ->
 			erlbot_ev:notify({exitevent, {State#state.mod, followup(Event), Reason}, IrcState}),

@@ -78,7 +78,7 @@ show_uptime(Chan) ->
 
 roll_dice(Chan, Max) ->
 	Res = choice:uniform(Max),
-	irc_conn:chanmsg(irc, Chan, hist, "Кручу, верчу, наебать хочу..."),
+	irc_conn:chanmsg(Chan, hist, "Кручу, верчу, наебать хочу..."),
 	timer:sleep(?DICE_TIMEOUT),
 	ok = irc_conn:chanmsg(Chan, hist, integer_to_list(Res)).
 
