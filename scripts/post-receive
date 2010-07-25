@@ -21,8 +21,8 @@ read FROM TO HEAD
 echo $FROM $TO $HEAD
 git checkout -f
 ./rebar compile
-./scripts/reload $NODE
+./scripts/rpc reload $NODE
 (IFS=$'\n'
 for LINE in `git log --reverse --pretty=format:"%h %an (%ar): %s" $FROM..$TO`; do
-	./scripts/bcast $NODE action "$LINE"
+	./scripts/rpc bcast $NODE action "$LINE"
 done)
