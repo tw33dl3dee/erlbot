@@ -21,5 +21,5 @@
   {registered, [irc_proto, irc_conn,    
                 throttle, choice, 
                 erlbot, erlbot_sup_top, erlbot_sup_ev, erlbot_config, erlbot_ev]},
-  {env, [{config_files, ["priv/erlbot.conf", "priv/local.conf"]}]}
+  {env, [{config_files, ["priv/erlbot.conf", "priv/erlbot.local.conf"]}]}
  ]}.

@@ -1,0 +1,76 @@
+#!/bin/bash
+
+SCRIPT_DIR=$(cd ${0%/*} && pwd)
+
+BASE_DIR=${SCRIPT_DIR%/*}
+LOG_DIR=$BASE_DIR/priv/log
+PIPE_DIR=/tmp/$BASE_DIR/
+AS_USER=
+
+# Make sure this script is running as the appropriate user
+if [ ! -z "$AS_USER" ] && [ $(whoami) != "$AS_USER" ]; then
+    exec sudo -u $AS_USER -i $0 $@
+fi
+
+# Make sure CWD is set to runner base dir
+cd $BASE_DIR
+
+# Make sure log and pipe directories exist
+mkdir -p $LOG_DIR
+mkdir -p $PIPE_DIR
+
+# Identify the script name
+SCRIPT=$(basename $0)
+
+# VM arg files
+ARG_FILE=priv/vm.args
+ARG_FILE_LOCAL=priv/vm.local.args
+
+# Node name specified via VM arg files
+NODE=$(grep $ARG_FILE $ARG_FILE_LOCAL -e '-[s]*name' | cut -f2 -d' ')
+
+CMD="erl -args_file $ARG_FILE -args_file $ARG_FILE_LOCAL"
+
+# Check the first argument for instructions
+case "$1" in
+    start)
+        run_erl -daemon $PIPE_DIR/ $LOG_DIR "exec $CMD"
+        ;;
+
+    stop)
+		./scripts/rpc stop $NODE
+        ;;
+
+    restart)
+        ## Restart the VM without exiting the process
+		./scripts/rpc restart $NODE
+        ;;
+
+    reload)
+		./scripts/rpc reload $NODE
+        ;;
+
+	where)
+		echo $NODE
+		;;
+
+    ping)
+        ## See if the VM is alive
+        ./scripts/rpc ping $NODE 
+        ;;
+
+    attach)
+        exec to_erl $PIPE_DIR
+        ;;
+
+    console)
+		exec $CMD
+        ;;
+
+    *)
+        echo "Usage: $SCRIPT {start|stop|restart|reload|ping|console|attach|where}"
+        exit 1
+        ;;
+esac
+
+exit 0

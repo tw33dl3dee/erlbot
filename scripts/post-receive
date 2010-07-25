@@ -12,7 +12,7 @@
 # see contrib/hooks/ for a sample, or uncomment the next line and
 # rename the file to "post-receive".
 
-NODE=nya@magrathea.twee.cc
+NODE=$(./scripts/erlbot where)
 
 unset GIT_DIR
 cd ..
@@ -21,7 +21,7 @@ read FROM TO HEAD
 echo $FROM $TO $HEAD
 git checkout -f
 ./rebar compile
-./scripts/rpc reload $NODE
+./scripts/erlbot reload
 (IFS=$'\n'
 for LINE in `git log --reverse --pretty=format:"%h %an (%ar): %s" $FROM..$TO`; do
 	./scripts/rpc bcast $NODE action "$LINE"

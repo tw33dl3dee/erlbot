@@ -9,19 +9,40 @@
 main(["reload", Node]) ->
 	make_call(Node, erlbot, reload, []);
 ?HELP("reload", "<node>");
+
+main(["stop", Node]) ->
+	make_call(Node, init, stop, []);
+?HELP("stop", "<node>");
+
+main(["restart", Node]) ->
+	make_call(Node, init, restart, []);
+?HELP("restart", "<node>");
+
+main(["ping", Node]) ->
+	case net_adm:ping(list_to_atom(Node)) of
+        pong -> ok;
+        pang -> io:format("Node ~s down.~n", [Node]),
+				halt(1)
+    end;
+?HELP("ping", "<node>");
+
 main(["bcast", Node, Method, Msg]) ->
 	Fun = list_to_atom(Method),
 	make_call(Node, irc_conn, for_each_channel, [fun (Chan) -> irc_conn:Fun(Chan, hist, Msg) end]);
+
 ?HELP("bcast", "<node> [chanmsg|action] <message>");
 main(["chanmsg", Node, Chan, Msg]) ->
 	make_call(Node, irc_conn, chanmsg, [Chan, hist, Msg]);
 ?HELP("chanmsg", "<node> <channel> <message>");
+
 main(["action", Node, Chan, Msg]) ->
 	make_call(Node, irc_conn, action, [Chan, hist, Msg]);
 ?HELP("action", "<node> <channel> <message>");
+
 main(["control", Node, Command | Args]) ->
 	make_call(Node, irc_conn, list_to_atom(Command), Args);
 ?HELP("control", "<node> <command> args...");
+
 main(_) ->
 	io:format("Usage: ~ts [reload|bcast|chanmsg|action|control>] [args...]~n", 
 			  [filename:basename(escript:script_name())]).
