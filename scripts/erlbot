@@ -29,7 +29,7 @@ ARG_FILE_LOCAL=priv/vm.local.args
 # Node name specified via VM arg files
 NODE=$(grep $ARG_FILE $ARG_FILE_LOCAL -e '-[s]*name' | cut -f2 -d' ')
 
-CMD="erl -args_file $ARG_FILE -args_file $ARG_FILE_LOCAL"
+CMD="erl -pa ebin -pa deps/*/ebin -args_file $ARG_FILE -args_file $ARG_FILE_LOCAL"
 
 # Check the first argument for instructions
 case "$1" in

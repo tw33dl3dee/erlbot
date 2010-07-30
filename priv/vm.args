@@ -1,6 +1,3 @@
-## Load modules from ebin
--pa ebin
-
 ## Start SASL
 -boot start_sasl
 
