@@ -245,7 +245,11 @@ save_histent(Chan, Ident, Event) ->
 														  uid       = userid(Ident),
 														  cid       = chanid(Chan),
 														  event     = Event})
-							end).
+							end),
+	{C, Db} = erlbot_db:couchdb(),
+	couchbeam_db:save_doc(Db, {histent_to_json({unix_timestamp(neg_timestamp(timestamp())),
+												Ident, Chan, Event})}),
+	couchbeam_db:close(C, Db).
 
 show_history(Nick, Chan, Param) ->
 	case parse_hist_param(Param) of
