@@ -10,14 +10,12 @@
 -behaviour(erlbot_behaviour).
 -export([init/1, help/1, handle_event/4]).
 -export([fix_wstat/0, get_wstat/2, get_history/2, fix_wchain/0]).
--export([couchdb_upload/0, couchdb/0]).
+-export([couchdb_upload/0]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
 
 -include_lib("stdlib/include/qlc.hrl").
-
--include("couchbeam.hrl").
 
 -record(user, {uid    :: integer(),
 			   ident  :: list()}). 
@@ -398,12 +396,15 @@ fix_wchain() ->
 					   end).
 
 couchdb_upload() ->
-	{C, Db} = couchdb(),
+	{C, Db} = erlbot_db:couchdb(),
 	mnesia:async_dirty(fun () -> couchdb_upload_all(Db) end),
 	couchbeam_db:close(C, Db).
 
+unix_timestamp({YMD, HMS, U}) ->
+	{erlbot_util:unix_timestamp({YMD, HMS}), U}.
+
 couchdb_upload_all(Db) ->
-	Q = qlc:q([{erlbot_util:unix_timestamp(neg_timestamp(H#histent.timestamp)), 
+	Q = qlc:q([{unix_timestamp(neg_timestamp(H#histent.timestamp)), 
 				U#user.ident, Ch#chan.name, H#histent.event} ||
 				  H  <- mnesia:table(histent),
 				  Ch <- mnesia:table(chan),
@@ -416,30 +417,20 @@ couchdb_upload_all(Db) ->
 couchdb_save(Db, E) ->
 	case catch histent_to_json(E) of
 		{'EXIT', Reason} ->
-			io:format("ERR ~p~n", [E]);
+			io:format("ERR ~p: ~p~n", [E, Reason]);
 		Json ->
 			couchbeam_db:save_doc(Db, {Json})
 	end.
 
-histent_to_json({Ts, U, Ch, E}) ->
-	[{<<"timestamp">>, Ts},
+histent_to_json({{TsSec, TsUsec}, U, Ch, E}) ->
+	Key = io_lib:format("event:~b.~6..0b", [TsSec, TsUsec]),
+	[{<<"_id">>, utf8:encode(Key)},
+	 {<<"timestamp">>, TsSec + TsUsec/1000000},
 	 {<<"channel">>, utf8:encode(Ch)},
 	 {<<"user">>, utf8:encode(U)},
 	 {<<"event">>, histevent_to_json(E)}].
 
-histevent_to_json({chanmsg, Nick, Msg}) -> [<<"chanmsg">>, utf8:encode(Nick), utf8:encode(Msg)];
-histevent_to_json({action, Nick, Msg}) -> [<<"chanmsg">>, utf8:encode(Nick), utf8:encode(Msg)];
-histevent_to_json({topic, Nick, Topic}) -> [<<"topic">>, utf8:encode(Nick), utf8:encode(Topic)];
-histevent_to_json({join, Nick}) -> [<<"join">>, utf8:encode(Nick)];
-histevent_to_json({joined, Nick, {Topic, Author, Ts}}) -> [<<"joined">>, utf8:encode(Nick), [utf8:encode(Topic), utf8:encode(Author), Ts]];
-histevent_to_json({part, Nick, Reason}) -> [<<"part">>, utf8:encode(Nick), utf8:encode(Reason)];
-histevent_to_json({quit, Nick, Reason}) -> [<<"quit">>, utf8:encode(Nick), utf8:encode(Reason)];
-histevent_to_json({kick, Nick1, Nick2, Reason}) -> [<<"kick">>, utf8:encode(Nick1), utf8:encode(Nick2), utf8:encode(Reason)];
-histevent_to_json({mode, Nick1, Mode, Nick2}) -> [<<"mode">>, utf8:encode(Nick1), utf8:encode(Mode), utf8:encode(Nick2)];
-histevent_to_json({nick, Nick1, Nick2}) -> [<<"nick">>, utf8:encode(Nick1), utf8:encode(Nick2)].
-
-couchdb() ->
-	couchbeam:start(),
-	C = couchbeam_server:start_connection_link(#couchdb_params{host = "twee.cc"}),
-	Db = couchbeam_db:open(C, "erlbot_history"),
-	{C, Db}.
+histevent_to_json(X) when is_tuple(X) -> [histevent_to_json(Y) || Y <- tuple_to_list(X)];
+histevent_to_json(X) when is_atom(X)  -> list_to_binary(atom_to_list(X));
+histevent_to_json(X) when is_list(X)  -> utf8:encode(X);
+histevent_to_json(X) -> X.
