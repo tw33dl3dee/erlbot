@@ -65,21 +65,21 @@ handle_event(genevent, {action, Chan, ?USER2(Nick, Ident), Msg}, _, _) ->
 	update_wstat(Chan, Ident, Msg),
 	save_histent(Chan, Ident, {action, Nick, Msg});
 handle_event(selfevent, {chanmsg, Chan, hist, Msg}, IrcState, _) ->
-	save_histent(Chan, me, {chanmsg, IrcState#irc_state.nick, Msg});
+	save_histent(Chan, IrcState#irc_state.login, {chanmsg, IrcState#irc_state.nick, Msg});
 handle_event(selfevent, {action, Chan, hist, Msg}, IrcState, _) ->
-	save_histent(Chan, me, {action, IrcState#irc_state.nick, Msg});
+	save_histent(Chan, IrcState#irc_state.login, {action, IrcState#irc_state.nick, Msg});
 handle_event(chanevent, {topic, Chan, ?USER2(Nick, Ident), Topic}, _, _) ->
 	save_histent(Chan, Ident, {topic, Nick, Topic});
 handle_event(chanevent, {mytopic, Chan, _, Topic}, IrcState, _) ->
-	save_histent(Chan, me, {topic, IrcState#irc_state.nick, Topic});
+	save_histent(Chan, IrcState#irc_state.login, {topic, IrcState#irc_state.nick, Topic});
 handle_event(chanevent, {join, Chan, ?USER2(Nick, Ident)}, _, _) ->
 	save_histent(Chan, Ident, {join, Nick});
 handle_event(chanevent, {joined, Chan, Topic, _}, IrcState, _) ->
-	save_histent(Chan, me, {joined, IrcState#irc_state.nick, Topic});
+	save_histent(Chan, IrcState#irc_state.login, {joined, IrcState#irc_state.nick, Topic});
 handle_event(chanevent, {part, Chan, ?USER2(Nick, Ident), Reason}, _, _) ->
 	save_histent(Chan, Ident, {part, Nick, Reason});
 handle_event(chanevent, {parted, Chan}, IrcState, _) ->
-	save_histent(Chan, me, {part, IrcState#irc_state.nick, []});
+	save_histent(Chan, IrcState#irc_state.login, {part, IrcState#irc_state.nick, []});
 handle_event(chanevent, {quit, Chan, ?USER2(Nick, Ident), Reason}, _, _) ->
 	save_histent(Chan, Ident, {quit, Nick, Reason});
 handle_event(chanevent, {kick, Chan, ?USER2(Nick1, Ident), Nick2, Reason}, _, _) ->
