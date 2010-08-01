@@ -1,0 +1,10 @@
+{
+   "_id": "_design/stat",
+   "language": "javascript",
+   "views": {
+       "by_user": {
+           "map": "function(doc) {\n  if (doc.event &amp;&amp; (doc.event[0] == 'chanmsg' || doc.event[0] == 'action')) {\n    var days = Math.floor((Date.now()/1000 - doc.timestamp)/(24*3600));\n    emit(doc.user, [1, doc.event[2].length, days]);\n  }\n}",
+           "reduce": "function (key, values, rereduce) {\n  return values.reduce(function(acc, el) {\n    return [acc[0] + el[0], \n            acc[1] + el[1],\n            Math.max(acc[2], el[2])];\n  });\n}\n"
+       }
+   }
+}
