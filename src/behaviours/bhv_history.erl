@@ -240,16 +240,15 @@ fix_wstat() ->
 %% HISTORY -- per-channel event history
 
 save_histent(Chan, Ident, Event) ->
-	ok = mnesia:async_dirty(fun () ->
-									mnesia:write(#histent{timestamp = timestamp(),
-														  uid       = userid(Ident),
-														  cid       = chanid(Chan),
-														  event     = Event})
-							end),
-	{C, Db} = erlbot_db:couchdb(),
-	couchbeam_db:save_doc(Db, {histent_to_json({unix_timestamp(neg_timestamp(timestamp())),
-												Ident, Chan, Event})}),
-	couchbeam_db:close(C, Db).
+	mnesia:async_dirty(fun () ->
+							   mnesia:write(#histent{timestamp = timestamp(),
+													 uid       = userid(Ident),
+													 cid       = chanid(Chan),
+													 event     = Event})
+					   end),
+	couchbeam_db:save_doc(erlbot_db, {histent_to_json({unix_timestamp(neg_timestamp(timestamp())),
+													   Ident, Chan, Event})}),
+	ok.
 
 show_history(Nick, Chan, Param) ->
 	case parse_hist_param(Param) of
