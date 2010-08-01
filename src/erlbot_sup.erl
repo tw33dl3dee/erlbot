@@ -19,8 +19,8 @@
 -export([init/1]).
 
 -define(CHILD_SHUTDOWN, 60000).  % grace time for children shutdown
--define(MAX_R, 1000).            % max restart count
--define(MAX_T, 1).               % ... per this many seconds
+-define(MAX_R, 5).            % max restart count
+-define(MAX_T, 1).            % ... per this many seconds
 
 %% Helper macro for declaring children of supervisor
 -define(CHILD(Mod, Args, Type),     {Mod, {Mod, start_link, Args}, permanent, ?CHILD_SHUTDOWN, Type, [Mod]}).
@@ -40,23 +40,27 @@
 %%%   |
 %%%   --- throttle
 %%%   |
-%%%   --+ irc_conn
+%%%   --- erlbot_config
+%%%   |
+%%%   --- couchbeam
+%%%   |
+%%%   --+ erlbot_sup(ev)
 %%%   | |
-%%%   | --- irc_proto
+%%%   | --- erlbot_ev
 %%%   | |
-%%%   | --- irc_chan(Chan1)
+%%%   | --- event_sup(BhvName1)
 %%%   | |
-%%%   | --- irc_chan(Chan2)
+%%%   | --- event_sup(BhvName2)
 %%%   | |
 %%%   | ...
 %%%   |
-%%%   --+ erlbot_sup(ev)
+%%%   --+ irc_conn
 %%%     |
-%%%     --- erlbot_ev
+%%%     --- irc_proto
 %%%     |
-%%%     --- event_sup(BhvName1)
+%%%     --- irc_chan(Chan1)
 %%%     |
-%%%     --- event_sup(BhvName2)
+%%%     --- irc_chan(Chan2)
 %%%     |
 %%%     ...
 %%%-------------------------------------------------------------------
@@ -113,6 +117,7 @@ init(top) ->
 	{ok, {{one_for_one, ?MAX_R, ?MAX_T}, [?CHILD(throttle, [], worker), 
 										  ?CHILD(choice, [], worker),
 										  ?CHILD(erlbot_config, [], worker),
+										  ?CHILD(erlbot_db, [], worker),
 										  ?CHILD(erlbot_sup, [ev], supervisor),
 										  ?CHILD(irc_conn, [[connect]], worker)]}};
 init(ev) ->

@@ -3,19 +3,37 @@
 %%% Author  : Ivan Korotkov <twee@tweedle-dee.org>
 %%% Description : 
 %%%
-%%% Created : 18 Jul 2010 by Ivan Korotkov <twee@tweedle-dee.org>
+%%% Created :  1 Aug 2010 by Ivan Korotkov <twee@tweedle-dee.org>
 %%%-------------------------------------------------------------------
 -module(erlbot_db).
 
 -author("Ivan Korotkov <twee@tweedle-dee.org>").
 
+%% API
+-export([start_link/0]).
+-export([create_sequence/0, create_sequence/1, init_sequence/2, sequence/1, sequence/2, init_db/0, init_table/2]).
+
 -include("couchbeam.hrl").
 
-%% External interfaces
--export([create_sequence/0, create_sequence/1, init_sequence/2, sequence/1, sequence/2, init_db/0, init_table/2]).
--export([couchdb/0]).
-
 -record(sequence, {table, idx}).
+
+%%====================================================================
+%% API
+%%====================================================================
+
+start_link() ->
+	Params = erlbot_config:get_value(couchdb_params, required),
+	DbName = erlbot_config:get_value(couchdb_dbname, required),
+	DbParam = #couchdb_params{name = erlbot,
+							  host = proplists:get_value(host, Params),
+							  username = proplists:get_value(username, Params),
+							  password = proplists:get_value(password, Params)},
+	case couchbeam_server:start_connection_link(DbParam) of
+		Pid when is_pid(Pid) -> 
+			couchbeam_server:open_db(Pid, {?MODULE, DbName}),
+			{ok, Pid};
+		Res -> Res
+	end.
 
 init_db() ->
 	Node = node(),
@@ -45,8 +63,6 @@ sequence(Table) -> sequence(Table, 1).
 
 sequence(Table, Inc) -> mnesia:dirty_update_counter(sequence, Table, Inc).
 
-couchdb() ->
-	couchbeam:start(),
-	C = couchbeam_server:start_connection_link(#couchdb_params{host = "twee.cc"}),
-	Db = couchbeam_db:open(C, "erlbot"),
-	{C, Db}.
+%%====================================================================
+%% Internal functions
+%%====================================================================

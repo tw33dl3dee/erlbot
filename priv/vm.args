@@ -4,6 +4,9 @@
 ## Start mnesia
 -s mnesia 
 
+## Start CouchDB interface
+-s couchbeam
+
 ## Start erlbot
 -s erlbot
 
