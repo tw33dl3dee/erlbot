@@ -274,7 +274,7 @@ userid(me) -> 0;
 userid(Ident) ->
 	Q = qlc:q([U#user.uid || U <- mnesia:table(user), U#user.ident =:= Ident]),
 	case qlc:e(Q) of
-		[Id] -> Id;
+		[Id | ] -> Id;
 		[]   -> 
 			Id = erlbot_db:sequence(user),
 			mnesia:write(#user{uid = Id, ident = Ident}),
@@ -284,7 +284,7 @@ userid(Ident) ->
 chanid(Channel) ->
 	Q = qlc:q([Ch#chan.cid || Ch <- mnesia:table(chan), Ch#chan.name =:= Channel]),
 	case qlc:e(Q) of
-		[Id] -> Id;
+		[Id | ] -> Id;
 		[]   -> 
 			Id = erlbot_db:sequence(channel),
 			mnesia:write(#chan{cid = Id, name = Channel}),
