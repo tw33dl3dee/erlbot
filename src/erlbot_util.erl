@@ -250,7 +250,6 @@ from_unix_timestamp(Ts) when is_integer(Ts) ->
 from_unix_timestamp(Ts) when is_float(Ts) ->
 	{YMD, HMS} = from_unix_timestamp(trunc(Ts)),
 	{YMD, HMS, trunc((Ts - trunc(Ts))*1000000)}.
-
 %% Difference in seconds between 2 datetimes
 time_diff(DateTime1, DateTime2) ->
 	calendar:datetime_to_gregorian_seconds(DateTime1) - calendar:datetime_to_gregorian_seconds(DateTime2).

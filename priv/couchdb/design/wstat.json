@@ -1,0 +1,14 @@
+{
+   "_id": "_design/wstat",
+   "language": "erlang",
+   "views": {
+       "by_user": {
+           "map": "fun({Doc}) ->\n  WSTAT_MIN_LEN = 5, % minimum word length for statistic inclusion\n  Ident = proplists:get_value(<<\"user\">>, Doc, null),\n  Chan = proplists:get_value(<<\"channel\">>, Doc, null),\n  case proplists:get_value(<<\"event\">>, Doc) of\n    [<<\"chanmsg\">>, _, Msg] -> \n      Words = re:split(Msg, \"[^\\\\pL\\\\pN]+\", [unicode, {return, list}, trim]),\n      [Emit([Chan, Ident], [[1, unicode:characters_to_binary(W)]]) || W <- Words, length(W) >= WSTAT_MIN_LEN],\n      ok;\n    _ -> ok\n  end\nend.",
+           "reduce": "fun(Keys, Values, ReReduce) -> \n  WSTAT_MAX = 10, % number of words to output in word statistic\n  Sorted = lists:sort(fun (A, B) -> tl(A) < tl(B) end, lists:append(Values)),\n  Summed = lists:foldl(fun ([C1, V], [[C2, V] | T]) ->\n                             [[C1 + C2, V] | T];\n                           ([C, V], L) ->\n                             [[C, V] | L]\n                       end, [], Sorted),\n  lists:sublist(lists:sort(fun (A, B) -> A > B end, Summed), WSTAT_MAX)\nend.\n"
+       },
+       "by_user2": {
+           "map": "fun({Doc}) ->\n  WSTAT_MIN_LEN = 5, % minimum word length for statistic inclusion\n  Ident = proplists:get_value(<<\"user\">>, Doc, null),\n  case proplists:get_value(<<\"event\">>, Doc) of\n    [<<\"chanmsg\">>, _, Msg] -> \n      Words = re:split(Msg, \"[^\\\\pL\\\\pN]+\", [unicode, {return, list}, trim]),\n      [Emit([Ident, unicode:characters_to_binary(W)], 1) || W <- Words, length(W) >= WSTAT_MIN_LEN],\n      ok;\n    _ -> ok\n  end\nend.\n",
+           "reduce": "fun(Keys, Values, true) -> Values;\n   (Keys, Values, false) -> \n  lists:foldl(fun ([E, _], [[C, E] | H]) -> [[C + 1, E] | H];\n\t\t\t\t\t([E, _], L)            -> [[1, E] | L]\n\t\t\t\tend, [], Keys)\nend."
+       }
+   }
+}

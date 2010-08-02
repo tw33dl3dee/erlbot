@@ -127,11 +127,6 @@ show_lastseen(Chan, Target) ->
 			end
 	end.
 
--define(HIST_EVENT_BYNICK(Event, Nick),
-		element(2, Event) =:= Nick orelse
-		(element(3, Event) =:= Nick andalso 
-		 (element(1, Event) =:= kick orelse element(1, Event) =:= nick))).
-
 %% -> {DocId, [NickOrIdent, Chan, Ts], [Ident, Event]}
 trace_lastseen(Chan, {ident, Ident}) ->
 	ChanBin = utf8:encode(Chan),
@@ -158,6 +153,7 @@ dump_lastseen(Histents, Chan) ->
 
 %% WSTAT -- word statistics
 
+%%% === Subject to removal =================================================
 update_wstat(Chan, Ident, Msg) ->
 	Words = erlbot_util:words(Msg, 2), % don't count 1-letter words
 	mnesia:async_dirty(fun () ->
@@ -166,6 +162,7 @@ update_wstat(Chan, Ident, Msg) ->
 							   [mnesia:dirty_update_counter(wstat, {Uid, Cid, W}, 1) || W <- Words],
 							   ok
 					   end).
+%%% ========================================================================
 
 show_wstat(Chan, Source, Target) ->
 	Wstat = get_wstat(Chan, Target),
@@ -173,61 +170,48 @@ show_wstat(Chan, Source, Target) ->
 
 get_wstat(Chan, {nick, TargetNick}) ->
 	case trace_lastseen(Chan, {nick, TargetNick}) of
-		[#histent{uid = Uid}] -> get_wstat(Chan, {id, Uid});
-		[]                    -> []
+		[{_, _, [Ident, _]}] -> get_wstat(Chan, {ident, Ident});
+		[]                   -> []
 	end;
-get_wstat(Chan, Target) ->
-	mnesia:async_dirty(fun get_wstat_xact/2, [Chan, Target]).
+get_wstat(Chan, {ident, Ident}) ->
+	case erlbot_db:query_view({"wstat", "by_user"}, 
+							  [{key, [utf8:encode(Chan), utf8:encode(Ident)]}, 
+							   {group, true}]) of
+		{_, _, _, L} -> top_wstat(L);
+		_ -> []
+	end;
+get_wstat(Chan, all) ->
+	case erlbot_db:query_view({"wstat", "by_user"}, 
+							  [{startkey, [utf8:encode(Chan), <<"">>]}, 
+							   {endkey,   [utf8:encode(Chan), {[]}]},
+							   {group, true}]) of
+		{_, _, _, L} -> top_wstat(L);
+		_ -> []
+	end.
 
--define(WSTAT_MIN_LEN, 5).     %% minimum word length for statistic inclusion
--define(WSTAT_MIN_COUNT, 15).  %% minimum occurence count for statistic inclusion
+-define(WSTAT_MIN_COUNT, 10).         %% minimum occurence count for statistic inclusion
+-define(WSTAT_MIN_TOTAL_COUNT, 100).  %% don't show users with total top count less than this
 
-get_wstat_xact(Chan, {id, Uid}) ->
-	[#user{ident = Ident}] = mnesia:read(user, Uid),
-	[#chan{cid = Cid}] = mnesia:index_read(chan, Chan, #chan.name),
-	Q = qlc:q([{Ident, Count, Word} || 
-				  #wstat{key = {Uid_, Cid_, Word}, count = Count} <- mnesia:table(wstat),
-				  length(Word) >= ?WSTAT_MIN_LEN,
-				  Count >= ?WSTAT_MIN_COUNT,
-				  Uid =:= Uid_, Cid =:= Cid_], [{cache, ets}]),
-	Qs = qlc:keysort(2, Q),
-	top_wstat(lists:reverse(qlc:eval(Qs)));
-get_wstat_xact(Chan, all) ->
-	[#chan{cid = Cid}] = mnesia:index_read(chan, Chan, #chan.name),
-	Q = qlc:q([{U#user.ident, Count, Word} || 
-				  #wstat{key = {Uid, Cid_, Word}, count = Count} <- mnesia:table(wstat),
-				  U <- mnesia:table(user),
-				  length(Word) >= ?WSTAT_MIN_LEN,
-				  Count >= ?WSTAT_MIN_COUNT,
-				  U#user.uid =:= Uid,
-				  Cid_ =:= Cid], [{cache, ets}]),
-	Qs = qlc:keysort(2, Q),
-	top_wstat(lists:reverse(qlc:eval(Qs))).
-
--define(WSTAT_MAX, 10).              %% number of words to output in word statistic
--define(WSTAT_MIN_SHOW_COUNT, 100).  %% don't show users with total top count less than this
-
-%% StatByUser is [{Ident, Count, Word}] sorted by Count desc.
+%% StatByUser is [{undefined, [Chan, Ident], [[Count, Word], ...]}]
 top_wstat(StatByUser) ->
-	Stat = lists:foldl(fun ({Id, C, W}, D) -> dict:append(Id, {C, W}, D) end, 
-					   dict:new(), StatByUser),
-	TopStat = dict:map(fun (_, V) -> Words = lists:sublist(V, ?WSTAT_MAX),
-									 Total = lists:sum([C || {C, _} <- Words]),
-									 {Total, Words}
-					   end, Stat),
-	lists:keysort(1, dict:to_list(TopStat)).
+	[begin
+		 TopWords = [{C, W} || [C, W] <- Words, C >= ?WSTAT_MIN_COUNT],
+		 Total = lists:foldl(fun ({C, _}, S) -> C + S end, 0, TopWords),
+		 {Ident, {Total, TopWords}}
+	 end || {_, [_, Ident], Words} <- StatByUser].
 
 dump_wstat(TopStat, Source) ->
 	bhv_common:empty_check(Source, TopStat),
 	[dump_wstat_user(Id, Total, Words, Source) || 
 		{Id, {Total, Words}} <- TopStat, 
-		Total >= ?WSTAT_MIN_SHOW_COUNT],
+		Total >= ?WSTAT_MIN_TOTAL_COUNT],
 	ok.
 
 dump_wstat_user(Ident, _Total, Words, Chan) ->
 	ok = irc_conn:chanmsg(Chan, hist,
 						  [Ident, ": ", [[Word, " (", integer_to_list(Count), ") "] || {Count, Word} <- Words]]).
 
+%%% === Subject to removal =================================================
 fix_wstat() ->
 	Q = qlc:q([{Ch#chan.name, U#user.ident, Msg} ||
 				  #histent{event = {Event, _, Msg}} = H <- mnesia:table(histent),
@@ -239,6 +223,7 @@ fix_wstat() ->
 	mnesia:transaction(fun () -> [mnesia:delete({wstat, K}) || K <- mnesia:all_keys(wstat)],
 								 [update_wstat(Ch, Id, M) || {Ch, Id, M} <- qlc:eval(Q)] 
 					   end).
+%%% ========================================================================
 
 %% HISTORY -- per-channel event history
 
