@@ -72,7 +72,8 @@ get_stat() ->
 
 %% Filter out strangers and sort by total lines
 filter_stat(Stat) ->
-	lists:keysort(2, [{I, S} || {_, I, [L | _] = S} <- Stat, L >= ?MIN_VISIBLE_STAT_LINES]).
+	lists:reverse(lists:keysort(2, [{I, S} || {_, I, [L | _] = S} <- Stat, 
+											  L >= ?MIN_VISIBLE_STAT_LINES])).
 
 dump_stat(Ident, StatLines) ->
 	% idents are returned as binaries so compare with binary, too
