@@ -60,7 +60,7 @@ update_first_day(Ident) ->
 	end.
 %%% ========================================================================
 
--define(MIN_VISIBLE_STAT_LINES, 100).  % Minimum number of lines user must have to be shown in stat.
+-define(MIN_VISIBLE_STAT_LINES, 2000).  % Minimum number of lines user must have to be shown in stat.
 
 show_stat(Ident) -> dump_stat(Ident, get_stat()).
 
