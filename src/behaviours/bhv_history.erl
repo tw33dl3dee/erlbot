@@ -399,14 +399,12 @@ fix_wchain() ->
 					   end).
 
 couchdb_upload() ->
-	{C, Db} = erlbot_db:couchdb(),
-	mnesia:async_dirty(fun () -> couchdb_upload_all(Db) end),
-	couchbeam_db:close(C, Db).
+	mnesia:async_dirty(fun () -> couchdb_upload_all() end).
 
 unix_timestamp({YMD, HMS, U}) ->
 	{erlbot_util:unix_timestamp({YMD, HMS}), U}.
 
-couchdb_upload_all(Db) ->
+couchdb_upload_all() ->
 	Q = qlc:q([{unix_timestamp(neg_timestamp(H#histent.timestamp)), 
 				U#user.ident, Ch#chan.name, H#histent.event} ||
 				  H  <- mnesia:table(histent),
@@ -414,15 +412,15 @@ couchdb_upload_all(Db) ->
 				  U  <- mnesia:table(user),
 				  Ch#chan.cid  =:= H#histent.cid,
 				  U#user.uid =:= H#histent.uid]),
-	[couchdb_save(Db, E) || E <- lists:reverse(qlc:eval(Q))],
+	[couchdb_save(E) || E <- lists:reverse(qlc:eval(Q))],
 	ok.
 
-couchdb_save(Db, E) ->
+couchdb_save(E) ->
 	case catch histent_to_json(E) of
 		{'EXIT', Reason} ->
 			io:format("ERR ~p: ~p~n", [E, Reason]);
 		Json ->
-			couchbeam_db:save_doc(Db, {Json})
+			couchbeam_db:save_doc(erlbot_db, {Json})
 	end.
 
 histent_to_json({{TsSec, TsUsec}, U, Ch, E}) ->
