@@ -120,10 +120,10 @@ give_help(Nick) ->
 show_lastseen(Chan, Target) ->
 	case trace_lastseen(Chan, Target) of
 		[] -> dump_lastseen([], Chan);
-		[#histent{uid = Uid} = LastByNick] ->	
-			case trace_lastseen(Chan, {uid, Uid}) of
-				[LastByNick] -> dump_lastseen([LastByNick], Chan);
-				[LastById]   -> dump_lastseen([LastById, LastByNick], Chan)
+		[{DocId, _, [Ident, _]} = LastByNick] ->	
+			case trace_lastseen(Chan, {ident, Ident}) of
+				[{DocId, _, _}] -> dump_lastseen([LastByNick], Chan);
+				[LastByIdent]   -> dump_lastseen([LastByIdent, LastByNick], Chan)
 			end
 	end.
 
@@ -132,26 +132,29 @@ show_lastseen(Chan, Target) ->
 		(element(3, Event) =:= Nick andalso 
 		 (element(1, Event) =:= kick orelse element(1, Event) =:= nick))).
 
-trace_lastseen(Chan, {uid, Uid}) ->
-	Q = qlc:q([H#histent{timestamp = neg_timestamp(H#histent.timestamp)} ||
-				  H  <- mnesia:table(histent),
-				  Ch <- mnesia:table(chan),
-				  Ch#chan.cid  =:= H#histent.cid,
-				  Ch#chan.name =:= Chan,
-				  H#histent.uid =:= Uid], [{join, lookup}]),
-	fetch_first(Q);
+%% -> {DocId, [NickOrIdent, Chan, Ts], [Ident, Event]}
+trace_lastseen(Chan, {ident, Ident}) ->
+	ChanBin = utf8:encode(Chan),
+	IdentBin = utf8:encode(Ident),
+	case erlbot_db:query_view({"history", "by_user"}, [{startkey, [IdentBin, ChanBin, {[]}]}, 
+													   {endkey, [IdentBin, ChanBin, 0]}, 
+													   {descending, true}, {limit, 1}]) of
+		{_, _, _, [Histent]} -> [Histent];
+		_                    -> []
+	end;
 trace_lastseen(Chan, {nick, Nick}) ->
-	Q  = qlc:q([H#histent{timestamp = neg_timestamp(H#histent.timestamp)} ||
-				  H  <- mnesia:table(histent),
-				  Ch <- mnesia:table(chan),
-				  Ch#chan.cid  =:= H#histent.cid,
-				  Ch#chan.name =:= Chan,
-				  ?HIST_EVENT_BYNICK(H#histent.event, Nick)], [{join, lookup}]),
-	fetch_first(Q).
+	ChanBin = utf8:encode(Chan),
+	NickBin = utf8:encode(Nick),
+	case erlbot_db:query_view({"history", "by_nick"}, [{startkey, [NickBin, ChanBin, {[]}]}, 
+													   {endkey, [NickBin, ChanBin, 0]}, 
+													   {descending, true}, {limit, 1}]) of
+		{_, _, _, [Histent]} -> [Histent];
+		_                    -> []
+	end.
 
 dump_lastseen(Histents, Chan) ->
 	bhv_common:empty_check(Chan, Histents),
-	dump_histents(long, lists:sort(Histents), Chan).
+	dump_histents(long, [json_to_histent(H) || H <- lists:sort(Histents)], Chan).
 
 %% WSTAT -- word statistics
 
@@ -353,7 +356,9 @@ histent_to_json({{TsSec, TsUsec}, U, Ch, E}) ->
 	 {<<"user">>, utf8:encode(U)},
 	 {<<"event">>, histevent_to_json(E)}].
 
-json_to_histent({_DocId, [_Chan, Ts], Event}) ->
+%% Each histent that comes from DB has format {DocId, [.... , Ts], [Ident, Event]}
+json_to_histent({_DocId, Key, [_Ident, Event]}) ->
+	Ts = lists:last(Key),
 	{erlbot_util:from_unix_timestamp(Ts), json_to_histevent([atom | Event])}.
 
 histevent_to_json(X) when is_tuple(X) -> [histevent_to_json(Y) || Y <- tuple_to_list(X)];
@@ -410,17 +415,6 @@ event_to_list({nick, Nick1, Nick2}) ->
 	["@@ ", Nick1, " ныне известен как ", Nick2];
 event_to_list(Ev) ->
 	["??? какая-то Неведомая Ебанная Хуйня: ", io_lib:format("~p", [Ev])].
-
-%% Utility
-
-fetch_first(Q) ->
-	case mnesia:transaction(fun () -> C = qlc:cursor(Q),
-									  A = qlc:next_answers(C, 1),
-									  qlc:delete_cursor(C),
-									  A
-							end) of
-		{atomic, Histent} -> Histent
-	end.
 
 %% WCHAIN support (should be in bhv_wchain, actually, but uses #histent)
 
