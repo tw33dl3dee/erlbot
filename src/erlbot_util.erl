@@ -16,7 +16,7 @@
 -export([read_file/1]).
 -export([add_days/2, add_seconds/2, valid_datetime/1, time_diff/2, date_diff/2]).
 -export([convert_time_abs/3, convert_time_rel/2, convert_time_rel_diff/2]).
--export([unix_timestamp/1]).
+-export([unix_timestamp/1, from_unix_timestamp/1]).
 -export([lowercase/1, uppercase/1, words/2]).
 
 multiline(Term) ->
@@ -238,11 +238,18 @@ valid_datetime({Date, {H, M, S}}) when H >= 0, H < 24, M >= 0, M < 60, S >= 0, S
 valid_datetime(_) ->
 	false.
 
+-define(UNIX_EPOCH, {{1970, 1, 1}, {0, 0, 0}}).
+
 unix_timestamp({YMD, HMS, U}) ->
 	unix_timestamp({YMD, HMS}) + U/1000000;
 unix_timestamp({YMD, HMS}) ->
-	Epoch = {{1970, 1, 1}, {0, 0, 0}},
-	calendar:datetime_to_gregorian_seconds({YMD, HMS}) - calendar:datetime_to_gregorian_seconds(Epoch).
+	calendar:datetime_to_gregorian_seconds({YMD, HMS}) - calendar:datetime_to_gregorian_seconds(?UNIX_EPOCH).
+
+from_unix_timestamp(Ts) when is_integer(Ts) ->
+	calendar:gregorian_seconds_to_datetime(Ts + calendar:datetime_to_gregorian_seconds(?UNIX_EPOCH));
+from_unix_timestamp(Ts) when is_float(Ts) ->
+	{YMD, HMS} = from_unix_timestamp(trunc(Ts)),
+	{YMD, HMS, trunc((Ts - trunc(Ts))*1000000)}.
 
 %% Difference in seconds between 2 datetimes
 time_diff(DateTime1, DateTime2) ->
