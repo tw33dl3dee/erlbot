@@ -45,7 +45,7 @@ query_view(ViewName, Params) ->
 	Data = couchbeam_view:parse_view(View),
 	couchbeam_view:close_view(View),
 	case Data of 
-		{error, Err} -> error_logger:report_error([query_view, {view_name, ViewName}, 
+		{error, Err} -> error_logger:error_report([query_view, {view_name, ViewName}, 
 												   {params, Params}, {error, Err}]),
 						{error, Err};
 		Result -> Result
