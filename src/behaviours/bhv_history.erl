@@ -370,6 +370,10 @@ dump_histents(TimeFormat, Histents, Target) ->
 	Lines = [histent_to_list(TimeFormat, H) || H <- Histents],
 	ok = irc_conn:bulk_privmsg(Target, nohist, Lines).
 
+%%% === Subject to removal =================================================
+histent_to_list(TimeFormat, #histent{timestamp = TS, event = Event}) ->
+	[timestamp_to_list(TimeFormat, TS), " ", event_to_list(Event)];
+%%% ========================================================================
 histent_to_list(TimeFormat, {Ts, Event}) ->
 	[timestamp_to_list(TimeFormat, Ts), " ", event_to_list(Event)].
 
