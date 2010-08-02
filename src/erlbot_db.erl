@@ -12,6 +12,7 @@
 %% API
 -export([start_link/0]).
 -export([create_sequence/0, create_sequence/1, init_sequence/2, sequence/1, sequence/2, init_db/0, init_table/2]).
+-export([query_view/2]).
 
 -include("couchbeam.hrl").
 
@@ -33,6 +34,17 @@ start_link() ->
 			couchbeam_server:open_db(Pid, {?MODULE, DbName}),
 			{ok, Pid};
 		Res -> Res
+	end.
+
+query_view(ViewName, Params) ->
+	View = couchbeam_db:query_view(?MODULE, ViewName, Params),
+	Data = couchbeam_view:parse_view(View),
+	couchbeam_view:close_view(View),
+	case Data of 
+		{error, Err} -> error_logger:report_error([query_view, {view_name, ViewName}, 
+												   {params, Params}, {error, Err}]),
+						{error, Err};
+		Result -> Result
 	end.
 
 init_db() ->
