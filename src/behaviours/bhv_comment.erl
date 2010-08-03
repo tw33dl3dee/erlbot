@@ -17,6 +17,8 @@ init(_) -> undefined.
 
 help(_) -> none.
 
+handle_event(chanevent, {join, Chan, ?USER(Nick)}, _, _) ->
+	make_comment(join, Chan, Nick);
 handle_event(chanevent, {topic, Chan, ?USER(Nick), _}, _, _) ->
 	make_comment(topic, Chan, Nick);
 %% Bot can comment any `genmsg', direct or induced from `maybe_appeal'.
@@ -37,6 +39,14 @@ handle_event(_Type, _Event, _IrcState, _Data) ->
 								 [pos, Nick, ", ты гений!"],
 								 [pos, Nick, ": чмоки, противный"]]).
 
+-define(BOT_REGEX, "bot$|broom").
+
+make_comment(join, Chan, Nick) ->
+	case erlbot_util:contains(Nick, ?BOT_REGEX) of
+		false -> not_handled;
+		%% Greet other bots
+		true  -> irc_conn:chanmsg(Chan, hist, [Nick, ": няяяяяяяяя!"])
+	end;
 make_comment(topic, Chan, Nick) ->
 	make_comment(?TOPIC_COMMENTS(Nick), Chan, Nick);
 make_comment(message, Chan, Nick) ->

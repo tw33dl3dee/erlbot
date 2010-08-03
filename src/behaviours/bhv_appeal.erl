@@ -46,7 +46,8 @@ handle_appeal(Cause, Source, ?USER(Nick) = User, Msg) ->
 					   {fuckoff,     "(у?ебись|сосн?и)"},
 					   {caress,      "(няшка|кавай)"},
 					   {criticism,   "(тупа+я +пи+зда+|пи+зда+ +тупа+я+)"},
-					   {kiss,        "чмоки"}]).
+					   {kiss,        "чмоки"},
+					   {baran,       "баран"}]).
 
 appeal_type(Msg) -> appeal_type(?APPEAL_REGEX, Msg).
 
@@ -59,6 +60,7 @@ appeal_type([], _) -> undefined.
 
 appeal_react(kiss, _, _, _)             -> {message_react, action,  ["*KISSED* *YAHOO*"]};
 appeal_react(humiliation, _, Nick, _)   -> {message_react, chanmsg, [Nick, ": хамишь, сцуко."]};
+appeal_react(baran, _, Nick, _)         -> {message_react, chanmsg, [Nick, ": сам баран, баран!!!!"]};
 appeal_react(greeting, _, Nick, _)      -> {message_react, chanmsg, ["\\O/ Превед, ", Nick, "!!!"]};
 appeal_react(caress, _, _, _)           -> {message_react, chanmsg, "^_^"};
 appeal_react(criticism, _, _, _)        -> {message_react, action,  "тупая пизда v_v"};
