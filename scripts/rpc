@@ -28,23 +28,23 @@ main(["ping", Node]) ->
 
 main(["bcast", Node, Method, Msg]) ->
 	Fun = list_to_atom(Method),
-	make_call(Node, irc_conn, for_each_channel, [fun (Chan) -> irc_conn:Fun(Chan, hist, Msg) end]);
+	make_call(Node, irc_conn, for_each_channel, [fun (Chan) -> irc_conn:Fun(Chan, hist, utf8_to_binary(Msg)) end]);
+?HELP("bcast", "<node> [privmsg|action] <message>");
 
-?HELP("bcast", "<node> [chanmsg|action] <message>");
-main(["chanmsg", Node, Chan, Msg]) ->
-	make_call(Node, irc_conn, chanmsg, [Chan, hist, Msg]);
-?HELP("chanmsg", "<node> <channel> <message>");
+main(["privmsg", Node, Chan, Msg]) ->
+	make_call(Node, irc_conn, privmsg, [Chan, hist, utf8_to_binary(Msg)]);
+?HELP("privmsg", "<node> <channel> <message>");
 
 main(["action", Node, Chan, Msg]) ->
-	make_call(Node, irc_conn, action, [Chan, hist, Msg]);
+	make_call(Node, irc_conn, action, [Chan, hist, utf8_to_binary(Msg)]);
 ?HELP("action", "<node> <channel> <message>");
 
 main(["control", Node, Command | Args]) ->
-	make_call(Node, irc_conn, list_to_atom(Command), Args);
+	make_call(Node, irc_conn, list_to_atom(Command), [utf8_to_binary(A) || A <- Args]);
 ?HELP("control", "<node> <command> args...");
 
 main(_) ->
-	io:format("Usage: ~ts [reload|bcast|chanmsg|action|control>] [args...]~n", 
+	io:format("Usage: ~ts [stop|reload|ping|bcast|privmsg|action|control>] [args...]~n", 
 			  [filename:basename(escript:script_name())]).
 
 make_call(Node, Mod, Fun, Args) ->
@@ -53,4 +53,10 @@ make_call(Node, Mod, Fun, Args) ->
 			io:format(standard_error, "~p:~p(~p) failed: ~p~n", [Mod, Fun, Args, Reason]);
 		Res ->
 			io:format("~p:~p(~p) -> ~p~n", [Mod, Fun, Args, Res])
+	end.
+
+utf8_to_binary(Str) ->
+	case lists:all(fun (C) -> C < 128 end, Str) of
+		true  -> Str;                 % pure ascii7 string
+		false -> list_to_binary(Str)  % utf8 string, convert to binary
 	end.

@@ -77,25 +77,25 @@ connect() ->
 %% - `nohist' -- do not save
 %% This modifier is stripped before passing to `irc_proto_ref' but present in selfevents
 
-privmsg(Nick, Save, Msg)      -> gen_fsm:send_event(?MODULE, {irc_command, {msgtype(privmsg, Nick), Nick, Save, Msg}}).
-chanmsg(Channel, Save, Msg)   -> gen_fsm:send_event(?MODULE, {irc_command, {msgtype(chanmsg, Channel), Channel, Save, Msg}}).
-action(Channel, Save, Action) -> gen_fsm:send_event(?MODULE, {irc_command, {msgtype(action, Channel), Channel, Save, Action}}).
+privmsg(Nick, Save, Msg)      -> gen_fsm:send_event(?MODULE, {irc_command, {msgtype(privmsg, Nick), Nick, Save, ensure_utf8(Msg)}}).
+chanmsg(Channel, Save, Msg)   -> gen_fsm:send_event(?MODULE, {irc_command, {msgtype(chanmsg, Channel), Channel, Save, ensure_utf8(Msg)}}).
+action(Channel, Save, Action) -> gen_fsm:send_event(?MODULE, {irc_command, {msgtype(action, Channel), Channel, Save, ensure_utf8(Action)}}).
 join(Channel)                 -> gen_fsm:send_event(?MODULE, {irc_command, {join, Channel}}).
 part(Channel)                 -> gen_fsm:send_event(?MODULE, {irc_command, {part, Channel}}).
-quit(QuitMsg)                 -> gen_fsm:send_event(?MODULE, {irc_command, {quit, QuitMsg}}).
+quit(QuitMsg)                 -> gen_fsm:send_event(?MODULE, {irc_command, {quit, ensure_utf8(QuitMsg)}}).
 mode(Channel, User, Mode)     -> gen_fsm:send_event(?MODULE, {irc_command, {mode, Channel, User, Mode}}).
 umode(Mode)                   -> gen_fsm:send_event(?MODULE, {irc_command, {umode, Mode}}).
 nick(Nick)                    -> gen_fsm:send_event(?MODULE, {irc_command, {nick, Nick}}).
-kick(Channel, Nick, Reason)   -> gen_fsm:send_event(?MODULE, {irc_command, {kick, Channel, Nick, Reason}}).
-topic(Channel, Topic)         -> gen_fsm:send_event(?MODULE, {irc_command, {topic, Channel, Topic}}).
+kick(Channel, Nick, Reason)   -> gen_fsm:send_event(?MODULE, {irc_command, {kick, Channel, Nick, ensure_utf8(Reason)}}).
+topic(Channel, Topic)         -> gen_fsm:send_event(?MODULE, {irc_command, {topic, Channel, ensure_utf8(Topic)}}).
 
 %% Send big bulk of private/channel messages asynchronously
 bulk_chanmsg(Channel, Save, Lines) -> 
-	gen_fsm:send_event(?MODULE, {bulk_irc_command, msgtype(chanmsg, Channel), Channel, Save, Lines}).
+	gen_fsm:send_event(?MODULE, {bulk_irc_command, msgtype(chanmsg, Channel), Channel, Save, ensure_utf8(Lines)}).
 bulk_action(Channel, Save, Lines)  -> 
-	gen_fsm:send_event(?MODULE, {bulk_irc_command, msgtype(action, Channel), Channel, Save, Lines}).
+	gen_fsm:send_event(?MODULE, {bulk_irc_command, msgtype(action, Channel), Channel, Save, ensure_utf8(Lines)}).
 bulk_privmsg(Nick, Save, Lines)    -> 
-	gen_fsm:send_event(?MODULE, {bulk_irc_command, msgtype(privmsg, Nick), Nick, Save, Lines}).
+	gen_fsm:send_event(?MODULE, {bulk_irc_command, msgtype(privmsg, Nick), Nick, Save, ensure_utf8(Lines)}).
 
 %%% IRC queries
 
@@ -247,6 +247,12 @@ state_connected({get_channel_info, Chan}, _From, Conn) ->
 msgtype(action, Chan)  when ?IS_CHAN(Chan) -> action;
 msgtype(_, Chan)       when ?IS_CHAN(Chan) -> chanmsg;
 msgtype(_, _)                              -> privmsg.
+
+%% Convert utf8 binaries to internal Unicode lists (will be encoded back later by `irc_proto')
+%% This is required for `selfevent's to contain proper Unicode messages
+ensure_utf8(List) when is_list(List) -> [ensure_utf8(C) || C <- List];
+ensure_utf8(Bin) when is_binary(Bin) -> utf8:decode(Bin);
+ensure_utf8(CP) when is_integer(CP)  -> CP.
 
 find_user(Nick, [{_, Nick, _} | _]) -> true;
 find_user(Nick, [_ | Rest])         -> find_user(Nick, Rest);
