@@ -17,13 +17,13 @@ init(_) -> undefined.
 
 help(_) -> none.
 
-handle_event(chanevent, {join, Chan, ?USER(Nick)}, _, _) ->
-	make_comment(join, Chan, Nick);
-handle_event(chanevent, {topic, Chan, ?USER(Nick), _}, _, _) ->
-	make_comment(topic, Chan, Nick);
+handle_event(chanevent, {join, Chan, User}, _, _) ->
+	make_comment(join, Chan, User);
+handle_event(chanevent, {topic, Chan, User, _}, _, _) ->
+	make_comment(topic, Chan, User);
 %% Bot can comment any `genmsg', direct or induced from `maybe_appeal'.
-handle_event(_, {genmsg, Chan, ?USER(Nick), _}, _, _) ->
-	make_comment(message, Chan, Nick);
+handle_event(_, {genmsg, Chan, User, _}, _, _) ->
+	make_comment(message, Chan, User);
 handle_event(_Type, _Event, _IrcState, _Data) ->
 	not_handled.
 
@@ -39,22 +39,20 @@ handle_event(_Type, _Event, _IrcState, _Data) ->
 								 [pos, Nick, ", ты гений!"],
 								 [pos, Nick, ": чмоки, противный"]]).
 
--define(BOT_REGEX, "bot$|broom").
-
-make_comment(join, Chan, Nick) ->
-	case erlbot_util:contains(Nick, ?BOT_REGEX) of
+make_comment(join, Chan, ?USER(Nick) = User) ->
+	case bhv_common:is_bot(User) of
 		false -> not_handled;
 		%% Greet other bots
 		true  -> irc_conn:chanmsg(Chan, hist, [Nick, ": няяяяяяяяя!"])
 	end;
-make_comment(topic, Chan, Nick) ->
+make_comment(topic, Chan, ?USER(Nick)) ->
 	make_comment(?TOPIC_COMMENTS(Nick), Chan, Nick);
 make_comment(message, Chan, Nick) ->
     case choice:make([{1, do}, {?COMMENT_REV_PROB - 1, dont}]) of
         do   -> make_comment(?MESSAGE_COMMENTS(Nick), Chan, Nick);
         dont -> ok
     end;
-make_comment(Alternatives, Chan, Nick) ->
+make_comment(Alternatives, Chan, ?USER(Nick)) ->
 	case choice:make(Alternatives) of
 		[Emotion | Msg] ->
 			make_emotional_comment(Emotion, Chan, Nick, Msg)

@@ -9,9 +9,15 @@
 
 -export([empty_check/1, empty_check/2, error/2, fuckoff/2]).
 -export([pipe_script/4, pipe_script/3]).
+-export([is_bot/1]).
 
 -include("irc.hrl").
 -include("utf8.hrl").
+
+-define(BOT_NICK_REGEX, "bot$|broom").
+
+is_bot(?USER(Nick)) ->
+	erlbot_util:contains(Nick, ?BOT_NICK_REGEX).
 
 %% Execute script from script directory, piping it's output to channel
 %% If error occurs, displays error message and output

@@ -32,7 +32,8 @@ handle_event(_Type, _Event, _IrcState, _Data) ->
 %% Cause = `direct' | {`indirect', `chan'} | {`indirect', `priv'}
 handle_appeal(Cause, Source, ?USER(Nick) = User, Msg) ->
 	AppealType = appeal_type(Msg),
-	case appeal_react(AppealType, Source, Nick, Cause) of
+	IsBot = bhv_common:is_bot(User),
+	case appeal_react(AppealType, IsBot, Source, Nick, Cause) of
 		{message_react, Method, ReplyMsg} -> message_react(Source, Method, ReplyMsg);
 		%% Induced `genmsg' is `customevent' which means that `msgevent' 
 		%% (as `genmsg', `appeal' or `maybe_appeal') occurs once per user message
@@ -58,16 +59,19 @@ appeal_type([{Type, Regexp} | Rest], Msg) ->
 	end;
 appeal_type([], _) -> undefined.
 
-appeal_react(kiss, _, _, _)             -> {message_react, action,  ["*KISSED* *YAHOO*"]};
-appeal_react(humiliation, _, Nick, _)   -> {message_react, chanmsg, [Nick, ": хамишь, сцуко."]};
-appeal_react(baran, _, Nick, _)         -> {message_react, chanmsg, [Nick, ": сам баран, баран!!!!"]};
-appeal_react(greeting, _, Nick, _)      -> {message_react, chanmsg, ["\\O/ Превед, ", Nick, "!!!"]};
-appeal_react(caress, _, _, _)           -> {message_react, chanmsg, "^_^"};
-appeal_react(criticism, _, _, _)        -> {message_react, action,  "тупая пизда v_v"};
-appeal_react(fuckoff, Chan, Nick, _)
-  when ?IS_CHAN(Chan)                   -> {delayed_event, ?APPEAL_DELAY, customevent, {suicide, Chan, Nick}, undefined};
-appeal_react(_, _, _, direct)           -> {message_react, chanmsg, "Ня!"};
-appeal_react(_, _Source, _Nick, _Cause) -> not_handled.
+appeal_react(kiss, _, _, _, _)                  -> {message_react, action,  ["*KISSED* *YAHOO*"]};
+appeal_react(humiliation, _, _, Nick, _)        -> {message_react, chanmsg, [Nick, ": хамишь, сцуко."]};
+appeal_react(baran, _, _, Nick, _)              -> {message_react, chanmsg, [Nick, ": сам баран, баран!!!!"]};
+appeal_react(greeting, _, _, Nick, _)           -> {message_react, chanmsg, ["\\O/ Превед, ", Nick, "!!!"]};
+appeal_react(caress, _, _, _, _)                -> {message_react, chanmsg, "^_^"};
+appeal_react(criticism, _, _, _, _)             -> {message_react, action,  "тупая пизда v_v"};
+appeal_react(fuckoff, false, Chan, Nick, _)
+  when ?IS_CHAN(Chan)                           -> {delayed_event, ?APPEAL_DELAY, customevent, 
+													{suicide, Chan, Nick}, undefined};
+% Other bots cannot kick
+appeal_react(fuckoff, true, _, Nick, _)         -> {message_react, chanmsg, [Nick, ": слишком много чести."]};
+appeal_react(_, false, _, _, direct)            -> {message_react, chanmsg, "Ня!"};
+appeal_react(_, _IsBot, _Source, _Nick, _Cause) -> not_handled.
 
 message_react(Source, Method, Msg) ->
 	timer:sleep(?APPEAL_DELAY),
