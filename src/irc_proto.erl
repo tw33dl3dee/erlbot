@@ -144,11 +144,15 @@ notify(Event, #state{owner = Pid} = State) ->
 
 %% Here, chanmsg and privmsg join back again
 do_command({chanmsg, Channel, Msg}, State)       -> do_command({privmsg, Channel, Msg}, State);
+do_command({channotice, Channel, Msg}, State)    -> do_command({privnotice, Channel, Msg}, State);
 do_command({privmsg, To, Msg}, State)            -> send(State, "PRIVMSG " ++ To ++ " :", Msg);
+do_command({privnotice, To, Msg}, State)         -> send(State, "NOTICE " ++ To ++ " :", Msg);
 do_command({join, Channel}, State)               -> send(State, "JOIN :" ++ Channel);
 do_command({part, Channel}, State)               -> send(State, "PART " ++ Channel);
 do_command({quit, QuitMsg}, State)               -> send(State, "QUIT :" ++ QuitMsg);
 do_command({action, Channel, Action}, State)     -> send(State, "PRIVMSG " ++ Channel ++ " :" ++ [1] ++ "ACTION ", Action, [1]);
+do_command({ctcp_request, To, Request}, State)   -> send(State, "PRIVMSG " ++ To ++ " :" ++ [1] ++ Request ++ [1]);
+do_command({ctcp_reply, To, Request}, State)     -> send(State, "NOTICE " ++ To ++ " :" ++ [1] ++ Request ++ [1]);
 do_command({mode, Channel, User, Mode}, State)   -> send(State, "MODE " ++ Channel ++ " " ++ Mode ++ " " ++ User);
 do_command({umode, User, Mode}, State)           -> send(State, "MODE " ++ User ++ " " ++ Mode);
 do_command({user, Login, LongName}, State)       -> send(State, "USER " ++ Login ++ " 8 * :" ++ LongName);
@@ -262,6 +266,7 @@ parse_tokens([Nick, "MODE", Nick, Mode], State) ->
 	{{umode, Nick, Mode}, State};
 parse_tokens([User, "MODE", Channel, Mode, Nick], State) ->
 	{{mode, Channel, User, Mode, Nick}, State};
+%% TODO: parse NOTICEs
 parse_tokens([_Server, "NOTICE", _Target, Notice], State) ->
 	{{notice, undefined, Notice}, State};
 parse_tokens([_Server, topic, _Target, Channel, Topic], State) ->
@@ -290,10 +295,35 @@ parse_tokens(Tokens, State) ->
 %% - `action' (detected here)
 %% - `chanmsg'
 %% - `privmsg' (this is distinguished from `chanmsg' on higher level, where own nick is known)
-parse_privmsg(Channel, User, [1] ++ "ACTION " ++ Action, State) ->
-	{{action, Channel, User, string:strip(Action, right, 1)}, State};
+parse_privmsg(Target, User, [1] ++ Request, State) ->
+	parse_ctcp(Target, User, string:strip(Request, right, 1), State);
 parse_privmsg(Target, User, Msg, State) ->
 	{{privmsg, Target, User, Msg}, State}.
+
+parse_ctcp(Target, User, "ACTION " ++ Action, State) ->
+	{{action, Target, User, Action}, State};
+parse_ctcp(Target, User, "ERRMSG " ++ ErrMsg, State) ->
+	{{ctcp_error, Target, User, ErrMsg}, State};
+parse_ctcp(Target, User, "PING " ++ Time, State) ->
+	Ts = case catch list_to_integer(Time) of
+			 X when is_integer(X) -> X;
+			 _ -> Time
+		 end,
+	{{ctcp_ping, Target, User, Time}, State};
+parse_ctcp(Target, User, Request, State) ->
+	case catch parse_ctcp_request(Request) of
+		ReqName when is_atom(ReqName) -> 
+			{{ReqName, Target, User}, State};
+		_ -> {{ctcp_unknown, Target, User, Request}, State}
+	end.
+
+parse_ctcp_request("FINGER")     -> ctcp_finger;
+parse_ctcp_request("VERSION")    -> ctcp_version;
+parse_ctcp_request("SOURCE")     -> ctcp_source;
+parse_ctcp_request("USERINFO")   -> ctcp_userinfo;
+parse_ctcp_request("CLIENTINFO") -> ctcp_clientinfo;
+parse_ctcp_request("PING")       -> ctcp_ping;
+parse_ctcp_request("TIME")       -> ctcp_time.
 
 %% Parse `namesreply' (user list on channel)
 parse_names(Names) ->
