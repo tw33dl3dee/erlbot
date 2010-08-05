@@ -16,7 +16,8 @@
 
 %%% API
 -export([start_link/1, connect/0]).
--export([chanmsg/3, privmsg/3, action/3, join/1, part/1, quit/1, mode/3, umode/1, kick/3, topic/2, nick/1]).
+-export([chanmsg/3, privmsg/3, action/3, notice/3, join/1, part/1, quit/1, mode/3, umode/1, kick/3, topic/2, nick/1]).
+-export([ctcp_request/2, ctcp_reply/2]).
 -export([get_channels_info/0, get_channels/0, get_channel_info/1]).
 -export([for_each_channel/1, for_each_channel/2, is_user_present/2]).
 -export([bulk_chanmsg/3, bulk_action/3, bulk_privmsg/3]).
@@ -80,6 +81,7 @@ connect() ->
 privmsg(Nick, Save, Msg)      -> gen_fsm:send_event(?MODULE, {irc_command, {msgtype(privmsg, Nick), Nick, Save, ensure_utf8(Msg)}}).
 chanmsg(Channel, Save, Msg)   -> gen_fsm:send_event(?MODULE, {irc_command, {msgtype(chanmsg, Channel), Channel, Save, ensure_utf8(Msg)}}).
 action(Channel, Save, Action) -> gen_fsm:send_event(?MODULE, {irc_command, {msgtype(action, Channel), Channel, Save, ensure_utf8(Action)}}).
+notice(Target, Save, Notice)  -> gen_fsm:send_event(?MODULE, {irc_command, {msgtype(notice, Target), Target, Save, ensure_utf8(Notice)}}).
 join(Channel)                 -> gen_fsm:send_event(?MODULE, {irc_command, {join, Channel}}).
 part(Channel)                 -> gen_fsm:send_event(?MODULE, {irc_command, {part, Channel}}).
 quit(QuitMsg)                 -> gen_fsm:send_event(?MODULE, {irc_command, {quit, ensure_utf8(QuitMsg)}}).
@@ -88,6 +90,8 @@ umode(Mode)                   -> gen_fsm:send_event(?MODULE, {irc_command, {umod
 nick(Nick)                    -> gen_fsm:send_event(?MODULE, {irc_command, {nick, Nick}}).
 kick(Channel, Nick, Reason)   -> gen_fsm:send_event(?MODULE, {irc_command, {kick, Channel, Nick, ensure_utf8(Reason)}}).
 topic(Channel, Topic)         -> gen_fsm:send_event(?MODULE, {irc_command, {topic, Channel, ensure_utf8(Topic)}}).
+ctcp_request(Target, Request) -> gen_fsm:send_event(?MODULE, {irc_command, {ctcp_requst, Target, ensure_utf8(Request)}}).
+ctcp_reply(Target, Reply)     -> gen_fsm:send_event(?MODULE, {irc_command, {ctcp_requst, Target, ensure_utf8(Reply)}}).
 
 %% Send big bulk of private/channel messages asynchronously
 bulk_chanmsg(Channel, Save, Lines) -> 
@@ -244,9 +248,11 @@ state_connected({get_channel_info, Chan}, _From, Conn) ->
 %%--------------------------------------------------------------------
 
 %% Determine real message type (action/chan/priv) based on target (nick/channel)
-msgtype(action, Chan)  when ?IS_CHAN(Chan) -> action;
-msgtype(_, Chan)       when ?IS_CHAN(Chan) -> chanmsg;
-msgtype(_, _)                              -> privmsg.
+msgtype(action, Chan) when ?IS_CHAN(Chan) -> action;
+msgtype(notice, Chan) when ?IS_CHAN(Chan) -> channotice;
+msgtype(_, Chan)      when ?IS_CHAN(Chan) -> chanmsg;
+msgtype(notice, _)                        -> privnotice;
+msgtype(_, _)                             -> privmsg.
 
 %% Convert utf8 binaries to internal Unicode lists (will be encoded back later by `irc_proto')
 %% This is required for `selfevent's to contain proper Unicode messages
@@ -284,8 +290,6 @@ process_event_raw(Event, Conn) ->
 %% Transforms events targeted to self (own nick change, etc) to "myevents"
 myevent({privmsg, Target, User, Msg}, Nick) when Target /= Nick ->
 	{chanmsg, Target, User, Msg};
-myevent({privmsg, Nick, User, Msg}, Nick) ->
-	{privmsg, User, Msg};
 myevent({join, Channel, ?USER(Nick)}, Nick) ->
 	{joining, Channel};  % joined will be sent by channel FSM after ENDOFNAMES
 myevent({part, Channel, ?USER(Nick), _}, Nick) ->
@@ -296,11 +300,16 @@ myevent({mode, Channel, User, Mode, Nick}, Nick) ->
 	{mymode, Channel, User, Mode, Nick};
 %% User mode event can ONLY be myevent anyway
 myevent({umode, Nick, Mode}, Nick) ->
-	{umode, Nick, Mode};
+	{umode, Mode};
 myevent({nick, NewNick, ?USER(Nick)}, Nick) ->
 	{mynick, NewNick};
 myevent({topic, Channel, ?USER(Nick), Topic}, Nick) ->
 	{mytopic, Channel, Nick, Topic};
+%% Strip nick from self-directed events (privmsg, notice, CTCP)
+myevent({Type, Nick, User, Msg}, Nick) ->
+	{Type, User, Msg};
+myevent({Type, Nick, User}, Nick) ->
+	{Type, User};
 myevent(Event, _) ->
 	Event.
 
@@ -333,8 +342,12 @@ myevent(Event, _) ->
 %% - selfevents (propagated by commands executed)
 process_event({mynick, Nick}, Conn) ->
 	Conn#conn{nick = Nick};
-process_event({umode, _, Mode}, Conn) ->
+process_event({umode, Mode}, Conn) ->
 	apply_umode(Mode, Conn);
+process_event({ctcp_ping, ?USER(Nick), _Ts}, Conn) ->
+	ctcp_pong(Nick, Conn);
+process_event({ctcp_version, ?USER(Nick)}, Conn) ->
+	ctcp_version(Nick, Conn);
 process_event(Event, Conn) when ?IS_CHAN_EVENT(Event) ->
 	notify_chanevent(Event, Conn);
 process_event(Event, Conn) when ?IS_ALLCHAN_EVENT(Event) ->
@@ -391,7 +404,8 @@ do_irc_command({umode, Mode}, #conn{nick = Nick} = Conn) ->
 	do_irc_command({umode, Nick, Mode}, Conn);
 %% Strip `hist', `nohist' modifier from message commands
 do_irc_command({MsgType, Target, _, Msg} =  Cmd, #conn{irc_proto_ref = IrcRef} = Conn) 
-  when MsgType =:= chanmsg; MsgType =:= privmsg; MsgType =:= action ->
+  when MsgType =:= chanmsg; MsgType =:= privmsg; MsgType =:= action;
+	   MsgType =:= channotice; MsgType =:= privnotice ->
 	irc_proto:send_irc_command(IrcRef, {MsgType, Target, Msg}),
 	notify_selfevent(Cmd, Conn);
 do_irc_command(Cmd, #conn{irc_proto_ref = IrcRef} = Conn) ->
@@ -432,6 +446,14 @@ msg_throttle(#conn{umode = M}) ->
 
 pong(Server, Conn) ->
 	do_irc_command({pong, Server}, Conn).
+
+ctcp_pong(Nick, Conn) ->
+	do_irc_command({ctcp_reply, Nick, ["PING ", integer_to_list(erlbot_util:epoch())]}, Conn).
+
+ctcp_version(Nick, Conn) ->
+	{_, Name, Version} = lists:keyfind(erlbot, 1, application:which_applications()),
+	Env = string:strip(hd(string:tokens(erlang:system_info(system_version), "[]"))),
+	do_irc_command({ctcp_reply, Nick, ["VERSION ", Name, ":", Version, ":", Env]}, Conn).
 
 apply_umode([$- | Modes], Conn) ->
 	remove_umodes(Modes, Conn#conn.umode, Conn);
