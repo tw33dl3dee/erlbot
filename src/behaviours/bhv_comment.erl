@@ -49,20 +49,18 @@ make_comment(topic, Chan, ?USER(Nick)) ->
 	make_comment(?TOPIC_COMMENTS(Nick), Chan, Nick);
 make_comment(message, Chan, ?USER(Nick)) ->
     case choice:make([{1, do}, {?COMMENT_REV_PROB - 1, dont}]) of
-        do   -> make_comment(?MESSAGE_COMMENTS(Nick), Chan, Nick);
-        dont -> ok
-    end;
-make_comment(Alternatives, Chan, ?USER(Nick)) ->
-	case choice:make(Alternatives) of
-		[Emotion | Msg] ->
-			make_emotional_comment(Emotion, Chan, Nick, Msg)
-	end.
+        do   -> make_emotional_comment(?MESSAGE_COMMENTS(Nick), Chan, Nick);
+        dont -> not_handled
+    end.
 
 -define(SUICIDE_DISABLE_TIMEOUT, 120000).
 
-make_emotional_comment(pos, Chan, Nick, Msg) ->
-	irc_conn:chanmsg(Chan, hist, Msg),
-	{new_event, customevent, {suicide_enable, Nick}, undefined};
-make_emotional_comment(neg, Chan, Nick, Msg) ->
-	irc_conn:chanmsg(Chan, hist, Msg),
-	{new_event, customevent, {suicide_disable, Nick, ?SUICIDE_DISABLE_TIMEOUT}, undefined}.
+make_emotional_comment(Alternatives, Chan, Nick) ->
+	case choice:make(Alternatives) of
+		[pos | Msg] ->
+			irc_conn:chanmsg(Chan, hist, Msg),
+			{new_event, customevent, {suicide_enable, Nick}, undefined};
+		[neg | Msg] ->
+			irc_conn:chanmsg(Chan, hist, Msg),
+			{new_event, customevent, {suicide_disable, Nick, ?SUICIDE_DISABLE_TIMEOUT}, undefined}
+	end.
