@@ -310,7 +310,7 @@ parse_ctcp(Target, User, "PING " ++ Time, State) ->
 			 X when is_integer(X) -> X;
 			 _ -> Time
 		 end,
-	{{ctcp_ping, Target, User, Time}, State};
+	{{ctcp_ping, Target, User, Ts}, State};
 parse_ctcp(Target, User, Request, State) ->
 	case catch parse_ctcp_request(Request) of
 		ReqName when is_atom(ReqName) -> 
