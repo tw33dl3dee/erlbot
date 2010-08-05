@@ -1,6 +1,6 @@
 {application, erlbot,
  [
-  {description, "ERLBOT"},
+  {description, "Erlbot"},
   {vsn, "3.0"},
   {registered, []},
   {applications, [
