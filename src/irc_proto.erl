@@ -145,22 +145,23 @@ notify(Event, #state{owner = Pid} = State) ->
 %% Here, chanmsg and privmsg join back again
 do_command({chanmsg, Channel, Msg}, State)       -> do_command({privmsg, Channel, Msg}, State);
 do_command({channotice, Channel, Msg}, State)    -> do_command({privnotice, Channel, Msg}, State);
-do_command({privmsg, To, Msg}, State)            -> send(State, "PRIVMSG " ++ To ++ " :", Msg);
-do_command({privnotice, To, Msg}, State)         -> send(State, "NOTICE " ++ To ++ " :", Msg);
-do_command({join, Channel}, State)               -> send(State, "JOIN :" ++ Channel);
-do_command({part, Channel}, State)               -> send(State, "PART " ++ Channel);
-do_command({quit, QuitMsg}, State)               -> send(State, "QUIT :" ++ QuitMsg);
-do_command({action, Channel, Action}, State)     -> send(State, "PRIVMSG " ++ Channel ++ " :" ++ [1] ++ "ACTION ", Action, [1]);
-do_command({ctcp_request, To, Request}, State)   -> send(State, "PRIVMSG " ++ To ++ " :" ++ [1] ++ Request ++ [1]);
-do_command({ctcp_reply, To, Request}, State)     -> send(State, "NOTICE " ++ To ++ " :" ++ [1] ++ Request ++ [1]);
-do_command({mode, Channel, User, Mode}, State)   -> send(State, "MODE " ++ Channel ++ " " ++ Mode ++ " " ++ User);
-do_command({umode, User, Mode}, State)           -> send(State, "MODE " ++ User ++ " " ++ Mode);
-do_command({user, Login, LongName}, State)       -> send(State, "USER " ++ Login ++ " 8 * :" ++ LongName);
-do_command({nick, Nick}, State)                  -> send(State, "NICK " ++ Nick);
-do_command({oper, Login, Passwd}, State)         -> send(State, "OPER " ++ Login ++ " " ++ Passwd);
-do_command({kick, Channel, Nick, Reason}, State) -> send(State, "KICK " ++ Channel ++ " " ++ Nick ++ " :" ++ Reason);
-do_command({topic, Channel, Topic}, State)       -> send(State, "TOPIC " ++ Channel ++ " :" ++ Topic);
-do_command({pong, Server}, State)                -> send(State, "PONG :" ++ Server).
+do_command({privmsg, To, Msg}, State)            -> send(State, ["PRIVMSG ", To, " :"], Msg);
+do_command({privnotice, To, Msg}, State)         -> send(State, ["NOTICE ", To, " :"], Msg);
+do_command({join, Channel}, State)               -> send(State, ["JOIN :", Channel]);
+do_command({part, Channel}, State)               -> send(State, ["PART ", Channel]);
+do_command({quit, QuitMsg}, State)               -> send(State, ["QUIT :", QuitMsg]);
+do_command({action, Channel, Action}, State)     -> send(State, ["PRIVMSG ", Channel, " :", 1, "ACTION "], Action, [1]);
+%% BUG: some CTCP may require splitting over several lines
+do_command({ctcp_request, To, Request}, State)   -> send(State, ["PRIVMSG ", To, " :", 1, Request, 1]);
+do_command({ctcp_reply, To, Request}, State)     -> send(State, ["NOTICE ", To, " :", 1, Request, 1]);
+do_command({mode, Channel, User, Mode}, State)   -> send(State, ["MODE ", Channel, " ", Mode, " ", User]);
+do_command({umode, User, Mode}, State)           -> send(State, ["MODE ", User, " ", Mode]);
+do_command({user, Login, LongName}, State)       -> send(State, ["USER ", Login, " 8 * :", LongName]);
+do_command({nick, Nick}, State)                  -> send(State, ["NICK ", Nick]);
+do_command({oper, Login, Passwd}, State)         -> send(State, ["OPER ", Login, " ", Passwd]);
+do_command({kick, Channel, Nick, Reason}, State) -> send(State, ["KICK ", Channel, " ", Nick, " :", Reason]);
+do_command({topic, Channel, Topic}, State)       -> send(State, ["TOPIC ", Channel, " :", Topic]);
+do_command({pong, Server}, State)                -> send(State, ["PONG :", Server]).
 
 %% Send raw command
 %% Raw command consists of:
