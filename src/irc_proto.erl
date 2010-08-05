@@ -268,8 +268,8 @@ parse_tokens([Nick, "MODE", Nick, Mode], State) ->
 parse_tokens([User, "MODE", Channel, Mode, Nick], State) ->
 	{{mode, Channel, User, Mode, Nick}, State};
 %% TODO: parse NOTICEs
-parse_tokens([_Server, "NOTICE", _Target, Notice], State) ->
-	{{notice, undefined, Notice}, State};
+parse_tokens([Source, "NOTICE", Target, Notice], State) ->
+	parse_notice(Target, Source, Notice, State);
 parse_tokens([_Server, topic, _Target, Channel, Topic], State) ->
 	{{chantopic, Channel, Topic}, State};
 parse_tokens([_Server, topicinfo, _Target, Channel, Author, Ts], State) ->
@@ -297,34 +297,54 @@ parse_tokens(Tokens, State) ->
 %% - `chanmsg'
 %% - `privmsg' (this is distinguished from `chanmsg' on higher level, where own nick is known)
 parse_privmsg(Target, User, [1] ++ Request, State) ->
-	parse_ctcp(Target, User, string:strip(Request, right, 1), State);
+	parse_ctcp_request(Target, User, string:strip(Request, right, 1), State);
 parse_privmsg(Target, User, Msg, State) ->
 	{{privmsg, Target, User, Msg}, State}.
 
-parse_ctcp(Target, User, "ACTION " ++ Action, State) ->
+parse_notice(Target, User, [1] ++ Reply, State) ->
+	parse_ctcp_reply(Target, User, string:strip(Reply, right, 1), State);
+parse_notice(Target, Source, Notice, State) ->
+	{{notice, Target, Source, Notice}, State}.
+
+parse_ctcp_request(Target, User, "ACTION " ++ Action, State) ->
 	{{action, Target, User, Action}, State};
-parse_ctcp(Target, User, "ERRMSG " ++ ErrMsg, State) ->
+parse_ctcp_request(Target, User, "ERRMSG " ++ ErrMsg, State) ->
 	{{ctcp_error, Target, User, ErrMsg}, State};
-parse_ctcp(Target, User, "PING " ++ Time, State) ->
-	Ts = case catch list_to_integer(Time) of
-			 X when is_integer(X) -> X;
-			 _ -> Time
-		 end,
+parse_ctcp_request(Target, User, "PING " ++ Time, State) ->
+	Ts = erlbot_util:maybe_int(Time),
 	{{ctcp_ping, Target, User, Ts}, State};
-parse_ctcp(Target, User, Request, State) ->
-	case catch parse_ctcp_request(Request) of
+parse_ctcp_request(Target, User, Request, State) ->
+	case catch ctcp_request_name(Request) of
 		ReqName when is_atom(ReqName) -> 
 			{{ReqName, Target, User}, State};
 		_ -> {{ctcp_unknown, Target, User, Request}, State}
 	end.
 
-parse_ctcp_request("FINGER")     -> ctcp_finger;
-parse_ctcp_request("VERSION")    -> ctcp_version;
-parse_ctcp_request("SOURCE")     -> ctcp_source;
-parse_ctcp_request("USERINFO")   -> ctcp_userinfo;
-parse_ctcp_request("CLIENTINFO") -> ctcp_clientinfo;
-parse_ctcp_request("PING")       -> ctcp_ping;
-parse_ctcp_request("TIME")       -> ctcp_time.
+parse_ctcp_reply(Target, User, "PING " ++ Time, State) ->
+	Ts = erlbot_util:maybe_int(Time),
+	{{ctcp_pong, Target, User, Ts}, State};
+parse_ctcp_reply(Target, User, Reply, State) ->
+	case catch ctcp_reply_name(Reply) of
+		ReqName when is_atom(ReqName) -> 
+			{{ReqName, Target, User}, State};
+		_ -> {{ctcp_unknown_reply, Target, User, Reply}, State}
+	end.
+
+ctcp_request_name("FINGER")     -> ctcp_finger;
+ctcp_request_name("VERSION")    -> ctcp_version;
+ctcp_request_name("SOURCE")     -> ctcp_source;
+ctcp_request_name("USERINFO")   -> ctcp_userinfo;
+ctcp_request_name("CLIENTINFO") -> ctcp_clientinfo;
+ctcp_request_name("PING")       -> ctcp_ping;
+ctcp_request_name("TIME")       -> ctcp_time.
+
+ctcp_reply_name("FINGER")     -> ctcp_finger_reply;
+ctcp_reply_name("VERSION")    -> ctcp_version_reply;
+ctcp_reply_name("SOURCE")     -> ctcp_source_reply;
+ctcp_reply_name("USERINFO")   -> ctcp_userinfo_reply;
+ctcp_reply_name("CLIENTINFO") -> ctcp_clientinfo_reply;
+ctcp_reply_name("PING")       -> ctcp_pong;
+ctcp_reply_name("TIME")       -> ctcp_time_reply.
 
 %% Parse `namesreply' (user list on channel)
 parse_names(Names) ->

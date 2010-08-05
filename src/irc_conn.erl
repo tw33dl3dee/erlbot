@@ -90,8 +90,8 @@ umode(Mode)                   -> gen_fsm:send_event(?MODULE, {irc_command, {umod
 nick(Nick)                    -> gen_fsm:send_event(?MODULE, {irc_command, {nick, Nick}}).
 kick(Channel, Nick, Reason)   -> gen_fsm:send_event(?MODULE, {irc_command, {kick, Channel, Nick, ensure_utf8(Reason)}}).
 topic(Channel, Topic)         -> gen_fsm:send_event(?MODULE, {irc_command, {topic, Channel, ensure_utf8(Topic)}}).
-ctcp_request(Target, Request) -> gen_fsm:send_event(?MODULE, {irc_command, {ctcp_requst, Target, ensure_utf8(Request)}}).
-ctcp_reply(Target, Reply)     -> gen_fsm:send_event(?MODULE, {irc_command, {ctcp_requst, Target, ensure_utf8(Reply)}}).
+ctcp_request(Target, Request) -> gen_fsm:send_event(?MODULE, {irc_command, {ctcp_request, Target, ensure_utf8(Request)}}).
+ctcp_reply(Target, Reply)     -> gen_fsm:send_event(?MODULE, {irc_command, {ctcp_reply, Target, ensure_utf8(Reply)}}).
 
 %% Send big bulk of private/channel messages asynchronously
 bulk_chanmsg(Channel, Save, Lines) -> 
@@ -175,7 +175,7 @@ state_not_connected(connect, Conn) ->
 	irc_proto:connect(),
 	{next_state, state_connecting, Conn}.
 
-state_connecting({notice, _, _}, Conn) ->
+state_connecting({notice, _, _, _}, Conn) ->
 	Umode = erlbot_config:get_value(pretend_umode, []),
 	{next_state, state_auth_nick, auth_login(apply_umode(Umode, Conn))};
 state_connecting(_, Conn) ->
@@ -290,6 +290,8 @@ process_event_raw(Event, Conn) ->
 %% Transforms events targeted to self (own nick change, etc) to "myevents"
 myevent({privmsg, Target, User, Msg}, Nick) when Target /= Nick ->
 	{chanmsg, Target, User, Msg};
+myevent({notice, Target, User, Msg}, Nick) when Target /= Nick ->
+	{channotice, Target, User, Msg};
 myevent({join, Channel, ?USER(Nick)}, Nick) ->
 	{joining, Channel};  % joined will be sent by channel FSM after ENDOFNAMES
 myevent({part, Channel, ?USER(Nick), _}, Nick) ->
@@ -306,6 +308,8 @@ myevent({nick, NewNick, ?USER(Nick)}, Nick) ->
 myevent({topic, Channel, ?USER(Nick), Topic}, Nick) ->
 	{mytopic, Channel, Nick, Topic};
 %% Strip nick from self-directed events (privmsg, notice, CTCP)
+myevent({notice, Nick, User, Msg}, Nick) ->
+	{privnotice, User, Msg};
 myevent({Type, Nick, User, Msg}, Nick) ->
 	{Type, User, Msg};
 myevent({Type, Nick, User}, Nick) ->
