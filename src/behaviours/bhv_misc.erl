@@ -19,7 +19,6 @@ help(chancmd) ->
 	[{"jabberwork",		"ну, Бармаглот (до сих пор нерабочий. кстати)"},
 	 {"uptime ",		"аптайм бота"},
 	 {"time",			"текущее время"},
-	 {"ping",			"пинг бота (хз нах надо)"},
 	 {"dice <число>",	"бросок кубика (от 1 до N)"},
 	 {"kickme",			"оригинальный способ уйти с канала"},
 	 {"uuid",           "сгенерировать UUID (уникальный, под ответственность бота)"},
@@ -32,11 +31,6 @@ help(about) ->
 -define(KICK_REASONS(Nick), [["Всегда пожалуйста, ", Nick], 
 							 "Кто к нам с хуем придет, тот нахуй и пойдет."]).
 
--define(PING_REPLIES(Nick), [{chanmsg, ["Да-да, ", Nick, "?.."]},
-							 {action,  "понг"},
-							 {chanmsg, "Ну, понг."},
-							 {chanmsg, [Nick, ": сам пинг, че надо?"]}]).
-
 handle_event(cmdevent, {chancmd, Chan, ?USER(Nick), ["kickme" | _]}, _, _) ->
 	ok = irc_conn:kick(Chan, Nick, choice:make(?KICK_REASONS(Nick)));
 handle_event(cmdevent, {chancmd, Chan, _, ["jabberwock"]}, _, _) ->
@@ -48,10 +42,6 @@ handle_event(cmdevent, {chancmd, Chan, ?USER(Nick), ["uuid"]}, _, _) ->
 handle_event(cmdevent, {chancmd, Chan, _, ["time"]}, _, _) ->
 	{success, [Time]} = erlbot_util:system("date '+%a %b %d %R:%S %Z %Y'"),
 	ok = irc_conn:chanmsg(Chan, nohist, ["Точное время: ", Time, "."]);
-handle_event(cmdevent, {chancmd, Chan, ?USER(Nick), ["ping"]}, _, _) ->
-	ok = case choice:make(?PING_REPLIES(Nick)) of 
-			 {Action, Msg} -> irc_conn:Action(Chan, nohist, Msg) 
-		 end;
 handle_event(cmdevent, {chancmd, Chan, _, ["dice", Max | _]}, _, _) ->
 	case catch list_to_integer(Max) of
 		X when X > 0 -> roll_dice(Chan, X);
