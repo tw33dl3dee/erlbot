@@ -11,12 +11,9 @@
 
 %% API
 -export([start_link/0]).
--export([create_sequence/0, create_sequence/1, init_sequence/2, sequence/1, sequence/2, init_db/0, init_table/2]).
 -export([query_view/2, foldl_view/4, create_design_docs/0]).
 
 -include("couchbeam.hrl").
-
--record(sequence, {table, idx}).
 
 %%====================================================================
 %% API
@@ -89,34 +86,6 @@ create_design_docs() ->
 							   end
 					   end, 
 					   ok).
-
-init_db() ->
-	Node = node(),
-	ok = case mnesia:create_schema([Node]) of
-			 {error, {Node, {already_exists, Node}}} -> ok;
-			 E                                       -> E
-		 end,
-	ok = mnesia:start().
-
-init_table(Name, TabDef) ->
-	{atomic, ok} = case mnesia:create_table(Name, TabDef) of
-					   {aborted, {already_exists, Name}} -> {atomic, ok};
-					   E                                 -> E
-				   end,
-	ok = mnesia:wait_for_tables([Name], infinity).
-
-create_sequence() -> create_sequence([node()]).
-
-create_sequence(Nodes) ->
-	init_table(sequence, [{type, set}, {disc_copies, Nodes},
-						  {attributes, record_info(fields, sequence)}]).
-
-init_sequence(Table, Idx) ->
-	{atomic, ok} = mnesia:transaction(fun() -> mnesia:write(#sequence{table = Table, idx = Idx}) end).
-
-sequence(Table) -> sequence(Table, 1).
-
-sequence(Table, Inc) -> mnesia:dirty_update_counter(sequence, Table, Inc).
 
 %%====================================================================
 %% Internal functions
