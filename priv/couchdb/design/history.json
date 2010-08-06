@@ -10,6 +10,9 @@
        },
        "by_nick": {
            "map": "function(doc) {\n  if (doc.timestamp && doc.event) {\n    emit([doc.event[1], doc.channel, doc.timestamp], [doc.user, doc.event]);\n    if (doc.event[0] == 'nick' || doc.event[0] == 'kick')\n      emit([doc.event[2], doc.channel, doc.timestamp], doc.event);\n    if (doc.event[0] == 'mode')\n      emit([doc.event[3], doc.channel, doc.timestamp], doc.event);\n  }\n}"
+       },
+       "msg_by_chan": {
+           "map": "function(doc) {\n  if (doc.event && (doc.event[0] == 'chanmsg' || doc.event[0] == 'action')) {\n    emit([doc.channel, doc.timestamp, doc.user], doc.event[2]);\n  }\n}\n"
        }
    }
 }

@@ -62,8 +62,10 @@ foldl_view(Fun, Acc, ViewName, Params) ->
 
 foldl_view_cont(Fun, Acc, [LastRow], ViewName, Params) ->
 	NextParams = case LastRow of 
-					 {undefined, Key, _} -> [{startkey, Key} | Params];
-					 {DocId, Key, _}     -> [{startkey, Key}, {startkey_docid, DocId} | Params]
+					 {undefined, Key, _}    -> [{startkey, Key} | Params];
+					 {undefined, Key, _, _} -> [{startkey, Key} | Params];
+					 {DocId, Key, _}        -> [{startkey, Key}, {startkey_docid, DocId} | Params];
+					 {DocId, Key, _, _}     -> [{startkey, Key}, {startkey_docid, DocId} | Params]
 				 end,
 	case query_view(ViewName, [{limit, ?MAX_FETCH_ENTRIES} | NextParams]) of
 		{_, _, _, [LastRow]} -> Fun(LastRow, Acc);

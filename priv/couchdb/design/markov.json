@@ -1,0 +1,18 @@
+{
+   "_id": "_design/markov",
+   "language": "javascript",
+   "views": {
+       "wchain": {
+           "map": "function(doc) {\n  if (doc.word_chain)\n    emit(doc.word_chain, 1);\n}",
+           "reduce": "function(keys, values, rereduce) {\n  return sum(values);\n}"
+       },
+       "wchain_rev": {
+           "map": "function(doc) {\n  if (doc.word_chain) \n    emit(doc.word_chain.reverse(), 1);\n}",
+           "reduce": "function(keys, values, rereduce) {\n  return sum(values);\n}"
+       },
+       "sources": {
+           "map": "function(doc) {\n  if (doc.word_chain)\n    emit(doc.source, 1);\n}",
+           "reduce": "function(keys, values, rereduce) {\n  return sum(values);\n}"
+       }
+   }
+}

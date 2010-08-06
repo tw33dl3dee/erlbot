@@ -17,7 +17,7 @@
 -export([read_file/1]).
 -export([add_days/2, add_seconds/2, valid_datetime/1, time_diff/2, date_diff/2]).
 -export([convert_time_abs/3, convert_time_rel/2, convert_time_rel_diff/2]).
--export([unix_timestamp/1, from_unix_timestamp/1]).
+-export([unix_timestamp/1, unix_timestamp/0, from_unix_timestamp/1]).
 -export([lowercase/1, uppercase/1, words/2]).
 
 multiline(Term) ->
@@ -251,6 +251,13 @@ unix_timestamp({YMD, HMS, U}) ->
 	unix_timestamp({YMD, HMS}) + U/1000000;
 unix_timestamp({YMD, HMS}) ->
 	calendar:datetime_to_gregorian_seconds({YMD, HMS}) - calendar:datetime_to_gregorian_seconds(?UNIX_EPOCH).
+
+%% Returns current timestamp as {number(), list()}
+unix_timestamp() ->
+	{M, S, Usec} = erlang:now(),
+	Sec = M*1000000 + S,
+	{Sec + Usec/1000000, 
+	 io_lib:format("~b.~6..0b", [Sec, Usec])}.
 
 from_unix_timestamp(Ts) when is_integer(Ts) ->
 	calendar:gregorian_seconds_to_datetime(Ts + calendar:datetime_to_gregorian_seconds(?UNIX_EPOCH));
