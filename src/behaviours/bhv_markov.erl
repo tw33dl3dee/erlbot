@@ -54,13 +54,13 @@ update_wchains(_, _) ->
 	ok.
 
 add_wchain(Wchain, Source) ->
-	couchbeam_db:save_doc(erlbot_db, {wchain_to_json(Wchain, Source)}).
+	couchbeam_db:save_doc(erlbot_db, wchain_to_json(Wchain, Source)).
 
 wchain_to_json(Wchain, Source) ->
 	{_, Ts} = erlbot_util:unix_timestamp(),
-	[{<<"_id">>,  list_to_binary(["markov:", Ts])},
-	 {source,     utf8:encode(Source)},
-	 {word_chain, [utf8:encode(W) || W <- Wchain]}].
+	{[{<<"_id">>,  list_to_binary(["markov:", Ts])},
+	  {source,     utf8:encode(Source)},
+	  {word_chain, [utf8:encode(W) || W <- Wchain]}]}.
 
 %%% Show
 
