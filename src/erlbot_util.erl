@@ -9,17 +9,26 @@
 
 -author("Ivan Korotkov <twee@tweedle-dee.org>").
 
--export([multiline/1, multiline/2, split/1, split/2, contains/2, join/2, set_flag/2, unset_flag/2]).
--export([maybe_int/1]).
+%% String utils
+-export([multiline/1, multiline/2, split/1, split/2, contains/2, join/2]).
+-export([lowercase/1, uppercase/1, words/2]).
+
+%% Datetime utils
 -export([epoch/0, epoch/1]).
--export([uri_encode/1]).
--export([execv/3, execv/4, execvp/2, execvp/3, system/1, system/2, find_prog/2, signame/1]).
--export([read_file/1]).
 -export([add_days/2, add_seconds/2, valid_datetime/1, time_diff/2, date_diff/2]).
 -export([convert_time_abs/3, convert_time_rel/2, convert_time_rel_diff/2]).
 -export([unix_timestamp/1, unix_timestamp/0, from_unix_timestamp/1]).
 -export([timestamp_to_list/3, datetime_to_list/3]).
--export([lowercase/1, uppercase/1, words/2]).
+
+%% OS interface
+-export([execv/3, execv/4, execvp/2, execvp/3, system/1, system/2]).
+-export([find_prog/2, signame/1]).
+-export([read_file/1]).
+
+%% Misc
+-export([set_flag/2, unset_flag/2]).
+-export([maybe_int/1]).
+-export([uri_encode/1]).
 
 multiline(Term) ->
 	string:tokens(lists:flatten(io_lib:print(Term)), io_lib:nl()).
@@ -248,18 +257,20 @@ valid_datetime(_) ->
 
 -define(UNIX_EPOCH, {{1970, 1, 1}, {0, 0, 0}}).
 
+%% Erlang datetime to Unix timestamp
 unix_timestamp({YMD, HMS, U}) ->
 	unix_timestamp({YMD, HMS}) + U/1000000;
 unix_timestamp({YMD, HMS}) ->
 	calendar:datetime_to_gregorian_seconds({YMD, HMS}) - calendar:datetime_to_gregorian_seconds(?UNIX_EPOCH).
 
-%% Returns current timestamp as {number(), list()}
+%% Returns current Unix timestamp as {number(), list()}
 unix_timestamp() ->
 	{M, S, Usec} = erlang:now(),
 	Sec = M*1000000 + S,
 	{Sec + Usec/1000000, 
 	 io_lib:format("~b.~6..0b", [Sec, Usec])}.
 
+%% Unix timestamp to Erlang datetime
 from_unix_timestamp(Ts) when is_integer(Ts) ->
 	calendar:gregorian_seconds_to_datetime(Ts + calendar:datetime_to_gregorian_seconds(?UNIX_EPOCH));
 from_unix_timestamp(Ts) when is_float(Ts) ->
