@@ -46,7 +46,7 @@ make_comment(join, Chan, ?USER(Nick) = User) ->
 		true  -> irc_conn:chanmsg(Chan, hist, [Nick, ": няяяяяяяяя!"])
 	end;
 make_comment(topic, Chan, ?USER(Nick)) ->
-	make_comment(?TOPIC_COMMENTS(Nick), Chan, Nick);
+	make_emotional_comment(?TOPIC_COMMENTS(Nick), Chan, Nick);
 make_comment(message, Chan, ?USER(Nick)) ->
     case choice:make([{1, do}, {?COMMENT_REV_PROB - 1, dont}]) of
         do   -> make_emotional_comment(?MESSAGE_COMMENTS(Nick), Chan, Nick);
