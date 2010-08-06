@@ -175,12 +175,11 @@ get_history(_Chan, {login_count, _LoginCount}) -> [];
 %% Trace by specified begin/end time.
 get_history(Chan, {time, From, To}) ->
 	ChanBin = utf8:encode(Chan),
-	io:format("~p~n", [[{startkey, [ChanBin, erlbot_util:unix_timestamp(From)]},
-						  {endkey,   [ChanBin, erlbot_util:unix_timestamp(To)]}]]),
-	erlbot_db:foldl_view(fun (H, L) -> [json_to_histent(H) | L] end, [],
-						 {"history", "by_chan"}, 
-						 [{startkey, [ChanBin, erlbot_util:unix_timestamp(From)]},
-						  {endkey,   [ChanBin, erlbot_util:unix_timestamp(To)]}]).
+	Histents = erlbot_db:foldl_view(fun (H, L) -> [json_to_histent(H) | L] end, [],
+									{"history", "by_chan"}, 
+									[{startkey, [ChanBin, erlbot_util:unix_timestamp(From)]},
+									 {endkey,   [ChanBin, erlbot_util:unix_timestamp(To)]}]),
+	lists:reverse(Histents).
 
 %% Each histent that comes from DB has format {DocId, [.... , Ts], [Ident, Event]}
 json_to_histent({_DocId, Key, [_Ident, Event]}) ->
