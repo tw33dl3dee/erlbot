@@ -1,9 +1,6 @@
 ## Start SASL
 -boot start_sasl
 
-## Start mnesia
--s mnesia 
-
 ## Start CouchDB interface
 -s couchbeam
 
