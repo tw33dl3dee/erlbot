@@ -34,10 +34,12 @@ help(privcmd) ->
 help(about) ->
 	"Статистика пиздежа".
 
+%%% === Subject to removal =================================================
 %% We could use either `genevent' for counting (which includes public commands to bot) or
 %% `msgevent' (which excludes "<botnick>: " part from appeals.
 handle_event(genevent, {What, _, ?USER2(_, Ident), Msg}, _, _) when What =:= chanmsg; What =:= action ->
 	update_stat(Ident, 1, length(Msg));
+%%% ========================================================================
 handle_event(cmdevent, {chancmd, Chan, ?USER2(_, Ident), ["stat" | _]}, _, _) ->
 	ok = irc_conn:bulk_chanmsg(Chan, nohist, show_stat(Ident));
 handle_event(cmdevent, {privcmd, ?USER2(Nick, Ident), ["stat" | _]}, _, _) ->

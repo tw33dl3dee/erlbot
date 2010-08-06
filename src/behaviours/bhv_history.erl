@@ -9,7 +9,7 @@
 
 -behaviour(erlbot_behaviour).
 -export([init/1, help/1, handle_event/4]).
--export([fix_wstat/0, get_wstat/2, get_history/2, fix_wchain/0]).
+-export([get_wstat/2, get_history/2]).
 -export([couchdb_upload/0]).
 
 -include("utf8.hrl").
@@ -17,6 +17,7 @@
 
 -include_lib("stdlib/include/qlc.hrl").
 
+%%% === Subject to removal =================================================
 -record(user, {uid    :: integer(),
 			   ident  :: list()}). 
 -record(chan, {cid   :: integer(),
@@ -29,6 +30,7 @@
 				  event      :: tuple()}).
 -record(wstat, {key      :: {integer(), integer(), list()},  % {uid, cid, word}
 				count    :: integer()}).
+%%% ========================================================================
 
 init(_) -> 
 	erlbot_db:create_sequence(),
@@ -400,16 +402,6 @@ event_to_list({nick, Nick1, Nick2}) ->
 	["@@ ", Nick1, " ныне известен как ", Nick2];
 event_to_list(Ev) ->
 	["??? какая-то Неведомая Ебанная Хуйня: ", io_lib:format("~p", [Ev])].
-
-%% WCHAIN support (should be in bhv_wchain, actually, but uses #histent)
-
-fix_wchain() ->
-	Q = qlc:q([Msg ||
-				  #histent{event = {Event, _, Msg}} <- mnesia:table(histent),
-				  Event =:= chanmsg orelse Event =:= action]),
-	mnesia:async_dirty(fun () -> [mnesia:delete({wchain, K}) || K <- mnesia:all_keys(wchain)],
-								 [bhv_markov:update_wchain_text(Msg) || Msg <- qlc:eval(Q)] 
-					   end).
 
 %% CouchDB uploaders
 
