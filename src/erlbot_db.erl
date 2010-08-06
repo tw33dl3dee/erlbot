@@ -12,7 +12,7 @@
 %% API
 -export([start_link/0]).
 -export([create_sequence/0, create_sequence/1, init_sequence/2, sequence/1, sequence/2, init_db/0, init_table/2]).
--export([query_view/2, create_design_docs/0]).
+-export([query_view/2, foldl_view/4, create_design_docs/0]).
 
 -include("couchbeam.hrl").
 
@@ -50,6 +50,27 @@ query_view(ViewName, Params) ->
 						{error, Err};
 		Result -> Result
 	end.
+
+%% Optimum lies somewhere in [1000, 4000]
+-define(MAX_FETCH_ENTRIES, 2000).
+
+foldl_view(Fun, Acc, ViewName, Params) ->
+	case query_view(ViewName, [{limit, ?MAX_FETCH_ENTRIES} | Params]) of
+		{_, _, _, []}  -> Acc;
+		{_, _, _, Res} -> foldl_view_cont(Fun, Acc, Res, ViewName, Params)
+	end.
+
+foldl_view_cont(Fun, Acc, [LastRow], ViewName, Params) ->
+	NextParams = case LastRow of 
+					 {undefined, Key, _} -> [{startkey, Key} | Params];
+					 {DocId, Key, _}     -> [{startkey, Key}, {startkey_docid, DocId} | Params]
+				 end,
+	case query_view(ViewName, [{limit, ?MAX_FETCH_ENTRIES} | NextParams]) of
+		{_, _, _, [LastRow]} -> Fun(LastRow, Acc);
+		{_, _, _, NextRes}   -> foldl_view_cont(Fun, Acc, NextRes, ViewName, Params)
+	end;
+foldl_view_cont(Fun, Acc, [Row | Rest], ViewName, Params) ->
+	foldl_view_cont(Fun, Fun(Row, Acc), Rest, ViewName, Params).
 
 -define(DESIGN_DOC_DIR, "priv/couchdb/design").
 
