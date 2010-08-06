@@ -14,17 +14,6 @@
 -include("utf8.hrl").
 -include("irc.hrl").
 
-%%% === Subject to removal =================================================
--include_lib("stdlib/include/qlc.hrl").
-
--record(lstat, {ident  :: list(),
-				lines  :: integer()}).
--record(cstat, {ident  :: list(),
-				chars  :: integer()}).
--record(uinfo, {ident     :: list(),
-				first_day :: {integer(), integer(), integer()}}).
-%%% ========================================================================
-
 init(_) -> undefined.
 
 help(chancmd) ->
@@ -32,35 +21,14 @@ help(chancmd) ->
 help(privcmd) ->
 	[{"stat", "пофапать на статистику тайно"}];
 help(about) ->
-	"Статистика пиздежа".
+	"Статистика пиздежа, по пиздоболам".
 
-%%% === Subject to removal =================================================
-%% We could use either `genevent' for counting (which includes public commands to bot) or
-%% `msgevent' (which excludes "<botnick>: " part from appeals.
-handle_event(genevent, {What, _, ?USER2(_, Ident), Msg}, _, _) when What =:= chanmsg; What =:= action ->
-	update_stat(Ident, 1, length(Msg));
-%%% ========================================================================
 handle_event(cmdevent, {chancmd, Chan, ?USER2(_, Ident), ["stat" | _]}, _, _) ->
 	ok = irc_conn:bulk_chanmsg(Chan, nohist, show_stat(Ident));
 handle_event(cmdevent, {privcmd, ?USER2(Nick, Ident), ["stat" | _]}, _, _) ->
 	ok = irc_conn:bulk_privmsg(Nick, nohist, show_stat(Ident));
 handle_event(_Type, _Event, _IrcState, _Data) ->
 	not_handled.
-
-%%% === Subject to removal =================================================
-update_stat(Ident, Lines, Chars) ->
-	mnesia:dirty_update_counter(lstat, Ident, Lines),
-	mnesia:dirty_update_counter(cstat, Ident, Chars),
-	mnesia:async_dirty(fun update_first_day/1, [Ident]),
-	ok.
-
-update_first_day(Ident) ->
-	case mnesia:read(uinfo, Ident) of
-		[] -> {Date, _} = erlang:localtime(),
-			  mnesia:write(#uinfo{ident = Ident, first_day = Date});
-		_  -> not_handled
-	end.
-%%% ========================================================================
 
 -define(MIN_VISIBLE_STAT_LINES, 2000).  % Minimum number of lines user must have to be shown in stat.
 
