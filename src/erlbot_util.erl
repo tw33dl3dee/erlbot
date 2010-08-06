@@ -18,6 +18,7 @@
 -export([add_days/2, add_seconds/2, valid_datetime/1, time_diff/2, date_diff/2]).
 -export([convert_time_abs/3, convert_time_rel/2, convert_time_rel_diff/2]).
 -export([unix_timestamp/1, unix_timestamp/0, from_unix_timestamp/1]).
+-export([timestamp_to_list/3, datetime_to_list/3]).
 -export([lowercase/1, uppercase/1, words/2]).
 
 multiline(Term) ->
@@ -264,6 +265,21 @@ from_unix_timestamp(Ts) when is_integer(Ts) ->
 from_unix_timestamp(Ts) when is_float(Ts) ->
 	{YMD, HMS} = from_unix_timestamp(trunc(Ts)),
 	{YMD, HMS, trunc((Ts - trunc(Ts))*1000000)}.
+
+timestamp_to_list(Tz, Format, Ts) ->
+	datetime_to_list(Tz, Format, from_unix_timestamp(trunc(Ts))).
+
+datetime_to_list(local, Format, DateTime) ->
+	datetime_to_list(universal, Format, calendar:universal_time_to_local_time(DateTime));
+datetime_to_list(universal, time, {_, {HH, MM, SS}}) ->
+	io_lib:format("~2..0b:~2..0b:~2..0b", [HH, MM, SS]);
+datetime_to_list(universal, date, {{Y, M, D}, _}) ->
+	io_lib:format("~2..0b/~2..0b/~2..0b", [Y rem 1000, M, D]);
+datetime_to_list(universal, datetime, DateTime) ->
+	[datetime_to_list(universal, date, DateTime), 
+	 " ", 
+	 datetime_to_list(universal, time, DateTime)].
+
 %% Difference in seconds between 2 datetimes
 time_diff(DateTime1, DateTime2) ->
 	calendar:datetime_to_gregorian_seconds(DateTime1) - calendar:datetime_to_gregorian_seconds(DateTime2).

@@ -9,50 +9,18 @@
 
 -behaviour(erlbot_behaviour).
 -export([init/1, help/1, handle_event/4]).
--export([get_wstat/2, get_history/2]).
--export([couchdb_upload/0]).
+-export([get_history/2, trace_lastseen/2]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
 
--include_lib("stdlib/include/qlc.hrl").
-
-%%% === Subject to removal =================================================
--record(user, {uid    :: integer(),
-			   ident  :: list()}). 
--record(chan, {cid   :: integer(),
-			   name  :: list()}). 
--record(histent, {timestamp  :: {{integer(), integer(), integer()}, 
-								 {integer(), integer(), integer()}, 
-								 integer()},
-				  uid        :: integer(),
-				  cid        :: integer(),
-				  event      :: tuple()}).
--record(wstat, {key      :: {integer(), integer(), list()},  % {uid, cid, word}
-				count    :: integer()}).
-%%% ========================================================================
-
-init(_) -> 
-	erlbot_db:create_sequence(),
-	ok = erlbot_db:init_table(user, [{disc_copies, [node()]},
-									 {index, [#user.ident]},
-									 {attributes, record_info(fields, user)}]),
-	ok = erlbot_db:init_table(chan, [{disc_copies, [node()]},
-									 {index, [#chan.name]},
-									 {attributes, record_info(fields, chan)}]),
-	ok = erlbot_db:init_table(histent, [{disc_copies, [node()]},
-										{type, ordered_set},
-										{attributes, record_info(fields, histent)}]),
-	ok = erlbot_db:init_table(wstat, [{disc_copies, [node()]},
-									  {attributes, record_info(fields, wstat)}]),
-	undefined.
+init(_) -> undefined.
 
 help(chancmd) ->
 	[{"hist <время>",				"история событий на канале (в приват)"},
-	 {"wstat [<ник>]",              "статистика употребления слов"},
 	 {"lastseen <ник>",             "вывод последней активности данного пользователя"}];
 help(privcmd) ->
-	[{"hist <канал> <время>",		"то же самое, но чтоб никто не узнал"}];
+	[{"hist <канал> <время>",		"история событий на канале (в приват)"}];
 help(about) ->
 	"История событий на канале".
 
@@ -61,10 +29,8 @@ verbose_help() ->
 	 "    (отрицательное время считается от текущего)"].
 
 handle_event(genevent, {chanmsg, Chan, ?USER2(Nick, Ident), Msg}, _, _) ->
-	update_wstat(Chan, Ident, Msg),
 	save_histent(Chan, Ident, {chanmsg, Nick, Msg});
 handle_event(genevent, {action, Chan, ?USER2(Nick, Ident), Msg}, _, _) ->
-	update_wstat(Chan, Ident, Msg),
 	save_histent(Chan, Ident, {action, Nick, Msg});
 handle_event(selfevent, {chanmsg, Chan, hist, Msg}, IrcState, _) ->
 	save_histent(Chan, [$~ | IrcState#irc_state.login], {chanmsg, IrcState#irc_state.nick, Msg});
@@ -102,14 +68,6 @@ handle_event(cmdevent, {chancmd, Chan, ?USER(Nick), ["hist" | Rest]}, _, _) ->
 	show_history(Nick, Chan, Rest);
 handle_event(cmdevent, {chancmd, Chan, _, ["lastseen", TargetNick]}, _, _) ->
 	show_lastseen(Chan, {nick, TargetNick});
-handle_event(cmdevent, {chancmd, Chan, _, ["wstat"]}, _, _) ->
-	show_wstat(Chan, Chan, all);
-handle_event(cmdevent, {chancmd, Chan, _, ["wstat", TargetNick]}, _, _) ->
-	show_wstat(Chan, Chan, {nick, TargetNick});
-handle_event(cmdevent, {privcmd, ?USER(Nick), ["wstat", Chan]}, _, _) ->
-	show_wstat(Chan, Nick, all);
-handle_event(cmdevent, {privcmd, ?USER(Nick), ["wstat", Chan, TargetNick]}, _, _) ->
-	show_wstat(Chan, Nick, {nick, TargetNick});
 handle_event(_Type, _Event, _IrcState, _Data) ->
 	not_handled.
 
@@ -151,140 +109,35 @@ trace_lastseen(Chan, {nick, Nick}) ->
 
 dump_lastseen(Histents, Chan) ->
 	bhv_common:empty_check(Chan, Histents),
-	dump_histents(long, [json_to_histent(H) || H <- lists:sort(Histents)], Chan).
-
-%% WSTAT -- word statistics
-
-%%% === Subject to removal =================================================
-update_wstat(Chan, Ident, Msg) ->
-	Words = erlbot_util:words(Msg, 2), % don't count 1-letter words
-	mnesia:async_dirty(fun () ->
-							   Cid = chanid(Chan),
-							   Uid = userid(Ident),
-							   [mnesia:dirty_update_counter(wstat, {Uid, Cid, W}, 1) || W <- Words],
-							   ok
-					   end).
-%%% ========================================================================
-
-show_wstat(Chan, Source, Target) ->
-	Wstat = get_wstat(Chan, Target),
-	dump_wstat(Wstat, Source).
-
-get_wstat(Chan, {nick, TargetNick}) ->
-	case trace_lastseen(Chan, {nick, TargetNick}) of
-		[{_, _, [Ident, _]}] -> get_wstat(Chan, {ident, Ident});
-		[]                   -> []
-	end;
-get_wstat(Chan, {ident, Ident}) ->
-	case erlbot_db:query_view({"wstat", "by_user"}, 
-							  [{key, [utf8:encode(Chan), utf8:encode(Ident)]}, 
-							   {group, true}]) of
-		{_, _, _, L} -> top_wstat(L);
-		_ -> []
-	end;
-get_wstat(Chan, all) ->
-	case erlbot_db:query_view({"wstat", "by_user"}, 
-							  [{startkey, [utf8:encode(Chan), <<"">>]}, 
-							   {endkey,   [utf8:encode(Chan), {[]}]},
-							   {group, true}]) of
-		{_, _, _, L} -> top_wstat(L);
-		_ -> []
-	end.
-
--define(WSTAT_MIN_COUNT, 10).         %% minimum occurence count for statistic inclusion
--define(WSTAT_MIN_TOTAL_COUNT, 100).  %% don't show users with total top count less than this
-
-%% StatByUser is [{undefined, [Chan, Ident], [[Count, Word], ...]}]
-top_wstat(StatByUser) ->
-	[begin
-		 TopWords = [{C, W} || [C, W] <- Words, C >= ?WSTAT_MIN_COUNT],
-		 Total = lists:foldl(fun ({C, _}, S) -> C + S end, 0, TopWords),
-		 {Ident, {Total, TopWords}}
-	 end || {_, [_, Ident], Words} <- StatByUser].
-
-dump_wstat(TopStat, Source) ->
-	bhv_common:empty_check(Source, TopStat),
-	[dump_wstat_user(Id, Total, Words, Source) || 
-		{Id, {Total, Words}} <- TopStat, 
-		Total >= ?WSTAT_MIN_TOTAL_COUNT],
-	ok.
-
-dump_wstat_user(Ident, _Total, Words, Chan) ->
-	ok = irc_conn:chanmsg(Chan, hist,
-						  [Ident, ": ", [[Word, " (", integer_to_list(Count), ") "] || {Count, Word} <- Words]]).
-
-%%% === Subject to removal =================================================
-fix_wstat() ->
-	Q = qlc:q([{Ch#chan.name, U#user.ident, Msg} ||
-				  #histent{event = {Event, _, Msg}} = H <- mnesia:table(histent),
-				  Ch <- mnesia:table(chan),
-				  U <- mnesia:table(user),
-				  Ch#chan.cid =:= H#histent.cid,
-				  U#user.uid =:= H#histent.uid,
-				  Event =:= chanmsg orelse Event =:= action]),
-	mnesia:transaction(fun () -> [mnesia:delete({wstat, K}) || K <- mnesia:all_keys(wstat)],
-								 [update_wstat(Ch, Id, M) || {Ch, Id, M} <- qlc:eval(Q)] 
-					   end).
-%%% ========================================================================
+	dump_histents(datetime, [json_to_histent(H) || H <- lists:sort(Histents)], Chan).
 
 %% HISTORY -- per-channel event history
 
-%%% === Subject to removal =================================================
 save_histent(Chan, Ident, Event) ->
-	mnesia:async_dirty(fun () ->
-							   mnesia:write(#histent{timestamp = timestamp(),
-													 uid       = userid(Ident),
-													 cid       = chanid(Chan),
-													 event     = Event})
-					   end),
-	couchbeam_db:save_doc(erlbot_db, {histent_to_json({unix_timestamp(),
-													   Ident, Chan, Event})}),
+	Doc = histent_to_json(Chan, Ident, Event),
+	couchbeam_db:save_doc(erlbot_db, Doc),
 	ok.
-%%% ========================================================================
+
+histent_to_json(Chan, Ident, Event) ->
+	{TsNum, TsStr} = erlbot_util:unix_timestamp(),
+	{[{<<"_id">>, list_to_binary(["event:", TsStr])},
+	  {timestamp, TsNum},
+	  {channel,   utf8:encode(Chan)},
+	  {user,      utf8:encode(Ident)},
+	  {event,     histevent_to_json(Event)}]}.
+
+histevent_to_json(X) when is_tuple(X) -> [histevent_to_json(Y) || Y <- tuple_to_list(X)];
+histevent_to_json(X) when is_atom(X)  -> list_to_binary(atom_to_list(X));
+histevent_to_json(X) when is_list(X)  -> utf8:encode(X);
+histevent_to_json(X) -> X.
 
 show_history(Nick, Chan, Param) ->
 	case parse_hist_param(Param) of
 		undefined -> give_help(Nick);
 		P -> print_hist_header(P, Nick, Chan),
 			 Histents = get_history(Chan, P),
-			 ok = dump_histents(short, Histents, Nick)
+			 ok = dump_histents(time, Histents, Nick)
 	end.
-
-% Convert current datetime to timestamp suitable for storing in DB.
-timestamp() -> 
-	{YMD, HMS} = erlang:universaltime(),
-	{_, _, Us} = erlang:now(),
-	neg_timestamp({YMD, HMS, Us}).
-
-unix_timestamp() ->
-	{_, _, Us} = erlang:now(),
-	{erlbot_util:unix_timestamp(erlang:universaltime()), Us}.
-
-neg_timestamp({{Y, M, D}, {HH, MM, SS}, U}) -> 
-	{{-Y, -M, -D}, {-HH, -MM, -SS}, -U}.
-
-%%% === Subject to removal =================================================
-userid(me) -> 0;
-userid(Ident) ->
-	Q = qlc:q([U#user.uid || U <- mnesia:table(user), U#user.ident =:= Ident]),
-	case qlc:e(Q) of
-		[Id | _] -> Id;
-		[]   -> 
-			Id = erlbot_db:sequence(user),
-			mnesia:write(#user{uid = Id, ident = Ident}),
-			Id
-	end.
-
-chanid(Channel) ->
-	Q = qlc:q([Ch#chan.cid || Ch <- mnesia:table(chan), Ch#chan.name =:= Channel]),
-	case qlc:e(Q) of
-		[Id | _] -> Id;
-		[]   -> 
-			Id = erlbot_db:sequence(channel),
-			mnesia:write(#chan{cid = Id, name = Channel}),
-			Id
-	end.
-%%% ========================================================================
 
 parse_hist_param([])           -> {login_count, 1};
 parse_hist_param([Arg1])       -> fix_hist_param(parse_time_or_number(Arg1));
@@ -316,42 +169,23 @@ print_hist_header({login_count, LoginCount}, Nick, Chan) ->
 print_hist_header({time, From, To}, Nick, Chan) ->
 	irc_conn:privmsg(Nick, nohist, erlbot_util:multiline("History for ~s from ~p to ~p~n", [Chan, From, To])).
 
-%% maximum number of history entries returned
-%% (to prevent OOM for huge histories)
--define(MAX_HISTORY_LEN, 10000).
-
 %% Trace by specified login count.
 %% TODO: implement it!
 get_history(_Chan, {login_count, _LoginCount}) -> [];
 %% Trace by specified begin/end time.
 get_history(Chan, {time, From, To}) ->
 	ChanBin = utf8:encode(Chan),
-	case erlbot_db:query_view({"history", "by_chan"}, 
-							  [{startkey, [ChanBin, erlbot_util:unix_timestamp(From)]},
-							   {endkey,   [ChanBin, erlbot_util:unix_timestamp(To)]},
-							   {limit,    ?MAX_HISTORY_LEN}]) of
-		{_, _, _, Histents} ->
-			[json_to_histent(H) || H <- Histents];
-		_ -> []
-	end.
-
-histent_to_json({{TsSec, TsUsec}, U, Ch, E}) ->
-	Key = io_lib:format("event:~b.~6..0b", [TsSec, TsUsec]),
-	[{<<"_id">>, utf8:encode(Key)},
-	 {<<"timestamp">>, TsSec + TsUsec/1000000},
-	 {<<"channel">>, utf8:encode(Ch)},
-	 {<<"user">>, utf8:encode(U)},
-	 {<<"event">>, histevent_to_json(E)}].
+	io:format("~p~n", [[{startkey, [ChanBin, erlbot_util:unix_timestamp(From)]},
+						  {endkey,   [ChanBin, erlbot_util:unix_timestamp(To)]}]]),
+	erlbot_db:foldl_view(fun (H, L) -> [json_to_histent(H) | L] end, [],
+						 {"history", "by_chan"}, 
+						 [{startkey, [ChanBin, erlbot_util:unix_timestamp(From)]},
+						  {endkey,   [ChanBin, erlbot_util:unix_timestamp(To)]}]).
 
 %% Each histent that comes from DB has format {DocId, [.... , Ts], [Ident, Event]}
 json_to_histent({_DocId, Key, [_Ident, Event]}) ->
 	Ts = lists:last(Key),
-	{erlbot_util:from_unix_timestamp(Ts), json_to_histevent([atom | Event])}.
-
-histevent_to_json(X) when is_tuple(X) -> [histevent_to_json(Y) || Y <- tuple_to_list(X)];
-histevent_to_json(X) when is_atom(X)  -> list_to_binary(atom_to_list(X));
-histevent_to_json(X) when is_list(X)  -> utf8:encode(X);
-histevent_to_json(X) -> X.
+	{Ts, json_to_histevent([atom | Event])}.
 
 json_to_histevent([atom, A | X])       -> json_to_histevent([binary_to_existing_atom(A, utf8) | X]);
 json_to_histevent(X) when is_list(X)   -> list_to_tuple([json_to_histevent(Y) || Y <- X]);
@@ -362,70 +196,32 @@ dump_histents(TimeFormat, Histents, Target) ->
 	Lines = [histent_to_list(TimeFormat, H) || H <- Histents],
 	ok = irc_conn:bulk_privmsg(Target, nohist, Lines).
 
-%%% === Subject to removal =================================================
-histent_to_list(TimeFormat, #histent{timestamp = TS, event = Event}) ->
-	[timestamp_to_list(TimeFormat, TS), " ", event_to_list(Event)];
-%%% ========================================================================
 histent_to_list(TimeFormat, {Ts, Event}) ->
-	[timestamp_to_list(TimeFormat, Ts), " ", event_to_list(Event)].
+	["[", erlbot_util:timestamp_to_list(local, TimeFormat, Ts), "] ", histevent_to_list(Event)].
 
-timestamp_to_list(long, {YMD, HMS, _}) ->
-	{{Y, M, D}, {HH, MM, SS}} = calendar:universal_time_to_local_time({YMD, HMS}),
-	io_lib:format("[~2..0b/~2..0b/~2..0b ~2..0b:~2..0b:~2..0b]", [Y rem 1000, M, D, HH, MM, SS]);
-timestamp_to_list(short, {YMD, HMS, _}) ->
-	{_, {HH, MM, SS}} = calendar:universal_time_to_local_time({YMD, HMS}),
-	io_lib:format("[~2..0b:~2..0b:~2..0b]", [HH, MM, SS]).
-
-event_to_list({chanmsg, Nick, Msg}) ->
+histevent_to_list({chanmsg, Nick, Msg}) ->
 	["<", Nick, "> ", Msg];
-event_to_list({action, Nick, Msg}) ->
+histevent_to_list({action, Nick, Msg}) ->
 	["* ", Nick, " ", Msg];
-event_to_list({topic, Nick, Topic}) ->
+histevent_to_list({topic, Nick, Topic}) ->
 	["--- ", Nick, " высрал в топег: ", Topic];
-event_to_list({join, Nick}) ->
+histevent_to_list({join, Nick}) ->
 	["=> пришел ", Nick];
-event_to_list({joined, Nick, {[], _, _}}) ->
+histevent_to_list({joined, Nick, {[], _, _}}) ->
 	["=> пришел ", Nick, " (топег пуст)"];
-event_to_list({joined, Nick, {Topic, Author, _Ts}}) ->
+histevent_to_list({joined, Nick, {Topic, Author, _Ts}}) ->
 	["=> пришел ", Nick, " (топег: `", Topic, "', установлен ", Author, ")"];
-event_to_list({part, Nick, []}) ->
+histevent_to_list({part, Nick, []}) ->
 	["<= ушел ", Nick];
-event_to_list({part, Nick, Reason}) ->
+histevent_to_list({part, Nick, Reason}) ->
 	["<= ушел ", Nick, " (", Reason, ")"];
-event_to_list({quit, Nick, Reason}) ->
+histevent_to_list({quit, Nick, Reason}) ->
 	["<== ушел нахуй ", Nick, " (", Reason, ")"];
-event_to_list({kick, Nick1, Nick2, Reason}) ->
+histevent_to_list({kick, Nick1, Nick2, Reason}) ->
 	["## ", Nick1, " пнул нахуй ", Nick2, " (", Reason, ")"];
-event_to_list({mode, Nick1, Nick2, Mode}) ->
+histevent_to_list({mode, Nick1, Nick2, Mode}) ->
 	["## ", Nick1, " дал ", Nick2, " права ", Mode];
-event_to_list({nick, Nick1, Nick2}) ->
+histevent_to_list({nick, Nick1, Nick2}) ->
 	["@@ ", Nick1, " ныне известен как ", Nick2];
-event_to_list(Ev) ->
+histevent_to_list(Ev) ->
 	["??? какая-то Неведомая Ебанная Хуйня: ", io_lib:format("~p", [Ev])].
-
-%% CouchDB uploaders
-
-unix_timestamp({YMD, HMS, U}) ->
-	{erlbot_util:unix_timestamp({YMD, HMS}), U}.
-
-couchdb_upload() ->
-	mnesia:async_dirty(fun () -> couchdb_upload_all() end).
-
-couchdb_upload_all() ->
-	Q = qlc:q([{unix_timestamp(neg_timestamp(H#histent.timestamp)), 
-				U#user.ident, Ch#chan.name, H#histent.event} ||
-				  H  <- mnesia:table(histent),
-				  Ch <- mnesia:table(chan),
-				  U  <- mnesia:table(user),
-				  Ch#chan.cid  =:= H#histent.cid,
-				  U#user.uid =:= H#histent.uid]),
-	[couchdb_save(E) || E <- lists:reverse(qlc:eval(Q))],
-	ok.
-
-couchdb_save(E) ->
-	case catch histent_to_json(E) of
-		{'EXIT', Reason} ->
-			io:format("ERR ~p: ~p~n", [E, Reason]);
-		Json ->
-			couchbeam_db:save_doc(erlbot_db, {Json})
-	end.
