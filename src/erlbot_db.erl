@@ -55,9 +55,11 @@ query_view(ViewName, Params) ->
 -define(MAX_FETCH_ENTRIES, 2000).
 
 foldl_view(Fun, Acc, ViewName, Params) ->
-	case query_view(ViewName, [{limit, ?MAX_FETCH_ENTRIES} | Params]) of
+	Params1 = proplists:delete(limit, Params),
+	Params2 = proplists:delete(startkey, Params1),
+	case query_view(ViewName, [{limit, ?MAX_FETCH_ENTRIES} | Params1]) of
 		{_, _, _, []}  -> Acc;
-		{_, _, _, Res} -> foldl_view_cont(Fun, Acc, Res, ViewName, Params)
+		{_, _, _, Res} -> foldl_view_cont(Fun, Acc, Res, ViewName, Params2)
 	end.
 
 foldl_view_cont(Fun, Acc, [LastRow], ViewName, Params) ->
@@ -125,5 +127,5 @@ save_design_doc(FilePath) ->
 	case couchbeam_db:save_doc(?MODULE, couchbeam:json_decode(Json)) of
 		{_}      -> ok;
 		conflict -> ok;  %% doc already saved
-		Err      -> io:format("~p~n", [Err])
+		Err      -> error_logger:error_report([save_design_doc, {doc, Json}, {error, Err}])
 	end.
