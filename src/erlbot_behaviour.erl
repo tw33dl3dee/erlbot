@@ -34,7 +34,8 @@ behaviour_info(_) ->
     undefined.
 
 start_link(EvMgr, BhvMod, BhvConfig) ->
-	event_sup:start_link(EvMgr, ?MODULE, {BhvMod, BhvConfig}).
+	%% Pass behaviour module name as handler Id
+	event_sup:start_link(EvMgr, {?MODULE, BhvMod}, {BhvMod, BhvConfig}).
 
 %% Used in supervisor children specifications
 %% BUG: _BhvMod itself won't be listed anywhere

@@ -393,26 +393,34 @@ notify_genevent(Event, Conn) ->
 notify_selfevent(Event, Conn) ->
 	notify(Event, selfevent, Conn).
 
+irc_state(Conn) ->
+	#irc_state{nick      = Conn#conn.nick, 
+			   login     = Conn#conn.login, 
+			   is_servop = Conn#conn.is_servop,
+			   umode     = Conn#conn.umode}.
+
 %% Propagate event to notifier
 notify(noevent, _, Conn)  -> Conn;
 notify(Event, Type, Conn) -> 
-	erlbot_ev:notify({Type, Event, #irc_state{nick      = Conn#conn.nick, 
-											  login     = Conn#conn.login, 
-											  is_servop = Conn#conn.is_servop,
-											  umode     = Conn#conn.umode}}),
+	erlbot_ev:notify({Type, Event, irc_state(Conn)}),
 	Conn.
+
+%% Pass command through filters first
+do_irc_command(Cmd, Conn) ->
+	{NewCmd, _} = erlbot_ev:filter({Cmd, irc_state(Conn)}),
+	do_irc_command1(NewCmd, Conn).
 
 %% Perform IRC command (low-level)
 %% `umode' needs additional nick (own)
-do_irc_command({umode, Mode}, #conn{nick = Nick} = Conn) ->
-	do_irc_command({umode, Nick, Mode}, Conn);
+do_irc_command1({umode, Mode}, #conn{nick = Nick} = Conn) ->
+	do_irc_command1({umode, Nick, Mode}, Conn);
 %% Strip `hist', `nohist' modifier from message commands
-do_irc_command({MsgType, Target, _, Msg} =  Cmd, #conn{irc_proto_ref = IrcRef} = Conn) 
+do_irc_command1({MsgType, Target, _, Msg} =  Cmd, #conn{irc_proto_ref = IrcRef} = Conn) 
   when MsgType =:= chanmsg; MsgType =:= privmsg; MsgType =:= action;
 	   MsgType =:= channotice; MsgType =:= privnotice ->
 	irc_proto:send_irc_command(IrcRef, {MsgType, Target, Msg}),
 	notify_selfevent(Cmd, Conn);
-do_irc_command(Cmd, #conn{irc_proto_ref = IrcRef} = Conn) ->
+do_irc_command1(Cmd, #conn{irc_proto_ref = IrcRef} = Conn) ->
 	irc_proto:send_irc_command(IrcRef, Cmd),
 	notify_selfevent(Cmd, Conn).
 

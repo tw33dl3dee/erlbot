@@ -15,6 +15,7 @@
 %% API
 -export([start/0, deploy/0]).
 -export([add_behaviour/1, remove_behaviour/1]).
+-export([add_filter/1, remove_filter/1]).
 -export([reload_config/0, reload_code/0, reload/0]).
 
 %%====================================================================
@@ -34,10 +35,16 @@ config_change(_Changed, _New, _Removed) ->
 start() -> application:start(?MODULE).
 
 add_behaviour(BhvMod) ->
-	erlbot_sup:add_behaviour(BhvMod).
+	erlbot_sup:add_module(behaviours, BhvMod).
 
 remove_behaviour(BhvMod) ->
-	erlbot_sup:remove_behaviour(BhvMod).
+	erlbot_sup:remove_module(behaviours, BhvMod).
+
+add_filter(FltMod) ->
+	erlbot_sup:add_module(filters, FltMod).
+
+remove_filter(FltMod) ->
+	erlbot_sup:remove_module(filters, FltMod).
 
 reload_config() ->
 	case erlbot_config:reload() of
