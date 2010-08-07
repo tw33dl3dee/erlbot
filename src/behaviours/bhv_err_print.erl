@@ -19,10 +19,12 @@ help(_) -> none.
 
 handle_event(exitevent, {Bhv, Chan, Reason}, _, _) when ?IS_CHAN(Chan) ->
 	error_logger:error_report([crash, {behaviour, Bhv}, {reason, Reason}]),
-	ok = irc_conn:bulk_action(Chan, hist, log(Bhv, Reason));
-handle_event(exitevent, {Bhv, Nick, Reason}, _, _) when Nick =/= undefined ->
+	irc_conn:bulk_action(Chan, hist, log(Bhv, Reason));
+handle_event(exitevent, {Bhv, undefined, Reason}, _, _) ->
+	error_logger:error_report([crash, {behaviour, Bhv}, {reason, Reason}]);
+handle_event(exitevent, {Bhv, Nick, Reason}, _, _) ->
 	error_logger:error_report([crash, {behaviour, Bhv}, {reason, Reason}]),
-	ok = irc_conn:bulk_privmsg(Nick, nohist, log(Bhv, Reason));
+	irc_conn:bulk_privmsg(Nick, nohist, log(Bhv, Reason));
 handle_event(_Type, _Event, _IrcState, _Data) ->
 	not_handled.
 
