@@ -56,7 +56,7 @@ reload() ->
 	 reload_config()}.
 
 deploy() ->
-	ok = erlbot_db:init_db().
+	ok = erlbot_db:create_design_docs().
 
 %%%--------------------------------------------------------------------
 %%% Internal functions
