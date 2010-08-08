@@ -11,7 +11,9 @@
 
 %% String utils
 -export([multiline/1, multiline/2, split/1, split/2, contains/2, join/2]).
--export([lowercase/1, uppercase/1, words/2]).
+-export([lowercase/1, uppercase/1, switchcase/1]).
+-export([lc/1, uc/1, sc/1]).
+-export([words/2]).
 
 %% Datetime utils
 -export([epoch/0, epoch/1]).
@@ -341,6 +343,8 @@ convert_time(LT) ->
 lowercase(S) -> [lc(C) || C <- S].
 uppercase(S) -> [uc(C) || C <- S].
 
+switchcase(S) -> [sc(C) || C <- S].
+
 lc(C) when C >= $A, C =< $Z; C >= 1040, C =< 1071 -> C + 32;  % Latin and Cyrillic
 lc(1025) -> 1105;											  % ё
 lc(C) -> C.
@@ -348,3 +352,9 @@ lc(C) -> C.
 uc(C) when C >= $a, C =< $z; C >= 1072, C =< 1103 -> C - 32;  % Latin and Cyrillic
 uc(1105) -> 1025;											  % ё
 uc(C) -> C.
+
+sc(C) when C >= $a, C =< $z; C >= 1072, C =< 1103 -> C - 32;  % Latin and Cyrillic
+sc(C) when C >= $A, C =< $Z; C >= 1040, C =< 1071 -> C + 32;
+sc(1025) -> 1105;											  % ё
+sc(1105) -> 1025;
+sc(C) -> C.
