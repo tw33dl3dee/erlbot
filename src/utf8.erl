@@ -111,6 +111,14 @@ parse_node({remote, _, {atom, _, 'LATIN'}, {string, Line, LatinString}}) ->
 	{string, Line, LatinString};
 parse_node({string, Line, String}) ->
 	{string, Line, try_decode(String)};
+parse_node({atom, Line, Atom}) ->
+	case atom_to_list(Atom) of 
+		[$$ | L] -> case try_decode(L) of
+						[C] when C > 127 -> {char, Line, C};
+						_ -> {atom, Line, Atom}
+					end;
+		_ -> {atom, Line, Atom}
+	end;
 parse_node(Node) when is_list(Node) ->
 	[parse_node(Elmt) || Elmt <- Node];
 parse_node(Node) when is_tuple(Node) ->
