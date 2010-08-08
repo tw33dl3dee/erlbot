@@ -37,7 +37,10 @@ delayed_notify(Event, Delay) ->
 %%% Filters stuff
 
 filter(Command) ->
-	filter(Command, gen_event:which_handlers(name(filters))).
+	case filter(Command, gen_event:which_handlers(name(filters))) of
+		{error, _} -> Command;
+		NewCommand -> NewCommand
+	end.
 
 %%%--------------------------------------------------------------------
 %%% Internal functions
