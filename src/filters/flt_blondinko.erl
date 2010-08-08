@@ -15,12 +15,12 @@
 
 init(_) -> undefined.
 
--define(BLONDINKO_REV_PROB, 100).  %% Chance of message being translated to blondinko style: 1/50th
+-define(BLONDINKO_REV_PROB, 100).  %% Chance of message being translated to blondinko style: 1/100th
 
-filter_command({chanmsg, Chan, Save, Msg}, _IrcState, _Data) ->
+filter_command({Type, Chan, Save, Msg}, _IrcState, _Data) when Type =:= chanmsg; Type =:= action ->
 	case choice:make([{1, do}, {?BLONDINKO_REV_PROB - 1, dont}]) of
         dont -> not_handled;
-        do   -> {new_command, {chanmsg, Chan, Save, to_blondinko(Msg)}}
+        do   -> {new_command, {Type, Chan, Save, to_blondinko(Msg)}}
     end;
 filter_command(_Command, _IrcState, _Data) ->
 	not_handled.
