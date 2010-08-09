@@ -83,4 +83,4 @@ announce_timer(Chan, _Nick, Timeout) ->
 	Message = io_lib:format("Таймер установлен на ~2..0B:~2..0B ~2..0B/~2..0B/~2..0B"
 							" (через ~*..0B:~2..0B), насяльника!",
 							[HH, MM, Y rem 100, M, D, HPad, HDiff, MDiff]),
-	ok = irc_conn:chanmsg(Chan, hist, Message).
+	ok = irc_conn:chanmsg(Chan, nohist, Message).
