@@ -65,7 +65,7 @@ parse_time(TimeSpec) ->
 	end.
 
 parse_hhmm(TimeSpec) ->
-	case re:run(TimeSpec, "^(\\d?\\d)[:\\.](\\d\\d)", [unicode, {capture, all_but_first, list}]) of
+	case re:run(TimeSpec, "^(\\d+)[:\\.](\\d\\d)", [unicode, {capture, all_but_first, list}]) of
 		{match, [HH, MM]} ->
 			{list_to_integer(HH), list_to_integer(MM)};
 		nomatch ->
@@ -74,7 +74,13 @@ parse_hhmm(TimeSpec) ->
 
 announce_timer(Chan, _Nick, Timeout) ->
 	{{Y, M, D}, {HH, MM, _}} = erlbot_util:add_seconds(erlang:localtime(), Timeout),
+	HDiff = Timeout div 3600,
+	MDiff = (Timeout div 60 rem 60),
+	HPad = if HDiff >= 1000 -> 4;
+			  HDiff >= 100  -> 3;
+			  true          -> 2
+		   end,
 	Message = io_lib:format("Таймер установлен на ~2..0B:~2..0B ~2..0B/~2..0B/~2..0B"
-							" (через ~2..0B:~2..0B), насяльника!",
-							[HH, MM, Y rem 100, M, D, Timeout div 3600, (Timeout div 60 rem 60)]),
+							" (через ~*..0B:~2..0B), насяльника!",
+							[HH, MM, Y rem 100, M, D, HPad, HDiff, MDiff]),
 	ok = irc_conn:chanmsg(Chan, hist, Message).
