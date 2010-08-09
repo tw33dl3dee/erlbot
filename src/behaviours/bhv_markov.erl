@@ -80,7 +80,7 @@ generate_text(Start, MaxLen) ->
 		none   -> [];
 		Prefix -> FwText = continue_text(lists:reverse(Prefix), forward, MaxLen),
 				  BwText = continue_text(Prefix, reverse, MaxLen - length(FwText)),
-				  BwText ++ lists:nthtail(length(Prefix) - 1, FwText)
+				  BwText ++ lists:nthtail(length(Prefix), FwText)
 	end.
 
 continue_text(Text, forward, 0) -> 
