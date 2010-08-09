@@ -64,7 +64,7 @@ wchain_to_json(Wchain, Source) ->
 
 %%% Show
 
--define(WCHAIN_MAX_LEN, 20).
+-define(WCHAIN_MAX_LEN, 50).
 
 show_markov_sentence(Start, Target) ->
 	case generate_text(Start, ?WCHAIN_MAX_LEN) of
@@ -76,23 +76,27 @@ show_markov_sentence(Start, Target) ->
 
 %% Generate Markov chain of words by starting prefix
 generate_text(Start, MaxLen) ->
-	case random_wchain([utf8:encode(W) || W <- Start]) of
+	case random_wchain([utf8:encode(W) || W <- Start], forward) of
 		none   -> [];
-		Prefix -> io:format("STRT ~p~n", [Prefix]), continue_text(lists:reverse(Prefix), MaxLen)
+		Prefix -> FwText = continue_text(lists:reverse(Prefix), forward, MaxLen),
+				  BwText = continue_text(Prefix, reverse, MaxLen - length(FwText)),
+				  BwText ++ lists:nthtail(length(Prefix) - 1, FwText)
 	end.
 
-continue_text(Text, 0) -> lists:reverse(Text);
-continue_text(Text, MaxLen) ->
+continue_text(Text, forward, 0) -> 
+	lists:reverse(Text);
+continue_text(Text, reverse, 0) -> 
+	Text;
+continue_text(Text, Direction, MaxLen) ->
 	Prefix = lists:sublist(Text, ?PREFIX_MAX_LEN),
-	case random_wchain(lists:reverse(Prefix)) of
-		none   -> continue_text(Text, 0);
-		Wchain -> io:format("NEXT ~p~n", [Wchain]), continue_text([lists:last(Wchain) | Text], MaxLen - 1)
+	case random_wchain(lists:reverse(Prefix), Direction) of
+		none   -> continue_text(Text, Direction, 0);
+		Wchain -> continue_text([lists:last(Wchain) | Text], Direction, MaxLen - 1)
 	end.
 
 %% Randomly select word chain by prefix
-random_wchain(Prefix) ->
-	io:format("PREF ~p~n", [Prefix]), 
-	case erlbot_db:query_view({"markov", "wchain"}, 
+random_wchain(Prefix, Direction) ->
+	case erlbot_db:query_view({"markov", view_name(Direction)},
 							  [{startkey, Prefix}, 
 							   {endkey, Prefix ++ [{[]}]}, 
 							   {group, true}]) of
@@ -101,6 +105,9 @@ random_wchain(Prefix) ->
 			choice:make(Alternatives);
 		_ -> none
 	end.
+
+view_name(forward) -> "wchain";
+view_name(reverse) -> "wchain_rev".
 
 %%% Sources control
 
