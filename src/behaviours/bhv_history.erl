@@ -9,7 +9,8 @@
 
 -behaviour(erlbot_behaviour).
 -export([init/1, help/1, handle_event/4]).
--export([get_history/2, trace_lastseen/2]).
+-export([get_history/2]).
+-export([resolve_nick/2]).
 
 -include("utf8.hrl").
 -include("irc.hrl").
@@ -75,7 +76,16 @@ give_help(Nick) ->
 	irc_conn:bulk_privmsg(Nick, nohist, ["Ебани тебя оса..."]),
 	ok = irc_conn:bulk_privmsg(Nick, nohist, verbose_help()).
 
-%% LASTSEEN -- when user was last seen on channel
+%%% Public API
+
+%% Resolves nick to ident
+resolve_nick(Chan, Nick) ->
+	case trace_lastseen(Chan, {nick, Nick}) of
+		[{_, _, [Ident, _]}] -> utf8:decode(Ident);
+		[]                   -> undefined
+	end.
+
+%%% LASTSEEN -- when user was last seen on channel
 
 show_lastseen(Chan, Target) ->
 	case trace_lastseen(Chan, Target) of
@@ -111,7 +121,7 @@ dump_lastseen(Histents, Chan) ->
 	bhv_common:empty_check(Chan, Histents),
 	dump_histents(datetime, [json_to_histent(H) || H <- lists:sort(Histents)], Chan).
 
-%% HISTORY -- per-channel event history
+%%% HISTORY -- per-channel event history
 
 save_histent(Chan, Ident, Event) ->
 	Doc = histent_to_json(Chan, Ident, Event),

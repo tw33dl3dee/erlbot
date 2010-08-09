@@ -39,9 +39,9 @@ show_wstat(Chan, Source, Target) ->
 	dump_wstat(Wstat, Source).
 
 get_wstat(Chan, {nick, TargetNick}) ->
-	case bhv_history:trace_lastseen(Chan, {nick, TargetNick}) of
-		[{_, _, [Ident, _]}] -> get_wstat(Chan, {ident, Ident});
-		[]                   -> []
+	case bhv_history:resolve_nick(Chan, TargetNick) of
+		undefined -> [];
+		Ident     -> get_wstat(Chan, {ident, Ident})
 	end;
 get_wstat(Chan, {ident, Ident}) ->
 	case erlbot_db:query_view({"wstat", "by_user"}, 
