@@ -64,7 +64,7 @@ wchain_to_json(Wchain, Source) ->
 
 %%% Show
 
--define(WCHAIN_MAX_LEN, 50).
+-define(WCHAIN_MAX_LEN, 20).
 
 show_markov_sentence(Start, Target) ->
 	case generate_text(Start, ?WCHAIN_MAX_LEN) of
@@ -79,7 +79,9 @@ generate_text(Start, MaxLen) ->
 	case random_wchain([utf8:encode(W) || W <- Start], forward) of
 		none   -> [];
 		Prefix -> FwText = continue_text(lists:reverse(Prefix), forward, MaxLen),
-				  BwText = continue_text(Prefix, reverse, MaxLen - length(FwText)),
+                  %% backward chain may be no longer than forward chain
+                  BwMaxLen = erlang:min(MaxLen - length(FwText), length(FwText)),
+				  BwText = continue_text(Prefix, reverse, BwMaxLen),
 				  BwText ++ lists:nthtail(length(Prefix), FwText)
 	end.
 
