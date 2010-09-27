@@ -71,7 +71,7 @@ show_markov_sentence(Start, Target) ->
 		[] -> not_handled;
 		Sentence ->
 			Line = erlbot_util:join(" ", Sentence),
-			irc_conn:chanmsg(Target, hist, [Line, "."])
+			irc_conn:chanmsg(Target, hist, Line)
 	end.
 
 %% Generate Markov chain of words by starting prefix
@@ -98,7 +98,7 @@ continue_text(Text, Direction, MaxLen) ->
 
 %% Randomly select word chain by prefix
 random_wchain(Prefix, Direction) ->
-	case erlbot_db:query_view({"markov", view_name(Direction)},
+	case erlbot_db:query_view({"markov2", view_name(Direction)},
 							  [{startkey, Prefix}, 
 							   {endkey, Prefix ++ [{[]}]}, 
 							   {group, true}]) of
@@ -113,12 +113,10 @@ view_name(reverse) -> "wchain_rev".
 
 %%% Sources control
 
-add_source(history, Chan) ->
-	BotIdent = [$~ | erlbot_config:get_value(login, required)],
-	upload_history(utf8:encode(Chan), utf8:encode(BotIdent));
 add_source(_Name, _File) ->
 	ok.
 
+%% BUG: implement deletion by id
 remove_source(Name) ->
 	NameBin = utf8:encode(Name),
 	erlbot_db:foldl_view(fun ({_DocId, _, _, Doc}, S) -> couchbeam_db:delete_doc(erlbot_db, Doc), 
