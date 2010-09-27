@@ -56,7 +56,8 @@ contains(String, Pattern) ->
 		nomatch -> false
 	end.
 
-join(Sep, [H|T]) -> [H | [[Sep, El] || El <- T]].
+join(Sep, [H|T]) -> [H | [[Sep, El] || El <- T]];
+join(_, []) -> [].
 
 set_flag(Flag, Flags) -> [Flag | unset_flag(Flag, Flags)].
 
