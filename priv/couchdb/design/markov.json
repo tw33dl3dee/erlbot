@@ -9,6 +9,10 @@
        "wchain_rev": {
            "map": "fun({Doc}) ->\n  case proplists:get_value(<<\"event\">>, Doc) of\n    [Type, _, Msg] \n    when Type =:= <<\"chanmsg\">>; Type =:= <<\"action\">> -> \n      case proplists:get_value(<<\"user\">>, Doc) of \n        <<\"~nya\">> -> ok;\n        _ ->\n          Words = lists:reverse([W || W <- re:split(Msg, \"\\\\pZ+\", [unicode, {return, binary}, trim]), size(W) > 0]),\n          case Words of \n            [_, _, _ | _] ->\n              Zip3 = fun (_, _, _, [], R) -> \n                           lists:reverse(R);\n                         (F, [H1|T1], [H2|T2], [H3|T3], R) -> \n                           F(F, T1, T2, T3, [[H1, H2, H3] | R])\n                     end,\n              Chains = Zip3(Zip3, Words, tl(Words), tl(tl(Words)), []),\n              [Emit(Chain, 1) || Chain <- Chains],\n              ok;\n            _ -> ok\n          end\n      end;\n    _ -> ok\n  end\nend.",
            "reduce": "fun (_, Values, _) -> lists:sum(Values) end."
+       },
+       "sources": {
+           "map": "fun({Doc}) ->\n  case proplists:get_value(<<\"source\">>, Doc) of\n    undefined -> ok;\n    Source -> Emit(Source, 1)\n  end\nend.",
+           "reduce": "fun (_, Values, _) -> lists:sum(Values) end."
        }
    }
 }

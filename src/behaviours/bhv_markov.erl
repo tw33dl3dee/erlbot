@@ -107,7 +107,6 @@ remove_source(Name) ->
 	NameBin = utf8:encode(Name),
 	erlbot_db:delete_docs({"markov", "sources"}, [{startkey, NameBin}, {endkey, NameBin}, {reduce, false}]).
 
-%% TODO: `sources' view
 sources() ->
 	{_, _, _, Sources} = erlbot_db:query_view({"markov", "sources"}, [{group, true}]),
 	[{utf8:decode(Name), Count} || {_, Name, Count} <- Sources].
