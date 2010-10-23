@@ -11,7 +11,7 @@
 
 %% API
 -export([start_link/0]).
--export([query_view/2, foldl_view/4, create_design_docs/0]).
+-export([query_view/2, foldl_view/4, foldl_view/5, delete_docs/2, create_design_docs/0]).
 
 -include("couchbeam.hrl").
 
@@ -52,14 +52,21 @@ query_view(ViewName, Params) ->
 -define(MAX_FETCH_ENTRIES, 2000).
 
 foldl_view(Fun, Acc, ViewName, Params) ->
+	foldl_view(Fun, Acc, ViewName, Params, nogroup).
+
+%% Performs left fold on view contents specified by ViewName and Params
+%% Grouping may be:
+%%   - `nogroup': Fun is called for each document once
+%%   - `group': Fun is called for each chunk of documents (document list is passed)
+foldl_view(Fun, Acc, ViewName, Params, Grouping) ->
 	Params1 = proplists:delete(limit, Params),
 	Params2 = proplists:delete(startkey, Params1),
 	case query_view(ViewName, [{limit, ?MAX_FETCH_ENTRIES} | Params1]) of
 		{_, _, _, []}  -> Acc;
-		{_, _, _, Res} -> foldl_view_cont(Fun, Acc, Res, ViewName, Params2)
+		{_, _, _, Res} -> foldl_view_cont(Fun, Acc, Res, ViewName, Params2, Grouping)
 	end.
 
-foldl_view_cont(Fun, Acc, [LastRow], ViewName, Params) ->
+foldl_view_cont(Fun, Acc, [LastRow], ViewName, Params, Grouping) ->
 	NextParams = case LastRow of 
 					 {undefined, Key, _}    -> [{startkey, Key} | Params];
 					 {undefined, Key, _, _} -> [{startkey, Key} | Params];
@@ -67,11 +74,25 @@ foldl_view_cont(Fun, Acc, [LastRow], ViewName, Params) ->
 					 {DocId, Key, _, _}     -> [{startkey, Key}, {startkey_docid, DocId} | Params]
 				 end,
 	case query_view(ViewName, [{limit, ?MAX_FETCH_ENTRIES} | NextParams]) of
-		{_, _, _, [LastRow]} -> Fun(LastRow, Acc);
-		{_, _, _, NextRes}   -> foldl_view_cont(Fun, Acc, NextRes, ViewName, Params)
+		{_, _, _, [LastRow]} -> case Grouping of 
+									group   -> Fun([LastRow], Acc);
+									nogroup -> Fun(LastRow, Acc)
+								end;
+		{_, _, _, NextRes}   -> foldl_view_cont(Fun, Acc, NextRes, ViewName, Params, Grouping)
 	end;
-foldl_view_cont(Fun, Acc, [Row | Rest], ViewName, Params) ->
-	foldl_view_cont(Fun, Fun(Row, Acc), Rest, ViewName, Params).
+foldl_view_cont(Fun, Acc, Rows, ViewName, Params, group) ->
+	RowsR = lists:reverse(Rows),
+	foldl_view_cont(Fun, Fun(lists:reverse(tl(RowsR)), Acc), [hd(RowsR)], ViewName, Params, group);
+foldl_view_cont(Fun, Acc, [Row | Rest], ViewName, Params, nogroup) ->
+	foldl_view_cont(Fun, Fun(Row, Acc), Rest, ViewName, Params, nogroup).
+
+%% Deletes documents returned by view
+delete_docs(ViewName, Params) ->
+	F = fun ({_DocId, _Key, _Val, Doc}) -> Doc end,
+	foldl_view(fun (Docs, S) -> couchbeam_db:delete_docs(?MODULE, [F(D) || D <- Docs]),
+								S + 1
+			   end, 0,
+			   ViewName, [{include_docs, true} | Params], group).
 
 -define(DESIGN_DOC_DIR, "priv/couchdb/design").
 
