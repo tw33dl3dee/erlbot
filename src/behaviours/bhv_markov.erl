@@ -25,10 +25,6 @@ help(privcmd) ->
 help(about) ->
 	"Генерация случайных предложений на основе цепей Маркова".
 
-handle_event(genevent, {chanmsg, Chan, _, Msg}, _, _) ->
-	update_wchains_from_text(Msg, ["history:", Chan]);
-handle_event(genevent, {action, Chan, _, Msg}, _, _) ->
-	update_wchains_from_text(Msg, ["history:", Chan]);
 handle_event(customevent, {markov, Chan, Message}, _, _) ->
 	case erlbot_util:words(Message, 1) of
 		[]    -> not_handled;
@@ -41,21 +37,11 @@ handle_event(cmdevent, {privcmd, ?USER(Nick), ["markov", Word]}, _, _) ->
 handle_event(_Type, _Event, _IrcState, _Data) ->
 	not_handled.
 
-%%% Update
-
-update_wchains_from_text(Text, Source) ->
-	Words = erlbot_util:words(Text, 1),
-	update_wchains(Words, Source).
-
-update_wchains(Words, Source) when length(Words) > ?PREFIX_MAX_LEN ->
-	add_wchain(lists:sublist(Words, ?PREFIX_MAX_LEN + 1), Source),
-	update_wchains(tl(Words), Source);
-update_wchains(_, _) ->
-	ok.
-
+%% TODO: use in `add_source'
 add_wchain(Wchain, Source) ->
 	couchbeam_db:save_doc(erlbot_db, wchain_to_json(Wchain, Source)).
 
+%% FIXME
 wchain_to_json(Wchain, Source) ->
 	{_, Ts} = erlbot_util:unix_timestamp(),
 	{[{<<"_id">>,  list_to_binary(["markov:", Ts])},
@@ -98,7 +84,7 @@ continue_text(Text, Direction, MaxLen) ->
 
 %% Randomly select word chain by prefix
 random_wchain(Prefix, Direction) ->
-	case erlbot_db:query_view({"markov2", view_name(Direction)},
+	case erlbot_db:query_view({"markov", view_name(Direction)},
 							  [{startkey, Prefix}, 
 							   {endkey, Prefix ++ [{[]}]}, 
 							   {group, true}]) of
@@ -113,29 +99,15 @@ view_name(reverse) -> "wchain_rev".
 
 %%% Sources control
 
+%% TODO: update views to generate word chains for external sources
 add_source(_Name, _File) ->
 	ok.
 
-%% BUG: implement deletion by id
 remove_source(Name) ->
 	NameBin = utf8:encode(Name),
-	erlbot_db:foldl_view(fun ({_DocId, _, _, Doc}, S) -> couchbeam_db:delete_doc(erlbot_db, Doc), 
-														 S + 1 
-						 end, 0,
-						 {"markov", "sources"}, [{startkey, NameBin}, {endkey, NameBin}, 
-												 {reduce, false}, {include_docs, true}]).
+	erlbot_db:delete_docs({"markov", "sources"}, [{startkey, NameBin}, {endkey, NameBin}, {reduce, false}]).
 
+%% TODO: `sources' view
 sources() ->
 	{_, _, _, Sources} = erlbot_db:query_view({"markov", "sources"}, [{group, true}]),
 	[{utf8:decode(Name), Count} || {_, Name, Count} <- Sources].
-
-%% Generate word chain statistic from history
-upload_history(Chan, Ident) ->
-	erlbot_db:foldl_view(fun ({_, [_, _, Ident1], _Msg}, S) when Ident =:= Ident1 -> 
-								 io:format("SKIP ~ts~n", [_Msg]), S;
-							 ({_, [Chan1 | _], Msg}, S) when Chan =:= Chan1 -> 
-								 io:format("ADD  ~ts~n", [Msg]),
-								 update_wchains_from_text(Msg, ["history:", Chan]), S + 1;
-							 (_, S) -> S
-						 end, 0, 
-						 {"history", "msg_by_chan"}, []).
