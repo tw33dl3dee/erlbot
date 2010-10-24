@@ -186,7 +186,7 @@ fix_hist_param({filter, RE, P}) ->
 fix_hist_param(_)                          -> undefined.
 
 parse_time_or_number(S) ->
-	case re:run(S, "^(-?\\d?\\d)[:\\.](\\d\\d)", [unicode, {capture, all_but_first, list}]) of 
+	case re:run(S, "^(-\\d+|\\d?\\d)[:\\.](\\d\\d)", [unicode, {capture, all_but_first, list}]) of 
 		{match, [HH, MM]} -> parse_time(HH, MM);
 		nomatch           -> parse_number(S)
 	end.
