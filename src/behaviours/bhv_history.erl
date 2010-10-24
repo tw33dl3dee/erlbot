@@ -18,16 +18,18 @@
 init(_) -> undefined.
 
 help(chancmd) ->
-	[{"hist <время>",				"история событий на канале (в приват)"},
-	 {"lastseen <ник>",             "вывод последней активности данного пользователя"}];
+	[{"lastseen <ник>",                  "вывод последней активности данного пользователя"},
+	 {"hist <время1> [<время2>]",        "история событий на канале (в приват)"},
+	 {"hist /regex/ <время> [<время2>]", "история событий на канале с фильтрацией (в приват)"}];
 help(privcmd) ->
-	[{"hist <канал> <время>",		"история событий на канале (в приват)"}];
+	[{"hist <канал> <время1> [<время2>]",         "история событий на канале (в приват)"},
+	 {"hist <канал> /regex/ <время1> [<время2>]", "история событий на канале  с фильтрацией (в приват)"}];
 help(about) ->
 	"История событий на канале".
 
 verbose_help() ->
-	["    время может задаваться как h.mm, h:mm, -h.mm, -h:mm",
-	 "    (отрицательное время считается от текущего)"].
+	["Время может задаваться как h.mm, h:mm, -h.mm, -h:mm"
+	 " (отрицательное время считается от текущего)"].
 
 handle_event(genevent, {chanmsg, Chan, ?USER2(Nick, Ident), Msg}, _, _) ->
 	save_histent(Chan, Ident, {chanmsg, Nick, Msg});
@@ -72,9 +74,11 @@ handle_event(cmdevent, {chancmd, Chan, _, ["lastseen", TargetNick]}, _, _) ->
 handle_event(_Type, _Event, _IrcState, _Data) ->
 	not_handled.
 
-give_help(Nick) ->
-	irc_conn:bulk_privmsg(Nick, nohist, ["Ебани тебя оса..."]),
-	ok = irc_conn:bulk_privmsg(Nick, nohist, verbose_help()).
+print_error(Target, Error) ->
+	irc_conn:privmsg(Target, nohist, ["Ой: ", Error]).
+
+give_help(Target) ->
+	irc_conn:bulk_privmsg(Target, nohist, verbose_help()).
 
 %%% Public API
 
@@ -142,21 +146,43 @@ histevent_to_json(X) when is_list(X)  -> utf8:encode(X);
 histevent_to_json(X) -> X.
 
 show_history(Nick, Chan, Param) ->
-	case parse_hist_param(Param) of
-		undefined -> give_help(Nick);
+	case parse_hist_line(string:join(Param, " ")) of
+		undefined  -> give_help(Nick);
+		{error, E} -> print_error(Nick, E);
 		P -> print_hist_header(P, Nick, Chan),
 			 Histents = get_history(Chan, P),
 			 ok = dump_histents(time, Histents, Nick)
 	end.
 
-parse_hist_param([])           -> {login_count, 1};
-parse_hist_param([Arg1])       -> fix_hist_param(parse_time_or_number(Arg1));
-parse_hist_param([Arg1, Arg2]) -> fix_hist_param([parse_time_or_number(Arg1), parse_time_or_number(Arg2)]);
-parse_hist_param(_)            -> undefined.
+%% FIXME: '!hist /regexp/' won't work (while '!hist' means history by 1 login)
+%% ... or think of it as intended
+parse_hist_line([]) ->
+	parse_hist_params([]);	
+parse_hist_line(Param) ->
+	case re:run(Param,
+				"^(?:/(.*)/\\s+)?(?#        match optional regexp)"
+				"([\\d:\\.-]+)(?#           match first time/number)"
+				"(?:\\s+([\\d:\\.-]+))?$(?# match optional second time)",
+				[unicode, {capture, all_but_first, list}]) of
+		{match, [[] | Rest]} -> parse_hist_params(Rest);
+		{match, [RE | Rest]} -> fix_hist_param({filter, RE, parse_hist_params(Rest)});
+		nomatch -> undefined
+	end.
+
+parse_hist_params([])           -> {login_count, 1};
+parse_hist_params([Arg1])       -> fix_hist_param(parse_time_or_number(Arg1));
+parse_hist_params([Arg1, Arg2]) -> fix_hist_param([parse_time_or_number(Arg1), parse_time_or_number(Arg2)]);
+parse_hist_params(_)            -> undefined.
 
 fix_hist_param({number, X})                -> {login_count, X};
 fix_hist_param({time, From})               -> {time, From, erlang:universaltime()};
 fix_hist_param([{time, From}, {time, To}]) -> {time, From, To};
+fix_hist_param({filter, _, undefined})     -> undefined;
+fix_hist_param({filter, RE, P}) ->
+	case re:compile(RE, [unicode, caseless]) of
+		{ok, REc}         -> {filter, REc, P};
+		{error, {E, Pos}} -> {error, [E, " at symbol ", integer_to_list(Pos)]}
+	end;
 fix_hist_param(_)                          -> undefined.
 
 parse_time_or_number(S) ->
@@ -177,7 +203,9 @@ parse_time(HH, MM)        -> erlbot_util:convert_time_abs(list_to_integer(HH), l
 print_hist_header({login_count, LoginCount}, Nick, Chan) ->
 	irc_conn:privmsg(Nick, nohist, erlbot_util:multiline("History for ~s by ~p login(s)", [Chan, LoginCount]));
 print_hist_header({time, From, To}, Nick, Chan) ->
-	irc_conn:privmsg(Nick, nohist, erlbot_util:multiline("History for ~s from ~p to ~p~n", [Chan, From, To])).
+	irc_conn:privmsg(Nick, nohist, erlbot_util:multiline("History for ~s from ~p to ~p~n", [Chan, From, To]));
+print_hist_header({filter, _, P}, Nick, Chan) ->
+	print_hist_header(P, Nick, Chan).
 
 %% Trace by specified login count.
 %% TODO: implement it!
@@ -189,7 +217,18 @@ get_history(Chan, {time, From, To}) ->
 									{"history", "by_chan"}, 
 									[{startkey, [ChanBin, erlbot_util:unix_timestamp(From)]},
 									 {endkey,   [ChanBin, erlbot_util:unix_timestamp(To)]}]),
-	lists:reverse(Histents).
+	lists:reverse(Histents);
+get_history(Chan, {filter, RE, RangeOptions}) ->
+	filter_history(RE, get_history(Chan, RangeOptions)).
+
+filter_history(RE, Histents) ->
+	[H || H <- Histents, match_histent(H, RE)].
+
+match_histent(H, RE) ->
+	case histent_to_msg(H) of
+		undefined -> false;
+		Msg -> re:run(Msg, RE, [{capture, none}]) =:= match
+	end.
 
 %% Each histent that comes from DB has format {DocId, [.... , Ts], [Ident, Event]}
 json_to_histent({_DocId, Key, [_Ident, Event]}) ->
@@ -205,6 +244,7 @@ dump_histents(TimeFormat, Histents, Target) ->
 	Lines = [histent_to_list(TimeFormat, H) || H <- Histents],
 	ok = irc_conn:bulk_privmsg(Target, nohist, Lines).
 
+%% Converts histent to printable string
 histent_to_list(TimeFormat, {Ts, Event}) ->
 	["[", erlbot_util:timestamp_to_list(local, TimeFormat, Ts), "] ", histevent_to_list(Event)].
 
@@ -234,3 +274,14 @@ histevent_to_list({nick, Nick1, Nick2}) ->
 	["@@ ", Nick1, " ныне известен как ", Nick2];
 histevent_to_list(Ev) ->
 	["??? какая-то Неведомая Ебанная Хуйня: ", io_lib:format("~p", [Ev])].
+
+%% Extracts message (or `undefined' for events with no message) from histent
+histent_to_msg({_, Event}) -> histevent_to_msg(Event).
+
+histevent_to_msg({chanmsg, _, Msg}) -> Msg;
+histevent_to_msg({action, _, Msg}) -> Msg;
+histevent_to_msg({topic, _, Topic}) -> Topic;
+histevent_to_msg({part, _, Reason}) -> Reason;
+histevent_to_msg({quit, _, Reason}) -> Reason;
+histevent_to_msg({kick, _, _, Reason}) -> Reason;
+histevent_to_msg(_Ev) -> undefined.
