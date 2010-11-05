@@ -161,7 +161,11 @@ do_command({nick, Nick}, State)                  -> send(State, ["NICK ", Nick])
 do_command({oper, Login, Passwd}, State)         -> send(State, ["OPER ", Login, " ", Passwd]);
 do_command({kick, Channel, Nick, Reason}, State) -> send(State, ["KICK ", Channel, " ", Nick, " :", Reason]);
 do_command({topic, Channel, Topic}, State)       -> send(State, ["TOPIC ", Channel, " :", Topic]);
-do_command({pong, Server}, State)                -> send(State, ["PONG :", Server]).
+do_command({pong, Server}, State)                -> send(State, ["PONG :", Server]);
+do_command({kline, Ident, Host, Timeout, Reason}, State) ->
+	TimeStr = integer_to_list(Timeout),
+	send(State, ["KLINE ", TimeStr, " <", Ident, "@", Host,
+				 "> :K-lined for ", TimeStr, " min because: ", Reason]).
 
 %% Send raw command
 %% Raw command consists of:

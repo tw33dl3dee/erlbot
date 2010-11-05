@@ -16,7 +16,7 @@
 
 %%% API
 -export([start_link/1, connect/0]).
--export([chanmsg/3, privmsg/3, action/3, notice/3, join/1, part/1, quit/1, mode/3, umode/1, kick/3, topic/2, nick/1]).
+-export([chanmsg/3, privmsg/3, action/3, notice/3, join/1, part/1, quit/1, mode/3, umode/1, kick/3, kline/4, topic/2, nick/1]).
 -export([ctcp_request/2, ctcp_reply/2]).
 -export([get_channels_info/0, get_channels/0, get_channel_info/1]).
 -export([for_each_channel/1, for_each_channel/2, is_user_present/2]).
@@ -85,6 +85,7 @@ notice(Target, Save, Notice)  -> gen_fsm:send_event(?MODULE, {irc_command, {msgt
 join(Channel)                 -> gen_fsm:send_event(?MODULE, {irc_command, {join, Channel}}).
 part(Channel)                 -> gen_fsm:send_event(?MODULE, {irc_command, {part, Channel}}).
 quit(QuitMsg)                 -> gen_fsm:send_event(?MODULE, {irc_command, {quit, ensure_utf8(QuitMsg)}}).
+%% BUG Wtf is `User'?
 mode(Channel, User, Mode)     -> gen_fsm:send_event(?MODULE, {irc_command, {mode, Channel, User, Mode}}).
 umode(Mode)                   -> gen_fsm:send_event(?MODULE, {irc_command, {umode, Mode}}).
 nick(Nick)                    -> gen_fsm:send_event(?MODULE, {irc_command, {nick, Nick}}).
@@ -92,6 +93,7 @@ kick(Channel, Nick, Reason)   -> gen_fsm:send_event(?MODULE, {irc_command, {kick
 topic(Channel, Topic)         -> gen_fsm:send_event(?MODULE, {irc_command, {topic, Channel, ensure_utf8(Topic)}}).
 ctcp_request(Target, Request) -> gen_fsm:send_event(?MODULE, {irc_command, {ctcp_request, Target, ensure_utf8(Request)}}).
 ctcp_reply(Target, Reply)     -> gen_fsm:send_event(?MODULE, {irc_command, {ctcp_reply, Target, ensure_utf8(Reply)}}).
+kline(Ident, Host, Timeout, Reason) -> gen_fsm:send_event(?MODULE, {irc_command, {kline, Ident, Host, Timeout, Reason}}).
 
 %% Send big bulk of private/channel messages asynchronously
 bulk_chanmsg(Channel, Save, Lines) -> 
