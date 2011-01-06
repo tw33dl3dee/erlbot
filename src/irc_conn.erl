@@ -417,7 +417,7 @@ do_irc_command(Cmd, Conn) ->
 do_irc_command1({umode, Mode}, #conn{nick = Nick} = Conn) ->
 	do_irc_command1({umode, Nick, Mode}, Conn);
 %% Strip `hist', `nohist' modifier from message commands
-do_irc_command1({MsgType, Target, _, Msg} =  Cmd, #conn{irc_proto_ref = IrcRef} = Conn) 
+do_irc_command1({MsgType, Target, _, Msg} = Cmd, #conn{irc_proto_ref = IrcRef} = Conn) 
   when MsgType =:= chanmsg; MsgType =:= privmsg; MsgType =:= action;
 	   MsgType =:= channotice; MsgType =:= privnotice ->
 	irc_proto:send_irc_command(IrcRef, {MsgType, Target, Msg}),
