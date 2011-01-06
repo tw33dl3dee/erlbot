@@ -22,7 +22,7 @@ help(chancmd) ->
 	 {"vs <слово1> <слово2>",				"сравнение популярности (Google Fight)"},
 	 {"en-ru|ru-en|de-ru|ru-de <слово>",	"перевод через Google Translate"}];
 help(privcmd) ->
-	none;
+	[{"lmgtfy <строка>",                    "тонкая и ненавязчивая реклама Google"}];
 help(about) ->
 	"Поиск по Google".
 
@@ -44,6 +44,8 @@ handle_event(cmdevent, {chancmd, Chan, _, [Lang | Words]}, _, _)
   when Lang =:= "en-ru"; Lang =:= "ru-en"; Lang =:= "de-ru"; Lang =:= "ru-de" ->
 	[google_trans(Chan, Lang, Word) || Word <- Words],
 	ok;
+handle_event(cmdevent, {privcmd, ?USER(Nick), ["lmgtfy" | Query]}, _, _) when length(Query) > 0 ->
+	lmgtfy(Nick, Query);
 handle_event(_Type, _Event, _IrcState, _Data) ->
 	not_handled.
 
@@ -61,3 +63,6 @@ google_fight(Chan, Lang, Word1, Word2) ->
 
 google_trans(Chan, Dict, Word) ->
 	ok = bhv_common:pipe_script(Chan, "google.py", ["-D", Dict, Word]).
+
+lmgtfy(Nick, Query) ->
+	ok = bhv_common:pipe_script(Nick, "lmgtfy.py", Query).
