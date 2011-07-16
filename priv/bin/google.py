@@ -28,7 +28,8 @@ class Google(object):
         @return: parsed reply object (str, list or dict)
         """
         params['v'] = 1.0
-        url = 'http://ajax.googleapis.com/ajax/services/%s/%s?%s' % (service, method, urllib.urlencode(params))
+        url = 'http://ajax.googleapis.com/ajax/services/%s/%s?%s' % (
+            service, method, urllib.urlencode(params))
         req = urllib2.Request(url, headers={'Referer': self._referer})
         resp = urllib2.urlopen(req)
         return json.load(resp)
@@ -51,6 +52,8 @@ class Google(object):
     # List of filters to apply to google results HTML
     _postproc = [# <sup> raises into power
                  (r'<sup>',    '^'),
+                 # NBSP
+                 ('(?u)\xa0' , ' '),
                  # Strip all other tags (<b>, etc)
                  (r'<[^>]*>',  '')]
 
@@ -74,7 +77,8 @@ class Google(object):
                                        q=text,
                                        rsz="large" if (results > 4) else "small",
                                        hl=self._lang)
-        matches = [(urllib.unquote(res['url']), res['titleNoFormatting'], self._dehtmlize(res['content']))
+        matches = [(urllib.unquote(res['url']), res['titleNoFormatting'],
+                    self._dehtmlize(res['content']))
                    for res in repl['responseData']['results'][0:results]]
         match_count = len(matches) and int(repl['responseData']['cursor']['estimatedResultCount'])
         return (match_count, matches)
@@ -128,7 +132,7 @@ class Google(object):
         return res
 
     # Find what seems to be Calculator result
-    _calc_draft_match = r'(?s).*calc_img\.gif(?P<match>.*)</h2>'
+    _calc_draft_match = r'(?s).*?onebox/calculator-.*?\.gif(?P<match>.*)</h2>'
     # Accurately rip out the answer
     _calc_fine_match  = r'.*<b>(?P<match>.*)</b>'
 
@@ -139,7 +143,8 @@ class Google(object):
         @type  expr: str
         @return: value (str) or None
         """
-        resp = self._make_HTML_request('search', {'num': 1, 'ie': 'utf-8', 'oe': 'utf-8', 'q': expr})
+        resp = self._make_HTML_request('search',
+                                       {'num': 1, 'ie': 'utf-8', 'oe': 'utf-8', 'q': expr})
         draft = re.match(self._calc_draft_match, resp)
         if draft:
             fine = re.match(self._calc_fine_match, draft.group('match'))
@@ -154,10 +159,13 @@ class Google(object):
         @param term: term to search for
         @param results: number of results to return
         """
-        resp = self._make_HTML_request('search', {'ie': 'utf-8', 'oe': 'utf-8', 'q': 'define:%s' % term, 'defl': self._lang})
+        resp = self._make_HTML_request('search',
+                                       {'ie': 'utf-8', 'oe': 'utf-8', 'hl': self._lang,
+                                        'q': term, 'tbs': 'dfn:1'})
         body = PyQuery(resp)
-        items = body("ul.std li").map(lambda i, e: (PyQuery(PyQuery(e).html().split("<br/>")[0]).text(),
-                                                    "=".join((PyQuery(e)("a").attr('href') or "").split('=')[1:]) or None))
+        items = body("#ires ol ul li").map(
+            lambda i, e: (PyQuery(PyQuery(e).html().split("<br/>")[0]).text(),
+                          "=".join((PyQuery(e)("a").attr('href') or "").split('=')[1:]) or None))
         return items[:results]
 
 
