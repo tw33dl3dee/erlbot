@@ -201,7 +201,10 @@ parse_time([$- | HH], MM) -> erlbot_util:convert_time_rel(list_to_integer(HH), l
 parse_time(HH, MM)        -> erlbot_util:convert_time_abs(list_to_integer(HH), list_to_integer(MM), yesterday).
 
 print_hist_header(P, Nick, Chan) ->
-    irc_conn:privmsg(Nick, nohist, ["== ", format_hist_header(P, Chan), " =="]).
+    Header = ["== ", format_hist_header(P, Chan), " =="],
+    HdrLen = lists:flatlength(Header),
+    BorderLine = lists:duplicate(HdrLen, "*"),
+    irc_conn:bulk_privmsg(Nick, nohist, [BorderLine, Header, BorderLine]).
 
 format_hist_header({login_count, LoginCount}, Chan) ->
 	io_lib:format("History for ~s by ~p login(s)", [Chan, LoginCount]);
