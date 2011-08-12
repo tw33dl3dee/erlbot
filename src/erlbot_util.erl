@@ -20,7 +20,7 @@
 -export([add_days/2, add_seconds/2, valid_datetime/1, time_diff/2, date_diff/2]).
 -export([convert_time_abs/3, convert_time_rel/2, convert_time_rel_diff/2]).
 -export([unix_timestamp/1, unix_timestamp/0, from_unix_timestamp/1]).
--export([timestamp_to_list/3, datetime_to_list/3]).
+-export([timestamp_to_list/3, datetime_to_list/3, datetimes_to_lists/2]).
 
 %% OS interface
 -export([execv/3, execv/4, execvp/2, execvp/3, system/1, system/2]).
@@ -293,6 +293,17 @@ datetime_to_list(universal, datetime, DateTime) ->
 	[datetime_to_list(universal, date, DateTime), 
 	 " ", 
 	 datetime_to_list(universal, time, DateTime)].
+
+datetimes_to_lists(Type, DateTimes) ->
+    datetimes_to_lists(Type, DateTimes, []).
+
+datetimes_to_lists(Type, [{Date, _} = DateTime | Rest], [{Date, _} | _] = Prev) ->
+    [datetime_to_list(Type, time, DateTime)
+     | datetimes_to_lists(Type, Rest, [DateTime | Prev])];
+datetimes_to_lists(Type, [DateTime | Rest], Prev) ->
+    [datetime_to_list(Type, datetime, DateTime)
+     | datetimes_to_lists(Type, Rest, [DateTime | Prev])];
+datetimes_to_lists(_, [], _) -> [].
 
 %% Difference in seconds between 2 datetimes
 time_diff(DateTime1, DateTime2) ->

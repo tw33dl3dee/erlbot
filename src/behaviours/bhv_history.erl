@@ -180,7 +180,7 @@ fix_hist_param([{time, From}, {time, To}]) -> {time, From, To};
 fix_hist_param({filter, _, undefined})     -> undefined;
 fix_hist_param({filter, RE, P}) ->
 	case re:compile(RE, [unicode, caseless]) of
-		{ok, REc}         -> {filter, REc, P};
+		{ok, REc}         -> {filter, RE, REc, P};
 		{error, {E, Pos}} -> {error, [E, " at symbol ", integer_to_list(Pos)]}
 	end;
 fix_hist_param(_)                          -> undefined.
@@ -200,12 +200,16 @@ parse_number(S) ->
 parse_time([$- | HH], MM) -> erlbot_util:convert_time_rel(list_to_integer(HH), list_to_integer(MM));
 parse_time(HH, MM)        -> erlbot_util:convert_time_abs(list_to_integer(HH), list_to_integer(MM), yesterday).
 
-print_hist_header({login_count, LoginCount}, Nick, Chan) ->
-	irc_conn:privmsg(Nick, nohist, erlbot_util:multiline("History for ~s by ~p login(s)", [Chan, LoginCount]));
-print_hist_header({time, From, To}, Nick, Chan) ->
-	irc_conn:privmsg(Nick, nohist, erlbot_util:multiline("History for ~s from ~p to ~p~n", [Chan, From, To]));
-print_hist_header({filter, _, P}, Nick, Chan) ->
-	print_hist_header(P, Nick, Chan).
+print_hist_header(P, Nick, Chan) ->
+    irc_conn:privmsg(Nick, nohist, ["== ", format_hist_header(P, Chan), " =="]).
+
+format_hist_header({login_count, LoginCount}, Chan) ->
+	io_lib:format("History for ~s by ~p login(s)", [Chan, LoginCount]);
+format_hist_header({time, From, To}, Chan) ->
+	io_lib:format("History for ~s from ~s to ~s", 
+                  [Chan] ++ erlbot_util:datetimes_to_lists(local, [From, To]));
+format_hist_header({filter, RE, _, P}, Chan) ->
+	[format_hist_header(P, Chan), " with filter /", RE, "/"].
 
 %% Trace by specified login count.
 %% TODO: implement it!
@@ -218,8 +222,8 @@ get_history(Chan, {time, From, To}) ->
 									[{startkey, [ChanBin, erlbot_util:unix_timestamp(From)]},
 									 {endkey,   [ChanBin, erlbot_util:unix_timestamp(To)]}]),
 	lists:reverse(Histents);
-get_history(Chan, {filter, RE, RangeOptions}) ->
-	filter_history(RE, get_history(Chan, RangeOptions)).
+get_history(Chan, {filter, RE, REc, RangeOptions}) ->
+	filter_history(REc, get_history(Chan, RangeOptions)).
 
 filter_history(RE, Histents) ->
 	[H || H <- Histents, match_histent(H, RE)].
