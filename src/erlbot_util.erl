@@ -294,16 +294,19 @@ datetime_to_list(universal, datetime, DateTime) ->
 	 " ", 
 	 datetime_to_list(universal, time, DateTime)].
 
-datetimes_to_lists(Type, DateTimes) ->
-    datetimes_to_lists(Type, DateTimes, []).
+datetimes_to_lists(universal, DateTimes) ->
+    datetimes_to_lists2(DateTimes, []);
+datetimes_to_lists(local, DateTimes) ->
+    datetimes_to_lists2([calendar:universal_time_to_local_time(DateTime)
+                         || DateTime <- DateTimes], []).
 
-datetimes_to_lists(Type, [{Date, _} = DateTime | Rest], [{Date, _} | _] = Prev) ->
-    [datetime_to_list(Type, time, DateTime)
-     | datetimes_to_lists(Type, Rest, [DateTime | Prev])];
-datetimes_to_lists(Type, [DateTime | Rest], Prev) ->
-    [datetime_to_list(Type, datetime, DateTime)
-     | datetimes_to_lists(Type, Rest, [DateTime | Prev])];
-datetimes_to_lists(_, [], _) -> [].
+datetimes_to_lists2([{Date, _} = DateTime | Rest], [{Date, _} | _] = Prev) ->
+    [datetime_to_list(universal, time, DateTime)
+     | datetimes_to_lists2(Rest, [DateTime | Prev])];
+datetimes_to_lists2([DateTime | Rest], Prev) ->
+    [datetime_to_list(universal, datetime, DateTime)
+     | datetimes_to_lists2(Rest, [DateTime | Prev])];
+datetimes_to_lists2([], _) -> [].
 
 %% Difference in seconds between 2 datetimes
 time_diff(DateTime1, DateTime2) ->
