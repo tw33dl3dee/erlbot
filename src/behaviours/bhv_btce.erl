@@ -14,7 +14,7 @@
 -include("irc.hrl").
 
 %% Period between subsequent rate checks (msec).
--define(INITIAL_CHECK_PERIOD, 5000).
+-define(INITIAL_CHECK_PERIOD, 300000).
 -define(CHECK_PERIOD, 10000).
 
 init({Chans, Rates}) -> {false, [], Chans, Rates}.
