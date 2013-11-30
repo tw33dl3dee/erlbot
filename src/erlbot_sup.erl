@@ -11,7 +11,7 @@
 
 %%% API
 -export([start_link/1]).
--export([add_module/2, add_module/3, remove_module/2]).
+-export([add_module/2, remove_module/2]).
 -export([get_modules/1]).
 -export([config_change/3]).
 
@@ -23,15 +23,20 @@
 -define(MAX_T, 1).            % ... per this many seconds
 
 %% Helper macro for declaring children of supervisor
--define(CHILD(Mod, Args, Type),        {Mod, {Mod, start_link, Args}, permanent, ?CHILD_SHUTDOWN, Type, [Mod]}).
--define(CHILD2(Name, Mod, Args, Type), {Name, {Mod, start_link, Args}, permanent, ?CHILD_SHUTDOWN, Type, [Mod]}).
--define(CHILD_DYN(Mod, Args, Type),    {Mod, {Mod, start_link, Args}, permanent, ?CHILD_SHUTDOWN, Type, dynamic}).
+-define(CHILD(Mod, Args, Type),
+        {Mod, {Mod, start_link, Args}, permanent, ?CHILD_SHUTDOWN, Type, [Mod]}).
+-define(CHILD2(Name, Mod, Args, Type),
+        {Name, {Mod, start_link, Args}, permanent, ?CHILD_SHUTDOWN, Type, [Mod]}).
+-define(CHILD_DYN(Mod, Args, Type),
+        {Mod, {Mod, start_link, Args}, permanent, ?CHILD_SHUTDOWN, Type, dynamic}).
 
--define(CHILD_BHV(Mod, Args),{Mod, {erlbot_behaviour, start_link, [erlbot_ev:name(behaviours), Mod, Args]},
-							  permanent, ?CHILD_SHUTDOWN, worker, erlbot_behaviour:modules(Mod)}).
+-define(CHILD_BHV(Mod),
+        {Mod, {erlbot_behaviour, start_link, [erlbot_ev:name(behaviours), Mod]},
+         permanent, ?CHILD_SHUTDOWN, worker, erlbot_behaviour:modules(Mod)}).
 
--define(CHILD_FLT(Mod, Args),{Mod, {erlbot_filter, start_link, [erlbot_ev:name(filters), Mod, Args]},
-							  permanent, ?CHILD_SHUTDOWN, worker, erlbot_filter:modules(Mod)}).
+-define(CHILD_FLT(Mod),
+        {Mod, {erlbot_filter, start_link, [erlbot_ev:name(filters), Mod]},
+         permanent, ?CHILD_SHUTDOWN, worker, erlbot_filter:modules(Mod)}).
 
 %%%-------------------------------------------------------------------
 %%% Process layout:
@@ -93,15 +98,12 @@ start_link(Level) ->
 	Name = list_to_atom("erlbot_sup_" ++ atom_to_list(Level)),
 	supervisor:start_link({local, Name}, ?MODULE, Level).
 
-add_module(Type, Mod) ->
-	add_module(Type, Mod, module_config(Mod)).
-
-add_module(behaviours, Mod, Config) ->
-	error_logger:info_report([behaviour_added, {module, Mod}, {arg, Config}]),
-	supervisor:start_child(erlbot_sup_behaviours, ?CHILD_BHV(Mod, Config));
-add_module(filters, Mod, Config) ->
-	error_logger:info_report([filter_added, {module, Mod}, {arg, Config}]),
-	supervisor:start_child(erlbot_sup_filters, ?CHILD_FLT(Mod, Config)).
+add_module(behaviours, Mod) ->
+	error_logger:info_report([behaviour_added, {module, Mod}]),
+	supervisor:start_child(erlbot_sup_behaviours, ?CHILD_BHV(Mod));
+add_module(filters, Mod) ->
+	error_logger:info_report([filter_added, {module, Mod}]),
+	supervisor:start_child(erlbot_sup_filters, ?CHILD_FLT(Mod)).
 
 remove_module(behaviours, Mod) ->
 	error_logger:info_report([behaviour_removed, {module, Mod}]),
@@ -137,11 +139,11 @@ init(top) ->
 										  ?CHILD(irc_conn, [[connect]], worker)]}};
 init(behaviours) ->
 	Behaviours = erlbot_config:get_value(behaviours, []),
-	BhvChildren = [?CHILD_BHV(Mod, module_config(Mod)) || Mod <- Behaviours],
+	BhvChildren = [?CHILD_BHV(Mod) || Mod <- Behaviours],
 	{ok, {{one_for_one, ?MAX_R, ?MAX_T}, [?CHILD_DYN(erlbot_ev, [behaviours], worker) | BhvChildren]}};
 init(filters) ->
 	Filters = erlbot_config:get_value(filters, []),
-	FltChildren = [?CHILD_FLT(Mod, module_config(Mod)) || Mod <- Filters],
+	FltChildren = [?CHILD_FLT(Mod) || Mod <- Filters],
 	{ok, {{one_for_one, ?MAX_R, ?MAX_T}, [?CHILD_DYN(erlbot_ev, [filters], worker) | FltChildren]}}.
 
 %%%--------------------------------------------------------------------
@@ -163,6 +165,3 @@ reload_modules(Type, Old, New) ->
 	[remove_module(Type, Mod) || Mod <- Old -- New],
 	[add_module(Type, Mod)    || Mod <- New -- Old],
 	ok.
-
-module_config(Mod) ->
-	erlbot_config:get_value(Mod).

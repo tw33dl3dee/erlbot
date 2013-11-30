@@ -10,7 +10,7 @@
 -behaviour(gen_event).
 
 %% API
--export([start_link/3, modules/1]).
+-export([start_link/2, modules/1]).
 
 %% Meta-information
 -export([behaviour_info/1]).
@@ -33,9 +33,9 @@ behaviour_info(callbacks) ->
 behaviour_info(_) ->
     undefined.
 
-start_link(EvMgr, BhvMod, BhvConfig) ->
+start_link(EvMgr, BhvMod) ->
 	%% Pass behaviour module name as handler Id
-	event_sup:start_link(EvMgr, {?MODULE, BhvMod}, {BhvMod, BhvConfig}).
+	event_sup:start_link(EvMgr, {?MODULE, BhvMod}, BhvMod).
 
 %% Used in supervisor children specifications
 %% BUG: _BhvMod itself won't be listed anywhere
@@ -46,7 +46,8 @@ modules(_BhvMod) -> [event_sup].
 %%% Callback functions from gen_event
 %%%-------------------------------------------------------------------
 
-init({BhvMod, BhvConfig}) when is_atom(BhvMod) ->
+init(BhvMod) when is_atom(BhvMod) ->
+    BhvConfig = erlbot_config:get_value(BhvMod),
 	{ok, #state{mod = BhvMod, data = BhvMod:init(BhvConfig)}}.
 
 handle_info(_Info, State) ->
@@ -152,10 +153,11 @@ config_change(NewConfig, #state{mod = M, data = D} = State) ->
 
 %% Originator of the event (channel name or nick name) where stack trace or any other log may be sent.
 %% `undefined' if N/A.
-followup(Event) ->
+followup(Event) when is_tuple(Event) ->
 	case element(2, Event) of
 		?USER(Nick)              -> Nick;
 		Chan when ?IS_CHAN(Chan) -> Chan;
 		Nick when is_list(Nick)  -> Nick;
 		undefined                -> undefined
-	end.
+	end;
+followup(_) -> undefined.

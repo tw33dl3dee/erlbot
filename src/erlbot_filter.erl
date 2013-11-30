@@ -10,7 +10,7 @@
 -behaviour(gen_event).
 
 %% API
--export([start_link/3, modules/1]).
+-export([start_link/2, modules/1]).
 
 %% Meta-information
 -export([behaviour_info/1]).
@@ -32,9 +32,9 @@ behaviour_info(callbacks) ->
 behaviour_info(_) ->
     undefined.
 
-start_link(EvMgr, FltMod, FltConfig) ->
+start_link(EvMgr, FltMod) ->
 	%% Pass filter module name as handler Id
-	event_sup:start_link(EvMgr, {?MODULE, FltMod}, {FltMod, FltConfig}).
+	event_sup:start_link(EvMgr, {?MODULE, FltMod}, FltMod).
 
 %% Used in supervisor children specifications
 %% BUG: _FltMod itself won't be listed anywhere
@@ -45,7 +45,8 @@ modules(_FltMod) -> [event_sup].
 %%% Callback functions from gen_event
 %%%-------------------------------------------------------------------
 
-init({FltMod, FltConfig}) when is_atom(FltMod) ->
+init(FltMod) when is_atom(FltMod) ->
+    FltConfig = erlbot_config:get_value(FltMod),
 	{ok, #state{mod = FltMod, data = FltMod:init(FltConfig)}}.
 
 handle_info(_Info, State) ->
