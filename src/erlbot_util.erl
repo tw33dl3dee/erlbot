@@ -88,7 +88,7 @@ find_prog(File, Dir) ->
 %% Exec shell command with given input.
 system(Command, Input) ->
 	UtfCmd = binary_to_list(utf8:encode(Command)),
-	Port = open_port({spawn, UtfCmd}, [{line, ?EXEC_LINE}, eof, exit_status, binary, stderr_to_stdout]),
+	Port = open_port({spawn, UtfCmd}, [{line, ?EXEC_LINE}, exit_status, binary, stderr_to_stdout]),
 	send_input(Port, Input),
 	loop_port(Port, []).
 
@@ -112,8 +112,9 @@ execvp(Program, Args) -> execvp(Program, Args, <<>>).
 %% Note that Args are expected to be utf8 while Arg0 is not.
 execvp0(Path, [Arg0 | Args], Dir, Input) ->
 	UtfArgs = [binary_to_list(utf8:encode(S)) || S <- Args],
-	Port = open_port({spawn_executable, Path}, [{arg0, Arg0}, {args, UtfArgs}, {cd, Dir}, {line, ?EXEC_LINE}, 
-												eof, exit_status, binary, stderr_to_stdout]),
+	Port = open_port({spawn_executable, Path},
+                     [{arg0, Arg0}, {args, UtfArgs}, {cd, Dir}, {line, ?EXEC_LINE},
+                      exit_status, binary, stderr_to_stdout]),
 	send_input(Port, Input),
 	loop_port(Port, []).
 
@@ -124,24 +125,15 @@ send_input(Port, Input) when length(Input) > 0 ->
 send_input(_, _) ->
 	true.
 
--define(STATUS_WAIT, 5000).
-
 loop_port(Port, Data) ->
 	receive
 		{Port, {data, {Eol, Line}}} ->
 			loop_port(Port, [Eol, utf8:decode(Line) | Data]);
-		{Port, eof} ->
-			wait_port(Port, Data)
+        {Port, {exit_status, Status}} ->
+            {transform_status(Status), transform_output(Data)};
+        {Port, closed} ->
+            {success, transform_output(Data)}
 	end.
-
-wait_port(Port, Data) ->
-	ExitStatus = receive 
-					 {Port, {exit_status, Status}} ->
-						 transform_status(Status)
-				 after ?STATUS_WAIT ->
-						 timedout
-				 end,
-	{ExitStatus, transform_output(Data)}.
 
 transform_output(Data) ->
 	transform_output(Data, []).
