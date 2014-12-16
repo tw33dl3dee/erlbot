@@ -12,10 +12,13 @@ class ZenRusRates(object):
 
   def _make_request(self):
     url = 'http://joyreactor.cc/kursSource'
-    resp = urllib2.urlopen(urllib2.Request(url))
-    buf = StringIO.StringIO(resp.read())
-    text = gzip.GzipFile(fileobj=buf)
-    return json.load(text)
+    resp = urllib2.urlopen(urllib2.Request(url)).read()
+    buf = StringIO.StringIO(resp)
+    try:
+      text = gzip.GzipFile(fileobj=buf)
+      return json.load(text)
+    except IOError:
+      return json.loads(resp)
 
   def query_rates(self):
     data = self._make_request()
