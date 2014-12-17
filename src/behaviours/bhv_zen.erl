@@ -28,7 +28,7 @@ help(_) -> none.
 handle_event(_, _, _, {false, _, Chans, Rates}) ->
     {delayed_event, ?INITIAL_CHECK_PERIOD, customevent, check_rates, {true, [], Chans, Rates}};
 handle_event(customevent, check_rates, _, {_, LastRates, Chans, Rates} = D) ->
-    NewRates = get_rates(),
+    NewRates = get_rates(LastRates),
     case diff_rates(LastRates, NewRates, Rates) of
         [] ->
             {delayed_event, ?CHECK_PERIOD, customevent, check_rates, D};
@@ -40,10 +40,14 @@ handle_event(customevent, check_rates, _, {_, LastRates, Chans, Rates} = D) ->
 handle_event(_Type, _Event, _IrcState, _Data) ->
     not_handled.
 
-get_rates() ->
-	% BUG: use code:priv_dir
-    {success, [USD, EUR]} = erlbot_util:execv("zenrus.py", [], "priv/bin"),
-    [{"USD", list_to_number(USD)}, {"EUR", list_to_number(EUR)}].
+get_rates(LastRates) ->
+    % BUG: use code:priv_dir
+    case erlbot_util:execv("zenrus.py", [], "priv/bin") of
+        {success, [USD, EUR]} ->
+            [{"USD", list_to_number(USD)}, {"EUR", list_to_number(EUR)}];
+        _ ->
+            LastRates
+    end.
 
 list_to_number(Str) ->
     try float(list_to_integer(Str))
